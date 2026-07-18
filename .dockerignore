@@ -1,0 +1,11 @@
+.git
+.gitignore
+**/node_modules
+**/dist
+**/dist-server
+**/coverage
+**/.tmp
+**/*.tsbuildinfo
+.env
+*.log
+.DS_Store

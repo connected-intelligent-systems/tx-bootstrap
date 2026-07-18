@@ -1,0 +1,162 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "tx-bootstrap-participant.componentName" (dict "root" . "component" "portal") }}
+  labels:
+    {{- include "tx-bootstrap-participant.labels" . | nindent 4 }}
+    app.kubernetes.io/component: portal
+spec:
+  replicas: {{ .Values.portal.replicaCount }}
+  revisionHistoryLimit: {{ .Values.revisionHistoryLimit }}
+  selector:
+    matchLabels:
+      {{- include "tx-bootstrap-participant.selectorLabels" (dict "root" . "component" "portal") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "tx-bootstrap-participant.selectorLabels" (dict "root" . "component" "portal") | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      {{- include "tx-bootstrap-participant.podDefaults" . | nindent 6 }}
+      initContainers:
+        - name: wait-for-edc
+          image: {{ include "tx-bootstrap-participant.image" .Values.participantInit.image | quote }}
+          imagePullPolicy: {{ .Values.participantInit.image.pullPolicy }}
+          command:
+            - /bin/sh
+            - -ec
+            - |
+              attempts=0
+              until curl -sf "http://{{ include "tx-bootstrap-participant.componentName" (dict "root" . "component" "controlplane") }}:8080/api/check/readiness" >/dev/null \
+                && curl -sf "http://{{ include "tx-bootstrap-participant.componentName" (dict "root" . "component" "dataplane") }}:8080/api/check/readiness" >/dev/null; do
+                attempts=$((attempts + 1))
+                [ "$attempts" -lt 180 ] || exit 1
+                sleep 2
+              done
+          securityContext:
+            {{- include "tx-bootstrap-participant.containerSecurityContext" (dict "root" . "component" .Values.participantInit.securityContext) | nindent 12 }}
+          resources:
+            {{- toYaml .Values.jobs.resources | nindent 12 }}
+      containers:
+        - name: portal
+          image: {{ include "tx-bootstrap-participant.image" .Values.portal.image | quote }}
+          imagePullPolicy: {{ .Values.portal.image.pullPolicy }}
+          securityContext:
+            {{- include "tx-bootstrap-participant.containerSecurityContext" (dict "root" . "component" .Values.portal.securityContext) | nindent 12 }}
+          ports:
+            - { name: http, containerPort: 3000 }
+          env:
+            - { name: PORT, value: "3000" }
+            - name: EDC_MANAGEMENT_API_URL
+              value: "http://{{ include "tx-bootstrap-participant.componentName" (dict "root" . "component" "controlplane") }}:8081/management/"
+            - name: EDC_API_KEY
+              {{- include "tx-bootstrap-participant.secretValue" (dict "root" . "key" "edcApiKey") | nindent 14 }}
+            - name: FEDERATED_CATALOG_API_URL
+              value: "http://{{ include "tx-bootstrap-participant.componentName" (dict "root" . "component" "federated-catalog") }}:8000/"
+            - name: FEDERATED_CATALOG_API_KEY
+              {{- include "tx-bootstrap-participant.secretValue" (dict "root" . "key" "federatedCatalogApiKey") | nindent 14 }}
+            - name: PARTICIPANT_PORTAL_AUTH_MODE
+              value: {{ .Values.portal.auth.mode | quote }}
+            - name: PARTICIPANT_PORTAL_AUTH_HEADER
+              value: {{ .Values.portal.auth.header | quote }}
+            - name: PARTICIPANT_PORTAL_AUTH_ALLOWED_USERS
+              value: {{ join "," .Values.portal.auth.allowedUsers | quote }}
+            - name: PARTICIPANT_PORTAL_ALLOW_INSECURE_AUTH
+              value: {{ .Values.portal.auth.allowInsecure | quote }}
+            - name: PARTICIPANT_PORTAL_HTTPS_HEADERS
+              value: {{ .Values.portal.httpsHeaders | quote }}
+            - name: PARTICIPANT_PORTAL_ENABLE_RATE_LIMIT
+              value: {{ .Values.portal.rateLimit.enabled | quote }}
+            - name: PARTICIPANT_PORTAL_RATE_LIMIT_MAX
+              value: {{ .Values.portal.rateLimit.max | quote }}
+            - name: PARTICIPANT_PORTAL_RATE_LIMIT_WINDOW
+              value: {{ .Values.portal.rateLimit.window | quote }}
+            - name: PARTICIPANT_PORTAL_UPSTREAM_TIMEOUT_MS
+              value: {{ .Values.portal.upstreamTimeoutMs | quote }}
+            - name: PORTAL_TITLE
+              value: {{ .Values.portal.title | quote }}
+            - name: PARTICIPANT_PORTAL_NAME
+              value: {{ .Values.portal.name | quote }}
+            - name: PORTAL_PUBLIC_EDC_ENDPOINT
+              value: {{ .Values.portal.publicEdcEndpoint | quote }}
+            - name: DATABASE_URL
+              {{- include "tx-bootstrap-participant.secretValue" (dict "root" . "key" "portalDatabaseUrl") | nindent 14 }}
+            - name: ONBOARDING_DATASPACE_ADMIN_API_URL
+              value: {{ .Values.portal.onboarding.dataspaceAdminApiUrl | quote }}
+            - name: ONBOARDING_REGISTRATION_TOKEN
+              {{- if .Values.existingSecret.keys.onboardingRegistrationToken }}
+              {{- include "tx-bootstrap-participant.secretValue" (dict "root" . "key" "onboardingRegistrationToken") | nindent 14 }}
+              {{- else }}
+              value: ""
+              {{- end }}
+            - name: ONBOARDING_ORGANIZATION_NAME
+              value: {{ .Values.portal.onboarding.organizationName | quote }}
+            - name: ONBOARDING_REQUESTED_BPN
+              value: {{ default .Values.identity.participantBpn .Values.portal.onboarding.requestedBpn | quote }}
+            - name: ONBOARDING_CONTACT_EMAIL
+              value: {{ .Values.portal.onboarding.contactEmail | quote }}
+            - name: ONBOARDING_REQUESTED_ROLE
+              value: {{ .Values.portal.onboarding.requestedRole | quote }}
+            - name: ONBOARDING_DID
+              value: {{ default (include "tx-bootstrap-participant.participantDid" .) .Values.portal.onboarding.did | quote }}
+            - name: ONBOARDING_DSP_ENDPOINT
+              value: {{ default (include "tx-bootstrap-participant.dspCallbackAddress" .) .Values.portal.onboarding.dspEndpoint | quote }}
+            - name: ONBOARDING_CREDENTIAL_SERVICE_ENDPOINT
+              value: {{ default (printf "https://%s/api/credentials" .Values.identity.participantPublicHost) .Values.portal.onboarding.credentialServiceEndpoint | quote }}
+            - name: IDENTITYHUB_IDENTITY_API_URL
+              value: "http://{{ include "tx-bootstrap-participant.componentName" (dict "root" . "component" "identityhub") }}:8082/api/identity"
+            - name: IDENTITYHUB_PARTICIPANT_CONTEXT_ID
+              value: {{ .Values.identity.identityHubParticipantContextId | quote }}
+            - name: IDENTITYHUB_PARTICIPANT_CONTEXT_PATH_ID
+              value: {{ .Values.identity.participantBpnBase64 | quote }}
+            - name: IDENTITYHUB_API_KEY
+              {{- if .Values.existingSecret.keys.identityHubApiKey }}
+              {{- include "tx-bootstrap-participant.secretValue" (dict "root" . "key" "identityHubApiKey") | nindent 14 }}
+              {{- else }}
+              value: ""
+              {{- end }}
+            - name: IDENTITYHUB_VAULT_URL
+              value: {{ .Values.vault.url | quote }}
+            - name: IDENTITYHUB_VAULT_TOKEN
+              {{- include "tx-bootstrap-participant.secretValue" (dict "root" . "key" "vaultToken") | nindent 14 }}
+            - name: IDENTITYHUB_API_KEY_VAULT_PATH
+              value: {{ printf "%s/data/%s-apikey" .Values.vault.apiSecretPath .Values.identity.identityHubParticipantContextId | quote }}
+          startupProbe:
+            httpGet: { path: /health, port: http }
+            periodSeconds: 5
+            timeoutSeconds: 5
+            failureThreshold: 30
+          readinessProbe:
+            httpGet: { path: /health, port: http }
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet: { path: /health, port: http }
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.portal.resources | nindent 12 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "tx-bootstrap-participant.componentName" (dict "root" . "component" "portal") }}
+  labels:
+    {{- include "tx-bootstrap-participant.labels" . | nindent 4 }}
+    app.kubernetes.io/component: portal
+spec:
+  type: {{ .Values.portal.service.type }}
+  selector:
+    {{- include "tx-bootstrap-participant.selectorLabels" (dict "root" . "component" "portal") | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ .Values.portal.service.port }}
+      targetPort: http

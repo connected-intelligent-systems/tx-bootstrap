@@ -1,0 +1,23 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: tx-postgres
+  namespace: tx-infra
+spec:
+  description: Local tx-bootstrap integration database
+  instances: 1
+  enableSuperuserAccess: true
+  primaryUpdateStrategy: unsupervised
+  storage:
+    storageClass: local-path
+    size: 8Gi
+  postgresql:
+    parameters:
+      max_connections: "300"
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: "2"
+      memory: 1Gi

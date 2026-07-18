@@ -1,0 +1,264 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: provision-operator-databases
+  namespace: tx-infra
+  labels:
+    app.kubernetes.io/name: tx-bootstrap-database-provisioner
+    app.kubernetes.io/component: operator
+spec:
+  backoffLimit: 2
+  activeDeadlineSeconds: 600
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: tx-bootstrap-database-provisioner
+        app.kubernetes.io/component: operator
+    spec:
+      automountServiceAccountToken: false
+      restartPolicy: Never
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: provisioner
+          image: postgres:16-alpine
+          imagePullPolicy: IfNotPresent
+          command: [/opt/tx-bootstrap/database/operator-provision.sh]
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          envFrom:
+            - secretRef:
+                name: tx-operator-database-passwords
+          env:
+            - {
+                name: DATABASE_PROVISION_ROOT,
+                value: /opt/tx-bootstrap/database,
+              }
+            - { name: PGHOST, value: tx-postgres-rw.tx-infra.svc.cluster.local }
+            - { name: PGPORT, value: "5432" }
+            - { name: PGDATABASE, value: postgres }
+            - { name: PGSSLMODE, value: disable }
+            - name: PGUSER
+              valueFrom:
+                secretKeyRef:
+                  name: tx-postgres-superuser
+                  key: username
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: tx-postgres-superuser
+                  key: password
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
+            limits:
+              cpu: "1"
+              memory: 256Mi
+          volumeMounts:
+            - name: scripts
+              mountPath: /opt/tx-bootstrap/database
+              readOnly: true
+            - name: sql
+              mountPath: /opt/tx-bootstrap/database/sql
+              readOnly: true
+      volumes:
+        - name: scripts
+          configMap:
+            name: tx-database-provisioner-scripts
+            defaultMode: 0555
+        - name: sql
+          configMap:
+            name: tx-database-provisioner-sql
+            defaultMode: 0444
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: provision-provider-databases
+  namespace: tx-infra
+  labels:
+    app.kubernetes.io/name: tx-bootstrap-database-provisioner
+    app.kubernetes.io/component: provider
+spec:
+  backoffLimit: 2
+  activeDeadlineSeconds: 600
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: tx-bootstrap-database-provisioner
+        app.kubernetes.io/component: provider
+    spec:
+      automountServiceAccountToken: false
+      restartPolicy: Never
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: provisioner
+          image: postgres:16-alpine
+          imagePullPolicy: IfNotPresent
+          command: [/opt/tx-bootstrap/database/participant-provision.sh]
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          envFrom:
+            - secretRef:
+                name: tx-provider-database-passwords
+          env:
+            - {
+                name: DATABASE_PROVISION_ROOT,
+                value: /opt/tx-bootstrap/database,
+              }
+            - { name: PGHOST, value: tx-postgres-rw.tx-infra.svc.cluster.local }
+            - { name: PGPORT, value: "5432" }
+            - { name: PGDATABASE, value: postgres }
+            - { name: PGSSLMODE, value: disable }
+            - { name: PARTICIPANT_IDENTITYHUB_DB_NAME, value: provider_wallet }
+            - {
+                name: PARTICIPANT_IDENTITYHUB_DB_USER,
+                value: provider_identityhub,
+              }
+            - { name: PARTICIPANT_EDC_DB_NAME, value: provider_edc }
+            - { name: PARTICIPANT_EDC_DB_USER, value: provider_edc }
+            - { name: PARTICIPANT_PORTAL_DB_NAME, value: provider_portal }
+            - {
+                name: PARTICIPANT_PORTAL_OWNER_ROLE,
+                value: provider_portal_owner,
+              }
+            - {
+                name: PARTICIPANT_PORTAL_MIGRATOR_DB_USER,
+                value: provider_portal_migrator,
+              }
+            - { name: PARTICIPANT_PORTAL_DB_ROLE, value: provider_portal }
+            - name: PGUSER
+              valueFrom:
+                secretKeyRef:
+                  name: tx-postgres-superuser
+                  key: username
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: tx-postgres-superuser
+                  key: password
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
+            limits:
+              cpu: "1"
+              memory: 256Mi
+          volumeMounts:
+            - name: scripts
+              mountPath: /opt/tx-bootstrap/database
+              readOnly: true
+            - name: sql
+              mountPath: /opt/tx-bootstrap/database/sql
+              readOnly: true
+      volumes:
+        - name: scripts
+          configMap:
+            name: tx-database-provisioner-scripts
+            defaultMode: 0555
+        - name: sql
+          configMap:
+            name: tx-database-provisioner-sql
+            defaultMode: 0444
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: provision-consumer-databases
+  namespace: tx-infra
+  labels:
+    app.kubernetes.io/name: tx-bootstrap-database-provisioner
+    app.kubernetes.io/component: consumer
+spec:
+  backoffLimit: 2
+  activeDeadlineSeconds: 600
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: tx-bootstrap-database-provisioner
+        app.kubernetes.io/component: consumer
+    spec:
+      automountServiceAccountToken: false
+      restartPolicy: Never
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: provisioner
+          image: postgres:16-alpine
+          imagePullPolicy: IfNotPresent
+          command: [/opt/tx-bootstrap/database/participant-provision.sh]
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          envFrom:
+            - secretRef:
+                name: tx-consumer-database-passwords
+          env:
+            - {
+                name: DATABASE_PROVISION_ROOT,
+                value: /opt/tx-bootstrap/database,
+              }
+            - { name: PGHOST, value: tx-postgres-rw.tx-infra.svc.cluster.local }
+            - { name: PGPORT, value: "5432" }
+            - { name: PGDATABASE, value: postgres }
+            - { name: PGSSLMODE, value: disable }
+            - { name: PARTICIPANT_IDENTITYHUB_DB_NAME, value: consumer_wallet }
+            - {
+                name: PARTICIPANT_IDENTITYHUB_DB_USER,
+                value: consumer_identityhub,
+              }
+            - { name: PARTICIPANT_EDC_DB_NAME, value: consumer_edc }
+            - { name: PARTICIPANT_EDC_DB_USER, value: consumer_edc }
+            - { name: PARTICIPANT_PORTAL_DB_NAME, value: consumer_portal }
+            - {
+                name: PARTICIPANT_PORTAL_OWNER_ROLE,
+                value: consumer_portal_owner,
+              }
+            - {
+                name: PARTICIPANT_PORTAL_MIGRATOR_DB_USER,
+                value: consumer_portal_migrator,
+              }
+            - { name: PARTICIPANT_PORTAL_DB_ROLE, value: consumer_portal }
+            - name: PGUSER
+              valueFrom:
+                secretKeyRef:
+                  name: tx-postgres-superuser
+                  key: username
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: tx-postgres-superuser
+                  key: password
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
+            limits:
+              cpu: "1"
+              memory: 256Mi
+          volumeMounts:
+            - name: scripts
+              mountPath: /opt/tx-bootstrap/database
+              readOnly: true
+            - name: sql
+              mountPath: /opt/tx-bootstrap/database/sql
+              readOnly: true
+      volumes:
+        - name: scripts
+          configMap:
+            name: tx-database-provisioner-scripts
+            defaultMode: 0555
+        - name: sql
+          configMap:
+            name: tx-database-provisioner-sql
+            defaultMode: 0444

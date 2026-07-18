@@ -1,0 +1,70 @@
+# Local-only embedded Vault shared by provider and consumer deployments.
+services:
+  vault:
+    image: hashicorp/vault:1.15
+    environment:
+      VAULT_ADDR: "http://127.0.0.1:8200"
+      VAULT_TOKEN: ${VAULT_TOKEN:?VAULT_TOKEN must be set}
+      VAULT_LOCAL_CONFIG: >-
+        {"storage":{"file":{"path":"/vault/file"}},"listener":[{"tcp":{"address":"0.0.0.0:8200","tls_disable":true}}],"disable_mlock":true,"ui":false}
+    command: server
+    volumes:
+      - participant-vault-data:/vault/file
+    healthcheck:
+      test: ["CMD", "vault", "status"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      backend:
+        aliases:
+          - ${PARTICIPANT_ROLE:-participant}-vault
+
+  vault-init:
+    image: hashicorp/vault:1.15
+    user: "0:0"
+    entrypoint: ["/bin/sh", "/usr/local/bin/local-vault-bootstrap"]
+    environment:
+      VAULT_ADDR: "http://vault:8200"
+      VAULT_APP_TOKEN: ${VAULT_TOKEN:?VAULT_TOKEN must be set}
+      IDENTITYHUB_SUPERUSER_API_KEY: ${IDENTITYHUB_SUPERUSER_API_KEY:?IDENTITYHUB_SUPERUSER_API_KEY must be set}
+      VAULT_AES_KEY_ALIASES: ${PARTICIPANT_IDENTITYHUB_ENCRYPTION_KEY_ALIAS:?PARTICIPANT_IDENTITYHUB_ENCRYPTION_KEY_ALIAS must be set}
+    configs:
+      - source: local-vault-bootstrap
+        target: /usr/local/bin/local-vault-bootstrap
+        mode: 0555
+    volumes:
+      - participant-vault-bootstrap:/vault/bootstrap
+    depends_on:
+      vault:
+        condition: service_started
+    networks:
+      backend:
+        aliases:
+          - ${PARTICIPANT_ROLE:-participant}-vault-init
+
+  identityhub:
+    depends_on:
+      vault-init:
+        condition: service_completed_successfully
+
+  participant-init:
+    depends_on:
+      vault:
+        condition: service_healthy
+      vault-init:
+        condition: service_completed_successfully
+
+  controlplane:
+    depends_on:
+      vault-init:
+        condition: service_completed_successfully
+
+  dataplane:
+    depends_on:
+      vault-init:
+        condition: service_completed_successfully
+
+volumes:
+  participant-vault-data:
+  participant-vault-bootstrap:

@@ -1,0 +1,282 @@
+name: Helm charts
+
+on:
+  workflow_call:
+  pull_request:
+    paths:
+      - "deploy/helm/**"
+      - ".github/workflows/helm-charts.yml"
+  push:
+    branches:
+      - main
+    tags:
+      - "v*"
+    paths:
+      - "deploy/helm/**"
+      - ".github/workflows/helm-charts.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: helm-charts-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  validate:
+    name: Validate ${{ matrix.chart }} chart
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        chart:
+          - operator
+          - participant
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v4.2.1
+
+      - name: Lint chart
+        run: helm lint --strict "deploy/helm/${{ matrix.chart }}"
+
+      - name: Render default variant
+        run: |
+          helm template "${{ matrix.chart }}" "deploy/helm/${{ matrix.chart }}" \
+            --namespace "tx-${{ matrix.chart }}" \
+            > "/tmp/${{ matrix.chart }}-default.yaml"
+
+      - name: Check operator variants
+        if: matrix.chart == 'operator'
+        run: |
+          helm template operator deploy/helm/operator \
+            --namespace tx-operator \
+            --set ingress.issuerDid.enabled=true \
+            --set ingress.onboarding.enabled=true \
+            --set ingress.console.enabled=true \
+            > /tmp/operator-ingress.yaml
+          test "$(grep -c '^kind: Ingress$' /tmp/operator-ingress.yaml)" -eq 3
+          if helm template invalid deploy/helm/operator \
+            --set existingSecret.name= >/dev/null 2>&1; then
+            echo "The schema accepted an empty existing Secret name." >&2
+            exit 1
+          fi
+          if helm template invalid deploy/helm/operator \
+            --set identity.issuerBpn=invalid >/dev/null 2>&1; then
+            echo "The schema accepted an invalid BPN." >&2
+            exit 1
+          fi
+          if helm template invalid deploy/helm/operator \
+            --set operatorConsole.image.tag=latest >/dev/null 2>&1; then
+            echo "The schema accepted a floating first-party image tag." >&2
+            exit 1
+          fi
+          helm template forwarded-header deploy/helm/operator \
+            --set operatorConsole.auth.mode=forwarded-header \
+            --set existingSecret.keys.operatorConsoleApiKey= \
+            > /tmp/operator-forwarded-header.yaml
+          helm template no-jobs deploy/helm/operator \
+            --set jobs.migrator.enabled=false \
+            --set jobs.issuerClaimsGrant.enabled=false \
+            > /tmp/operator-no-jobs.yaml
+          if grep -q '^kind: Job$' /tmp/operator-no-jobs.yaml; then
+            echo "A Job rendered while lifecycle Jobs were disabled." >&2
+            exit 1
+          fi
+
+      - name: Check participant variants
+        if: matrix.chart == 'participant'
+        run: |
+          helm template participant deploy/helm/participant \
+            --namespace tx-participant \
+            --set ingress.public.enabled=true \
+            --set ingress.internal.enabled=true \
+            > /tmp/participant-ingress.yaml
+          test "$(grep -c '^kind: Ingress$' /tmp/participant-ingress.yaml)" -eq 2
+          if helm template invalid deploy/helm/participant \
+            --set existingSecret.name= >/dev/null 2>&1; then
+            echo "The schema accepted an empty existing Secret name." >&2
+            exit 1
+          fi
+          if helm template invalid deploy/helm/participant \
+            --set identity.participantBpn=invalid >/dev/null 2>&1; then
+            echo "The schema accepted an invalid participant BPN." >&2
+            exit 1
+          fi
+          if helm template invalid deploy/helm/participant \
+            --set portal.upstreamTimeoutMs=0 >/dev/null 2>&1; then
+            echo "The schema accepted a non-positive portal upstream timeout." >&2
+            exit 1
+          fi
+          if helm template invalid deploy/helm/participant \
+            --set portal.image.tag=latest >/dev/null 2>&1; then
+            echo "The schema accepted a floating first-party image tag." >&2
+            exit 1
+          fi
+          if helm template invalid deploy/helm/participant \
+            --set portal.auth.mode=none >/dev/null 2>&1; then
+            echo "The schema accepted unauthenticated portal access without an explicit acknowledgement." >&2
+            exit 1
+          fi
+          helm template insecure-local deploy/helm/participant \
+            --set portal.auth.mode=none \
+            --set portal.auth.allowInsecure=true \
+            > /tmp/participant-insecure-local.yaml
+          helm template no-jobs deploy/helm/participant \
+            --set jobs.portalMigrator.enabled=false \
+            --set jobs.participantInit.enabled=false \
+            > /tmp/participant-no-jobs.yaml
+          if grep -q '^kind: Job$' /tmp/participant-no-jobs.yaml; then
+            echo "A Job rendered while lifecycle Jobs were disabled." >&2
+            exit 1
+          fi
+          helm template catalog-replicas deploy/helm/participant \
+            --set federatedCatalog.replicaCount=2 \
+            --set portal.auth.mode=forwarded-header \
+            > /tmp/participant-catalog-replicas.yaml
+          grep -q '^kind: StatefulSet$' /tmp/participant-catalog-replicas.yaml
+          grep -q '^  replicas: 2$' /tmp/participant-catalog-replicas.yaml
+          grep -q '^  volumeClaimTemplates:$' /tmp/participant-catalog-replicas.yaml
+
+      - name: Package chart
+        run: |
+          mkdir -p "/tmp/charts/${{ matrix.chart }}"
+          helm package "deploy/helm/${{ matrix.chart }}" \
+            --destination "/tmp/charts/${{ matrix.chart }}"
+
+      - name: Upload packaged chart
+        uses: actions/upload-artifact@v4
+        with:
+          name: tx-bootstrap-${{ matrix.chart }}-chart
+          path: /tmp/charts/${{ matrix.chart }}/*.tgz
+          if-no-files-found: error
+
+  publish:
+    name: Publish ${{ matrix.chart }} chart
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    needs: validate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        chart:
+          - operator
+          - participant
+    env:
+      OCI_REPOSITORY: ghcr.io/${{ github.repository_owner }}/tx-bootstrap-charts
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v4.2.1
+
+      - name: Log in to GitHub Container Registry
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          printf '%s' "$GHCR_TOKEN" | helm registry login ghcr.io \
+            --username "${{ github.actor }}" \
+            --password-stdin
+
+      - name: Package publishable chart
+        id: chart
+        shell: bash
+        run: |
+          set -euo pipefail
+          chart_dir="deploy/helm/${{ matrix.chart }}"
+          chart_name="$(helm show chart "$chart_dir" | awk '$1 == "name:" { print $2; exit }')"
+          source_version="$(helm show chart "$chart_dir" | awk '$1 == "version:" { print $2; exit }')"
+          if [ -z "$chart_name" ] || [ -z "$source_version" ]; then
+            echo "Could not read the chart name or version." >&2
+            exit 1
+          fi
+
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            release_version="${GITHUB_REF_NAME#v}"
+            if [ "$source_version" != "$release_version" ]; then
+              echo "Chart version $source_version does not match release tag $GITHUB_REF_NAME." >&2
+              exit 1
+            fi
+            publish_version="$release_version"
+            app_version="$release_version"
+          else
+            publish_version="${source_version}-dev.sha${GITHUB_SHA}"
+            app_version="sha-${GITHUB_SHA}"
+          fi
+
+          mkdir -p /tmp/charts
+          helm package "$chart_dir" \
+            --version "$publish_version" \
+            --app-version "$app_version" \
+            --destination /tmp/charts
+          chart_package="/tmp/charts/${chart_name}-${publish_version}.tgz"
+          test -f "$chart_package"
+
+          printf 'package=%s\n' "$chart_package" >> "$GITHUB_OUTPUT"
+          printf 'name=%s\n' "$chart_name" >> "$GITHUB_OUTPUT"
+          printf 'version=%s\n' "$publish_version" >> "$GITHUB_OUTPUT"
+          printf 'reference=oci://%s/%s\n' "$OCI_REPOSITORY" "$chart_name" >> "$GITHUB_OUTPUT"
+
+      - name: Check immutable chart version
+        id: publication
+        shell: bash
+        env:
+          CHART_NAME: ${{ steps.chart.outputs.name }}
+          CHART_PACKAGE: ${{ steps.chart.outputs.package }}
+          CHART_REFERENCE: ${{ steps.chart.outputs.reference }}
+          CHART_VERSION: ${{ steps.chart.outputs.version }}
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/published
+          if helm pull "$CHART_REFERENCE" \
+            --version "$CHART_VERSION" \
+            --destination /tmp/published \
+            > /tmp/helm-pull.log 2>&1; then
+            shopt -s nullglob
+            published_packages=(/tmp/published/*.tgz)
+            if [ "${#published_packages[@]}" -ne 1 ]; then
+              echo "Expected exactly one published chart package, found ${#published_packages[@]}." >&2
+              exit 1
+            fi
+            mkdir -p /tmp/local-chart /tmp/published-chart
+            tar -xzf "$CHART_PACKAGE" -C /tmp/local-chart
+            tar -xzf "${published_packages[0]}" -C /tmp/published-chart
+            if ! diff -ru \
+              "/tmp/published-chart/$CHART_NAME" \
+              "/tmp/local-chart/$CHART_NAME"; then
+              echo "Chart $CHART_NAME version $CHART_VERSION already exists with different contents." >&2
+              echo "Bump version in deploy/helm/${{ matrix.chart }}/Chart.yaml before publishing." >&2
+              exit 1
+            fi
+            echo "Chart $CHART_NAME version $CHART_VERSION is already published unchanged."
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          else
+            cat /tmp/helm-pull.log
+            if ! grep -Eqi 'not found|manifest unknown' /tmp/helm-pull.log; then
+              echo "Could not determine whether $CHART_REFERENCE:$CHART_VERSION exists." >&2
+              exit 1
+            fi
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish chart
+        if: steps.publication.outputs.publish == 'true'
+        run: helm push "${{ steps.chart.outputs.package }}" "oci://$OCI_REPOSITORY"
+
+      - name: Verify published chart
+        run: |
+          helm show chart "${{ steps.chart.outputs.reference }}" \
+            --version "${{ steps.chart.outputs.version }}"

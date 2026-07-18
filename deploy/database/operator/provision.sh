@@ -1,0 +1,60 @@
+#!/bin/sh
+set -eu
+
+DATABASE_PROVISION_ROOT="${DATABASE_PROVISION_ROOT:-/opt/tx-bootstrap/database}"
+# shellcheck source=../provision-lib.sh
+. "$DATABASE_PROVISION_ROOT/provision-lib.sh"
+
+for name in \
+    ISSUER_IDENTITYHUB_DB_PASSWORD \
+    ISSUER_SERVICE_DB_PASSWORD \
+    BDRS_DB_PASSWORD \
+    OPERATOR_MIGRATOR_DB_PASSWORD \
+    OPERATOR_CONSOLE_DB_PASSWORD \
+    REGISTRATION_DB_PASSWORD \
+    ISSUER_CLAIMS_DB_PASSWORD; do
+    require_env "$name"
+done
+
+ISSUER_IDENTITYHUB_DB_NAME="${ISSUER_IDENTITYHUB_DB_NAME:-issuer_wallet}"
+ISSUER_IDENTITYHUB_DB_USER="${ISSUER_IDENTITYHUB_DB_USER:-issuer_identityhub}"
+ISSUER_SERVICE_DB_NAME="${ISSUER_SERVICE_DB_NAME:-issuer}"
+ISSUER_SERVICE_DB_USER="${ISSUER_SERVICE_DB_USER:-issuer_service}"
+BDRS_DB_NAME="${BDRS_DB_NAME:-bdrs}"
+BDRS_DB_USER="${BDRS_DB_USER:-bdrs}"
+DATASPACE_ADMIN_DB_NAME="${DATASPACE_ADMIN_DB_NAME:-dataspace_admin}"
+DATASPACE_ADMIN_OWNER_ROLE="${DATASPACE_ADMIN_OWNER_ROLE:-dataspace_admin_owner}"
+OPERATOR_MIGRATOR_DB_USER="${OPERATOR_MIGRATOR_DB_USER:-operator_migrator}"
+OPERATOR_CONSOLE_DB_USER="${OPERATOR_CONSOLE_DB_USER:-operator_console_login}"
+REGISTRATION_DB_USER="${REGISTRATION_DB_USER:-registration_svc_login}"
+ISSUER_CLAIMS_DB_USER="${ISSUER_CLAIMS_DB_USER:-issuer_claims_writer}"
+
+ensure_login_role "$ISSUER_IDENTITYHUB_DB_USER" "$ISSUER_IDENTITYHUB_DB_PASSWORD"
+ensure_login_role "$ISSUER_SERVICE_DB_USER" "$ISSUER_SERVICE_DB_PASSWORD"
+ensure_login_role "$BDRS_DB_USER" "$BDRS_DB_PASSWORD"
+ensure_group_role "$DATASPACE_ADMIN_OWNER_ROLE"
+ensure_group_role operator_console
+ensure_group_role registration_svc
+ensure_login_role "$OPERATOR_MIGRATOR_DB_USER" "$OPERATOR_MIGRATOR_DB_PASSWORD"
+ensure_login_role "$OPERATOR_CONSOLE_DB_USER" "$OPERATOR_CONSOLE_DB_PASSWORD"
+ensure_login_role "$REGISTRATION_DB_USER" "$REGISTRATION_DB_PASSWORD"
+ensure_login_role "$ISSUER_CLAIMS_DB_USER" "$ISSUER_CLAIMS_DB_PASSWORD"
+
+ensure_role_membership "$DATASPACE_ADMIN_OWNER_ROLE" "$OPERATOR_MIGRATOR_DB_USER"
+ensure_role_membership operator_console "$OPERATOR_CONSOLE_DB_USER"
+ensure_role_membership registration_svc "$REGISTRATION_DB_USER"
+
+ensure_database "$ISSUER_IDENTITYHUB_DB_NAME" "$ISSUER_IDENTITYHUB_DB_USER"
+ensure_database "$ISSUER_SERVICE_DB_NAME" "$ISSUER_SERVICE_DB_USER"
+ensure_database "$BDRS_DB_NAME" "$BDRS_DB_USER"
+ensure_database "$DATASPACE_ADMIN_DB_NAME" "$DATASPACE_ADMIN_OWNER_ROLE"
+
+grant_database_connect "$ISSUER_IDENTITYHUB_DB_NAME" "$ISSUER_IDENTITYHUB_DB_USER"
+grant_database_connect "$ISSUER_SERVICE_DB_NAME" "$ISSUER_SERVICE_DB_USER"
+grant_database_connect "$ISSUER_SERVICE_DB_NAME" "$ISSUER_CLAIMS_DB_USER"
+grant_database_connect "$BDRS_DB_NAME" "$BDRS_DB_USER"
+grant_database_connect "$DATASPACE_ADMIN_DB_NAME" "$OPERATOR_MIGRATOR_DB_USER"
+grant_database_connect "$DATASPACE_ADMIN_DB_NAME" "$OPERATOR_CONSOLE_DB_USER"
+grant_database_connect "$DATASPACE_ADMIN_DB_NAME" "$REGISTRATION_DB_USER"
+
+echo "Operator PostgreSQL databases and roles are provisioned."

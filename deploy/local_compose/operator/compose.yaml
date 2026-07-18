@@ -1,0 +1,9 @@
+name: ${COMPOSE_PROJECT_PREFIX:-tx-bootstrap}-operator
+
+include:
+  - path:
+      - ${OPERATOR_COMPOSE_REF:-oci://ghcr.io/salberternst/tx-bootstrap-operator:latest}
+      - ../vault-bootstrap.compose.yml
+      - database.override.yml
+      - compose.override.yml
+    env_file: .env.example

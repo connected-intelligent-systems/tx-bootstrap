@@ -1,0 +1,2 @@
+# Helm templates contain Go template expressions that are not valid plain YAML.
+deploy/helm/*/templates/

@@ -1,0 +1,171 @@
+{
+  "operations": [
+    { "method": "POST", "path": "/api/management/v3/catalog/request", "scope": "catalog:read" },
+    { "method": "POST", "path": "/api/management/v3/catalog/dataset/request", "scope": "catalog:read" },
+    { "method": "POST", "path": "/api/management/v3/assets/request", "scope": "assets:read" },
+    { "method": "GET", "path": "/api/management/v3/assets/{id}", "scope": "assets:read" },
+    { "method": "POST", "path": "/api/management/v3/assets", "scope": "assets:write" },
+    { "method": "PUT", "path": "/api/management/v3/assets", "scope": "assets:write" },
+    { "method": "DELETE", "path": "/api/management/v3/assets/{id}", "scope": "assets:write" },
+    { "method": "POST", "path": "/api/management/v3/policydefinitions/request", "scope": "policies:read" },
+    { "method": "GET", "path": "/api/management/v3/policydefinitions/{id}", "scope": "policies:read" },
+    { "method": "POST", "path": "/api/management/v3/policydefinitions", "scope": "policies:write" },
+    { "method": "PUT", "path": "/api/management/v3/policydefinitions/{id}", "scope": "policies:write" },
+    { "method": "DELETE", "path": "/api/management/v3/policydefinitions/{id}", "scope": "policies:write" },
+    {
+      "method": "GET",
+      "path": "/api/management/v3/business-partner-groups/groups",
+      "scope": "business-partner-groups:read"
+    },
+    {
+      "method": "GET",
+      "path": "/api/management/v3/business-partner-groups/group/{group}",
+      "scope": "business-partner-groups:read"
+    },
+    {
+      "method": "GET",
+      "path": "/api/management/v3/business-partner-groups/{bpn}",
+      "scope": "business-partner-groups:read"
+    },
+    {
+      "method": "POST",
+      "path": "/api/management/v3/business-partner-groups",
+      "scope": "business-partner-groups:write"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/management/v3/business-partner-groups",
+      "scope": "business-partner-groups:write"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/management/v3/business-partner-groups/{bpn}",
+      "scope": "business-partner-groups:write"
+    },
+    {
+      "method": "POST",
+      "path": "/api/management/v3/contractdefinitions/request",
+      "scope": "contract-definitions:read"
+    },
+    {
+      "method": "GET",
+      "path": "/api/management/v3/contractdefinitions/{id}",
+      "scope": "contract-definitions:read"
+    },
+    {
+      "method": "POST",
+      "path": "/api/management/v3/contractdefinitions",
+      "scope": "contract-definitions:write"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/management/v3/contractdefinitions",
+      "scope": "contract-definitions:write"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/management/v3/contractdefinitions/{id}",
+      "scope": "contract-definitions:write"
+    },
+    {
+      "method": "POST",
+      "path": "/api/management/v3/contractnegotiations/request",
+      "scope": "contract-negotiations:read"
+    },
+    {
+      "method": "GET",
+      "path": "/api/management/v3/contractnegotiations/{id}",
+      "scope": "contract-negotiations:read"
+    },
+    {
+      "method": "POST",
+      "path": "/api/management/v3/contractnegotiations",
+      "scope": "contract-negotiations:write"
+    },
+    {
+      "method": "POST",
+      "path": "/api/management/v3/contractnegotiations/{id}/terminate",
+      "scope": "contract-negotiations:write"
+    },
+    {
+      "method": "POST",
+      "path": "/api/management/v3/contractagreements/request",
+      "scope": "contract-agreements:read"
+    },
+    {
+      "method": "GET",
+      "path": "/api/management/v3/contractagreements/{id}",
+      "scope": "contract-agreements:read"
+    },
+    {
+      "method": "GET",
+      "path": "/api/management/v3/contractagreements/{id}/negotiation",
+      "scope": "contract-agreements:read"
+    },
+    {
+      "method": "POST",
+      "path": "/api/management/v3/contractagreements/retirements/request",
+      "scope": "contract-agreements:read"
+    },
+    {
+      "method": "POST",
+      "path": "/api/management/v3/contractagreements/retirements",
+      "scope": "contract-agreements:retire"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/management/v3/contractagreements/retirements/{agreementId}",
+      "scope": "contract-agreements:retire"
+    },
+    {
+      "method": "POST",
+      "path": "/api/management/v3/transferprocesses/request",
+      "scope": "transfers:read"
+    },
+    {
+      "method": "GET",
+      "path": "/api/management/v3/transferprocesses/{id}",
+      "scope": "transfers:read"
+    },
+    {
+      "method": "POST",
+      "path": "/api/management/v3/transferprocesses",
+      "scope": "transfers:write"
+    },
+    {
+      "method": "POST",
+      "path": "/api/management/v3/transferprocesses/{id}/terminate",
+      "scope": "transfers:write"
+    },
+    {
+      "method": "GET",
+      "path": "/api/management/v3/edrs/{transferProcessId}/dataaddress",
+      "scope": "edr:data-address:read"
+    },
+    {
+      "method": "GET",
+      "path": "/api/federated-catalog/v1/datasets",
+      "scope": "federated-catalog:read"
+    },
+    {
+      "method": "GET",
+      "path": "/api/federated-catalog/v1/datasets/{entryId}",
+      "scope": "federated-catalog:read"
+    },
+    {
+      "method": "GET",
+      "path": "/api/federated-catalog/v1/participants",
+      "scope": "federated-catalog:read"
+    },
+    {
+      "method": "GET",
+      "path": "/api/federated-catalog/v1/sparql",
+      "scope": "federated-catalog:sparql"
+    },
+    {
+      "method": "POST",
+      "path": "/api/federated-catalog/v1/sparql",
+      "scope": "federated-catalog:sparql"
+    }
+  ]
+}

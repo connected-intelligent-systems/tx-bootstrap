@@ -1,0 +1,140 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "tx-bootstrap-participant.componentName" (dict "root" . "component" "dataplane") }}
+  labels:
+    {{- include "tx-bootstrap-participant.labels" . | nindent 4 }}
+    app.kubernetes.io/component: dataplane
+spec:
+  replicas: {{ .Values.dataPlane.replicaCount }}
+  revisionHistoryLimit: {{ .Values.revisionHistoryLimit }}
+  selector:
+    matchLabels:
+      {{- include "tx-bootstrap-participant.selectorLabels" (dict "root" . "component" "dataplane") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "tx-bootstrap-participant.selectorLabels" (dict "root" . "component" "dataplane") | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmaps.yaml") . | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- include "tx-bootstrap-participant.podDefaults" . | nindent 6 }}
+      initContainers:
+        - name: wait-for-controlplane
+          image: {{ include "tx-bootstrap-participant.image" .Values.participantInit.image | quote }}
+          imagePullPolicy: {{ .Values.participantInit.image.pullPolicy }}
+          command:
+            - /bin/sh
+            - -ec
+            - |
+              attempts=0
+              until curl -sf "http://{{ include "tx-bootstrap-participant.componentName" (dict "root" . "component" "controlplane") }}:8080/api/check/readiness" >/dev/null; do
+                attempts=$((attempts + 1))
+                [ "$attempts" -lt 180 ] || exit 1
+                sleep 2
+              done
+          securityContext:
+            {{- include "tx-bootstrap-participant.containerSecurityContext" (dict "root" . "component" .Values.participantInit.securityContext) | nindent 12 }}
+          resources:
+            {{- toYaml .Values.jobs.resources | nindent 12 }}
+      containers:
+        - name: dataplane
+          image: {{ include "tx-bootstrap-participant.image" .Values.dataPlane.image | quote }}
+          imagePullPolicy: {{ .Values.dataPlane.image.pullPolicy }}
+          securityContext:
+            {{- include "tx-bootstrap-participant.containerSecurityContext" (dict "root" . "component" .Values.dataPlane.securityContext) | nindent 12 }}
+          ports:
+            - { name: default, containerPort: 8080 }
+            - { name: public, containerPort: 8081 }
+            - { name: control, containerPort: 8083 }
+            - { name: version, containerPort: 8084 }
+          env:
+            {{- include "tx-bootstrap-participant.javaEnv" . | nindent 12 }}
+            - name: EDC_HOSTNAME
+              value: {{ include "tx-bootstrap-participant.componentName" (dict "root" . "component" "dataplane") | quote }}
+            - name: EDC_PARTICIPANT_ID
+              value: {{ .Values.identity.participantBpn | quote }}
+            - name: EDC_PARTICIPANT_CONTEXT_ID
+              value: {{ .Values.identity.participantContextId | quote }}
+            - name: EDC_IAM_ISSUER_ID
+              value: {{ include "tx-bootstrap-participant.participantDid" . | quote }}
+            - name: EDC_IAM_DID_WEB_USE_HTTPS
+              value: {{ .Values.identity.useHttpsDidWeb | quote }}
+            - { name: EDC_IAM_CREDENTIAL_REVOCATION_MIMETYPE, value: application/json }
+            - name: EDC_IAM_STS_OAUTH_TOKEN_URL
+              value: "http://{{ include "tx-bootstrap-participant.componentName" (dict "root" . "component" "identityhub") }}:8087/api/sts/token"
+            - name: EDC_IAM_STS_OAUTH_CLIENT_ID
+              value: {{ include "tx-bootstrap-participant.participantDid" . | quote }}
+            - { name: EDC_IAM_STS_OAUTH_CLIENT_SECRET_ALIAS, value: sts-oauth-client-secret }
+            - { name: WEB_HTTP_PORT, value: "8080" }
+            - { name: WEB_HTTP_PATH, value: /api }
+            - { name: WEB_HTTP_PUBLIC_PORT, value: "8081" }
+            - { name: WEB_HTTP_PUBLIC_PATH, value: /api/public }
+            - { name: WEB_HTTP_CONTROL_PORT, value: "8083" }
+            - { name: WEB_HTTP_CONTROL_PATH, value: /api/dataplane/control }
+            - { name: WEB_HTTP_VERSION_PORT, value: "8084" }
+            - { name: WEB_HTTP_VERSION_PATH, value: /.well-known/api }
+            - name: EDC_DATAPLANE_API_PUBLIC_BASEURL
+              value: {{ include "tx-bootstrap-participant.dataPlaneBaseUrl" . | quote }}
+            - name: TX_EDC_DATAPLANE_TOKEN_REFRESH_ENDPOINT
+              value: {{ include "tx-bootstrap-participant.dataPlaneTokenRefreshEndpoint" . | quote }}
+            - { name: EDC_TRANSFER_PROXY_TOKEN_SIGNER_PRIVATEKEY_ALIAS, value: token-signer-key }
+            - { name: EDC_TRANSFER_PROXY_TOKEN_VERIFIER_PUBLICKEY_ALIAS, value: token-signer-key }
+            - name: EDC_DPF_SELECTOR_URL
+              value: "http://{{ include "tx-bootstrap-participant.componentName" (dict "root" . "component" "controlplane") }}:8083/control/v1/dataplanes"
+            - name: EDC_DATASOURCE_DEFAULT_URL
+              {{- include "tx-bootstrap-participant.secretValue" (dict "root" . "key" "edcJdbcUrl") | nindent 14 }}
+            - name: EDC_DATASOURCE_DEFAULT_USER
+              {{- include "tx-bootstrap-participant.secretValue" (dict "root" . "key" "edcDbUser") | nindent 14 }}
+            - name: EDC_DATASOURCE_DEFAULT_PASSWORD
+              {{- include "tx-bootstrap-participant.secretValue" (dict "root" . "key" "edcDbPassword") | nindent 14 }}
+            {{- include "tx-bootstrap-participant.vaultEnv" . | nindent 12 }}
+          volumeMounts:
+            - name: opentelemetry
+              mountPath: /app/opentelemetry.properties
+              subPath: opentelemetry.properties
+              readOnly: true
+          startupProbe:
+            httpGet: { path: /api/check/readiness, port: default }
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 30
+          readinessProbe:
+            httpGet: { path: /api/check/readiness, port: default }
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet: { path: /api/check/readiness, port: default }
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.dataPlane.resources | nindent 12 }}
+      volumes:
+        - name: opentelemetry
+          configMap:
+            name: {{ include "tx-bootstrap-participant.componentName" (dict "root" . "component" "opentelemetry") }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "tx-bootstrap-participant.componentName" (dict "root" . "component" "dataplane") }}
+  labels:
+    {{- include "tx-bootstrap-participant.labels" . | nindent 4 }}
+    app.kubernetes.io/component: dataplane
+spec:
+  type: {{ .Values.dataPlane.service.type }}
+  selector:
+    {{- include "tx-bootstrap-participant.selectorLabels" (dict "root" . "component" "dataplane") | nindent 4 }}
+  ports:
+    - { name: default, port: 8080, targetPort: default }
+    - { name: public, port: 8081, targetPort: public }
+    - { name: control, port: 8083, targetPort: control }
+    - { name: version, port: 8084, targetPort: version }

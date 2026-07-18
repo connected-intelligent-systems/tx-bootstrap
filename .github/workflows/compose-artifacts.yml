@@ -1,0 +1,164 @@
+name: Compose artifacts
+
+on:
+  workflow_call:
+  pull_request:
+    paths:
+      - "deploy/compose/**"
+      - "deploy/database/**"
+      - "deploy/local_compose/**"
+      - ".github/workflows/compose-artifacts.yml"
+      - ".github/workflows/docker-images.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: compose-artifacts-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate-local:
+    name: Validate local deployment
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Validate local Compose applications
+        run: |
+          docker compose --env-file deploy/local_compose/local.env.example -f deploy/local_compose/compose.yaml config --quiet
+          for domain in operator provider consumer; do
+            docker compose \
+              --env-file deploy/local_compose/local.env.example \
+              -f "deploy/local_compose/$domain/compose.yaml" \
+              config --quiet
+          done
+
+  publish:
+    name: Publish ${{ matrix.artifact }}
+    runs-on: ubuntu-latest
+    env:
+      VAULT_URL: https://vault.example.invalid
+      VAULT_TOKEN: compose-validation-token
+      IDENTITYHUB_SUPERUSER_API_KEY: compose-validation-superuser-key
+      ISSUER_IDENTITYHUB_JDBC_URL: jdbc:postgresql://db.example.invalid/issuer_wallet
+      ISSUER_IDENTITYHUB_DB_USER: issuer_identityhub
+      ISSUER_IDENTITYHUB_DB_PASSWORD: compose-validation-identityhub-db-password
+      ISSUER_SERVICE_JDBC_URL: jdbc:postgresql://db.example.invalid/issuer
+      ISSUER_SERVICE_DB_USER: issuer_service
+      ISSUER_SERVICE_DB_PASSWORD: compose-validation-issuer-db-password
+      BDRS_JDBC_URL: jdbc:postgresql://db.example.invalid/bdrs
+      BDRS_DB_USER: bdrs
+      BDRS_DB_PASSWORD: compose-validation-bdrs-db-password
+      DATASPACE_ADMIN_OWNER_ROLE: dataspace_admin_owner
+      OPERATOR_MIGRATOR_DATABASE_URL: postgresql://operator_migrator:compose-validation-migrator-password@db.example.invalid/dataspace_admin
+      OPERATOR_CONSOLE_DATABASE_URL: postgresql://operator_console:compose-validation-console-password@db.example.invalid/dataspace_admin
+      OPERATOR_ONBOARDING_SERVICE_DATABASE_URL: postgresql://registration_svc:compose-validation-registration-password@db.example.invalid/dataspace_admin
+      ISSUER_MIGRATOR_DATABASE_URL: postgresql://issuer_service:compose-validation-issuer-db-password@db.example.invalid/issuer
+      ISSUER_CLAIMS_DB_ROLE: issuer_claims_writer
+      ISSUER_CLAIMS_DATABASE_URL: postgresql://issuer_claims_writer:compose-validation-claims-password@db.example.invalid/issuer
+      BDRS_API_KEY: compose-validation-bdrs-key
+      OPERATOR_CONSOLE_AUTH_MODE: api-key
+      OPERATOR_CONSOLE_API_KEY: compose-validation-console-key
+      OPERATOR_ONBOARDING_SERVICE_ALLOWED_ORIGINS: https://operator.example.invalid
+      BPN_ISSUER: BPNL000000000001
+      BPN_ISSUER_BASE64: QlBOTDAwMDAwMDAwMDAwMQ==
+      ISSUER_DID_HOST: issuer.example.invalid
+      ISSUER_IDENTITYHUB_ENCRYPTION_KEY_ALIAS: issuer-identityhub-encryption-key
+      ISSUER_SERVICE_ENCRYPTION_KEY_ALIAS: issuer-service-encryption-key
+      PARTICIPANT_ROLE: participant
+      PARTICIPANT_BPN: BPNL000000000002
+      PARTICIPANT_BPN_BASE64: QlBOTDAwMDAwMDAwMDAwMg==
+      PARTICIPANT_CONTEXT_ID: 00000000-0000-0000-0000-000000000002
+      PARTICIPANT_DID_HOST: participant.example.invalid
+      PARTICIPANT_PUBLIC_HOST: participant.example.invalid
+      PARTICIPANT_IDENTITYHUB_ENCRYPTION_KEY_ALIAS: participant-identityhub-encryption-key
+      PARTICIPANT_IDENTITYHUB_JDBC_URL: jdbc:postgresql://db.example.invalid/participant_wallet
+      PARTICIPANT_IDENTITYHUB_DB_USER: participant_identityhub
+      PARTICIPANT_IDENTITYHUB_DB_PASSWORD: compose-validation-participant-identityhub-password
+      PARTICIPANT_EDC_JDBC_URL: jdbc:postgresql://db.example.invalid/participant_edc
+      PARTICIPANT_EDC_DB_USER: participant_edc
+      PARTICIPANT_EDC_DB_PASSWORD: compose-validation-participant-edc-password
+      PARTICIPANT_PORTAL_MIGRATOR_DATABASE_URL: postgresql://participant_portal_migrator:compose-validation-portal-migrator-password@db.example.invalid/participant_portal
+      PARTICIPANT_PORTAL_OWNER_ROLE: participant_portal_owner
+      PARTICIPANT_PORTAL_DB_ROLE: participant_portal
+      PARTICIPANT_PORTAL_DATABASE_URL: postgresql://participant_portal:compose-validation-portal-password@db.example.invalid/participant_portal
+      BDRS_SERVER_URL: https://issuer.example.invalid/api/directory
+      EDC_API_KEY: compose-validation-edc-key
+      FEDERATED_CATALOG_API_KEY: compose-validation-federated-catalog-key
+      PARTICIPANT_PORTAL_AUTH_MODE: forwarded-header
+      OPERATOR_CONSOLE_IMAGE: ghcr.io/example/tx-bootstrap-operator-console:validation
+      OPERATOR_ONBOARDING_SERVICE_IMAGE: ghcr.io/example/tx-bootstrap-operator-onboarding-service:validation
+      PARTICIPANT_INIT_IMAGE: ghcr.io/example/tx-bootstrap-participant-init:validation
+      PARTICIPANT_PORTAL_BACKEND_IMAGE: ghcr.io/example/tx-bootstrap-participant-portal-backend:validation
+      FEDERATED_CATALOG_IMAGE: ghcr.io/example/tx-bootstrap-federated-catalog:validation
+    strategy:
+      fail-fast: false
+      matrix:
+        artifact:
+          - operator
+          - participant
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Check Docker Compose version
+        run: |
+          docker compose version
+          required=2.34.0
+          installed="$(docker compose version --short | sed 's/^v//')"
+          if [ "$(printf '%s\n%s\n' "$required" "$installed" | sort -V | head -n1)" != "$required" ]; then
+            echo "Docker Compose $required or newer is required to publish OCI artifacts (found $installed)." >&2
+            exit 1
+          fi
+
+      - name: Validate Compose application
+        run: |
+          compose_file="deploy/compose/${{ matrix.artifact }}.compose.yaml"
+          docker compose -f "$compose_file" config --quiet
+          docker compose --dry-run -f "$compose_file" \
+            publish "example.invalid/tx-bootstrap-${{ matrix.artifact }}:validation" --yes
+
+      - name: Log in to GitHub Container Registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate artifact metadata
+        if: github.event_name != 'pull_request'
+        id: metadata
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/tx-bootstrap-${{ matrix.artifact }}
+          tags: |
+            type=ref,event=branch
+            type=sha,format=long
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Publish Compose application
+        if: github.event_name != 'pull_request'
+        env:
+          ARTIFACT_TAGS: ${{ steps.metadata.outputs.tags }}
+        run: |
+          while IFS= read -r tag; do
+            [ -n "$tag" ] || continue
+            image_tag="${tag##*:}"
+            export OPERATOR_CONSOLE_IMAGE="ghcr.io/${{ github.repository_owner }}/tx-bootstrap-operator-console:$image_tag"
+            export OPERATOR_ONBOARDING_SERVICE_IMAGE="ghcr.io/${{ github.repository_owner }}/tx-bootstrap-operator-onboarding-service:$image_tag"
+            export PARTICIPANT_INIT_IMAGE="ghcr.io/${{ github.repository_owner }}/tx-bootstrap-participant-init:$image_tag"
+            export PARTICIPANT_PORTAL_BACKEND_IMAGE="ghcr.io/${{ github.repository_owner }}/tx-bootstrap-participant-portal-backend:$image_tag"
+            export FEDERATED_CATALOG_IMAGE="ghcr.io/${{ github.repository_owner }}/tx-bootstrap-federated-catalog:$image_tag"
+            docker compose \
+              -f "deploy/compose/${{ matrix.artifact }}.compose.yaml" \
+              publish "$tag" --resolve-image-digests --yes
+          done <<< "$ARTIFACT_TAGS"

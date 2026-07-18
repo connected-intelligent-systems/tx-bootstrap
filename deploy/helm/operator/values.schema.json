@@ -1,0 +1,477 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "title": "tx-bootstrap operator values",
+  "type": "object",
+  "required": [
+    "logLevel",
+    "identity",
+    "vault",
+    "existingSecret",
+    "jobs",
+    "issuerIdentityHub",
+    "issuerService",
+    "bdrs",
+    "issuerDid",
+    "operatorConsole",
+    "operatorOnboarding",
+    "ingress"
+  ],
+  "properties": {
+    "nameOverride": { "type": "string" },
+    "fullnameOverride": { "type": "string", "maxLength": 63 },
+    "imagePullSecrets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name"],
+        "properties": { "name": { "type": "string", "minLength": 1 } }
+      }
+    },
+    "serviceAccount": {
+      "type": "object",
+      "required": ["create", "name", "automountServiceAccountToken"],
+      "properties": {
+        "create": { "type": "boolean" },
+        "name": { "type": "string" },
+        "annotations": { "type": "object" },
+        "automountServiceAccountToken": { "type": "boolean" }
+      }
+    },
+    "podAnnotations": { "type": "object" },
+    "podLabels": { "type": "object" },
+    "terminationGracePeriodSeconds": { "type": "integer", "minimum": 1 },
+    "revisionHistoryLimit": { "type": "integer", "minimum": 0 },
+    "podSecurityContext": { "type": "object" },
+    "containerSecurityContext": { "type": "object" },
+    "logLevel": { "type": "string", "minLength": 1 },
+    "javaRuntime": {
+      "type": "object",
+      "required": [
+        "javaToolOptions",
+        "otelSdkDisabled",
+        "otelJavaagentEnabled"
+      ],
+      "properties": {
+        "javaToolOptions": { "type": "string", "minLength": 1 },
+        "otelSdkDisabled": { "type": "boolean" },
+        "otelJavaagentEnabled": { "type": "boolean" }
+      }
+    },
+    "identity": {
+      "type": "object",
+      "required": [
+        "issuerBpn",
+        "issuerBpnBase64",
+        "issuerDidHost",
+        "useHttpsDidWeb"
+      ],
+      "properties": {
+        "issuerBpn": {
+          "type": "string",
+          "pattern": "^BPN[LSA][A-Z0-9]{12}$"
+        },
+        "issuerBpnBase64": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]+={0,2}$"
+        },
+        "issuerDidHost": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?$"
+        },
+        "useHttpsDidWeb": { "type": "boolean" }
+      }
+    },
+    "vault": {
+      "type": "object",
+      "required": ["url", "apiSecretPath", "healthCheckPath"],
+      "properties": {
+        "url": { "type": "string", "pattern": "^https?://" },
+        "apiSecretPath": { "type": "string", "pattern": "^/" },
+        "healthCheckPath": { "type": "string", "pattern": "^/" }
+      }
+    },
+    "existingSecret": {
+      "type": "object",
+      "required": ["name", "keys"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "keys": {
+          "type": "object",
+          "required": [
+            "vaultToken",
+            "identityHubJdbcUrl",
+            "identityHubDbUser",
+            "identityHubDbPassword",
+            "issuerServiceJdbcUrl",
+            "issuerServiceDbUser",
+            "issuerServiceDbPassword",
+            "bdrsJdbcUrl",
+            "bdrsDbUser",
+            "bdrsDbPassword",
+            "operatorMigratorDatabaseUrl",
+            "operatorConsoleDatabaseUrl",
+            "onboardingDatabaseUrl",
+            "issuerMigratorDatabaseUrl",
+            "issuerClaimsDatabaseUrl",
+            "bdrsApiKey",
+            "operatorConsoleApiKey",
+            "issuerApiKey"
+          ],
+          "properties": {
+            "vaultToken": { "$ref": "#/definitions/secretKey" },
+            "identityHubJdbcUrl": { "$ref": "#/definitions/secretKey" },
+            "identityHubDbUser": { "$ref": "#/definitions/secretKey" },
+            "identityHubDbPassword": { "$ref": "#/definitions/secretKey" },
+            "issuerServiceJdbcUrl": { "$ref": "#/definitions/secretKey" },
+            "issuerServiceDbUser": { "$ref": "#/definitions/secretKey" },
+            "issuerServiceDbPassword": { "$ref": "#/definitions/secretKey" },
+            "bdrsJdbcUrl": { "$ref": "#/definitions/secretKey" },
+            "bdrsDbUser": { "$ref": "#/definitions/secretKey" },
+            "bdrsDbPassword": { "$ref": "#/definitions/secretKey" },
+            "operatorMigratorDatabaseUrl": {
+              "$ref": "#/definitions/secretKey"
+            },
+            "operatorConsoleDatabaseUrl": { "$ref": "#/definitions/secretKey" },
+            "onboardingDatabaseUrl": { "$ref": "#/definitions/secretKey" },
+            "issuerMigratorDatabaseUrl": { "$ref": "#/definitions/secretKey" },
+            "issuerClaimsDatabaseUrl": { "$ref": "#/definitions/secretKey" },
+            "bdrsApiKey": { "$ref": "#/definitions/secretKey" },
+            "operatorConsoleApiKey": { "type": "string" },
+            "issuerApiKey": { "type": "string" }
+          }
+        }
+      }
+    },
+    "jobs": {
+      "type": "object",
+      "required": [
+        "migrator",
+        "issuerClaimsGrant",
+        "retryTimeoutMs",
+        "retryDelayMs",
+        "resources"
+      ],
+      "properties": {
+        "migrator": {
+          "allOf": [
+            { "$ref": "#/definitions/job" },
+            {
+              "type": "object",
+              "required": [
+                "serviceAccountName",
+                "migrationDirectory",
+                "ownerRole"
+              ],
+              "properties": {
+                "serviceAccountName": { "type": "string", "minLength": 1 },
+                "migrationDirectory": { "type": "string", "pattern": "^/" },
+                "ownerRole": { "type": "string", "minLength": 1 }
+              }
+            }
+          ]
+        },
+        "issuerClaimsGrant": {
+          "allOf": [
+            { "$ref": "#/definitions/job" },
+            {
+              "type": "object",
+              "required": ["claimsRole"],
+              "properties": {
+                "claimsRole": { "type": "string", "minLength": 1 }
+              }
+            }
+          ]
+        },
+        "retryTimeoutMs": { "type": "integer", "minimum": 1000 },
+        "retryDelayMs": { "type": "integer", "minimum": 100 },
+        "resources": { "$ref": "#/definitions/resources" }
+      }
+    },
+    "issuerIdentityHub": { "$ref": "#/definitions/javaComponent" },
+    "issuerService": { "$ref": "#/definitions/javaComponent" },
+    "bdrs": { "$ref": "#/definitions/component" },
+    "issuerDid": { "$ref": "#/definitions/httpComponent" },
+    "operatorConsole": {
+      "allOf": [
+        { "$ref": "#/definitions/httpComponent" },
+        {
+          "type": "object",
+          "required": [
+            "auth",
+            "title",
+            "subtitle",
+            "configJson",
+            "themeJson",
+            "httpsHeaders"
+          ],
+          "properties": {
+            "image": { "$ref": "#/definitions/firstPartyImage" },
+            "auth": {
+              "type": "object",
+              "required": ["mode", "header", "allowedUsers"],
+              "properties": {
+                "mode": {
+                  "type": "string",
+                  "enum": ["api-key", "forwarded-header"]
+                },
+                "header": { "type": "string", "minLength": 1 },
+                "allowedUsers": { "type": "string" }
+              }
+            },
+            "title": { "type": "string" },
+            "subtitle": { "type": "string" },
+            "configJson": { "type": "string" },
+            "themeJson": { "type": "string" },
+            "httpsHeaders": { "type": "boolean" }
+          }
+        }
+      ]
+    },
+    "operatorOnboarding": {
+      "allOf": [
+        { "$ref": "#/definitions/httpComponent" },
+        {
+          "type": "object",
+          "required": [
+            "allowedOrigins",
+            "enableRateLimit",
+            "rateLimitMax",
+            "rateLimitWindow",
+            "title",
+            "configJson",
+            "themeJson"
+          ],
+          "properties": {
+            "image": { "$ref": "#/definitions/firstPartyImage" },
+            "allowedOrigins": { "type": "string", "minLength": 1 },
+            "enableRateLimit": { "type": "boolean" },
+            "rateLimitMax": { "type": "integer", "minimum": 1 },
+            "rateLimitWindow": { "type": "string", "minLength": 1 },
+            "title": { "type": "string", "minLength": 1 },
+            "configJson": { "type": "string" },
+            "themeJson": { "type": "string" }
+          }
+        }
+      ]
+    },
+    "ingress": {
+      "type": "object",
+      "required": ["issuerDid", "onboarding", "console"],
+      "properties": {
+        "issuerDid": { "$ref": "#/definitions/ingress" },
+        "onboarding": { "$ref": "#/definitions/ingress" },
+        "console": { "$ref": "#/definitions/ingress" }
+      }
+    },
+    "nodeSelector": { "type": "object" },
+    "tolerations": { "type": "array", "items": { "type": "object" } },
+    "affinity": { "type": "object" }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "operatorConsole": {
+            "properties": {
+              "auth": {
+                "properties": { "mode": { "const": "api-key" } }
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "existingSecret": {
+            "properties": {
+              "keys": {
+                "properties": {
+                  "operatorConsoleApiKey": { "minLength": 1 }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "definitions": {
+    "secretKey": { "type": "string", "minLength": 1 },
+    "image": {
+      "type": "object",
+      "required": ["repository", "tag", "digest", "pullPolicy"],
+      "properties": {
+        "repository": { "type": "string", "minLength": 1 },
+        "tag": { "type": "string", "minLength": 1 },
+        "digest": {
+          "type": "string",
+          "pattern": "^(|sha256:[a-fA-F0-9]{64})$"
+        },
+        "pullPolicy": {
+          "type": "string",
+          "enum": ["Always", "IfNotPresent", "Never"]
+        }
+      }
+    },
+    "firstPartyImage": {
+      "allOf": [
+        { "$ref": "#/definitions/image" },
+        {
+          "anyOf": [
+            {
+              "properties": {
+                "digest": { "pattern": "^sha256:[a-fA-F0-9]{64}$" }
+              }
+            },
+            {
+              "properties": {
+                "tag": {
+                  "not": { "enum": ["latest", "main", "master"] }
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "resources": {
+      "type": "object",
+      "required": ["requests", "limits"],
+      "properties": {
+        "requests": {
+          "type": "object",
+          "required": ["cpu", "memory"],
+          "properties": {
+            "cpu": { "type": ["string", "number"] },
+            "memory": { "type": ["string", "number"] }
+          }
+        },
+        "limits": {
+          "type": "object",
+          "required": ["cpu", "memory"],
+          "properties": {
+            "cpu": { "type": ["string", "number"] },
+            "memory": { "type": ["string", "number"] }
+          }
+        }
+      }
+    },
+    "service": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["ClusterIP", "NodePort", "LoadBalancer"]
+        },
+        "port": { "type": "integer", "minimum": 1, "maximum": 65535 }
+      }
+    },
+    "component": {
+      "type": "object",
+      "required": [
+        "replicaCount",
+        "securityContext",
+        "image",
+        "service",
+        "resources"
+      ],
+      "properties": {
+        "replicaCount": { "type": "integer", "minimum": 1 },
+        "securityContext": { "$ref": "#/definitions/runtimeIdentity" },
+        "image": { "$ref": "#/definitions/image" },
+        "service": { "$ref": "#/definitions/service" },
+        "resources": { "$ref": "#/definitions/resources" }
+      }
+    },
+    "runtimeIdentity": {
+      "type": "object",
+      "required": ["runAsUser", "runAsGroup"],
+      "properties": {
+        "runAsUser": { "type": "integer", "minimum": 1 },
+        "runAsGroup": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "javaComponent": {
+      "allOf": [
+        { "$ref": "#/definitions/component" },
+        {
+          "type": "object",
+          "required": [
+            "jtiValidation",
+            "encryptionKeyAlias",
+            "encryptionStrict"
+          ],
+          "properties": {
+            "jtiValidation": { "type": "boolean" },
+            "encryptionKeyAlias": { "type": "string", "minLength": 1 },
+            "encryptionStrict": { "type": "boolean" }
+          }
+        }
+      ]
+    },
+    "httpComponent": {
+      "allOf": [
+        { "$ref": "#/definitions/component" },
+        {
+          "type": "object",
+          "properties": {
+            "service": {
+              "allOf": [
+                { "$ref": "#/definitions/service" },
+                { "type": "object", "required": ["port"] }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "job": {
+      "type": "object",
+      "required": ["enabled", "backoffLimit", "activeDeadlineSeconds"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "backoffLimit": { "type": "integer", "minimum": 0 },
+        "activeDeadlineSeconds": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "ingress": {
+      "type": "object",
+      "required": [
+        "enabled",
+        "className",
+        "annotations",
+        "host",
+        "path",
+        "pathType",
+        "tls"
+      ],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "className": { "type": "string" },
+        "annotations": { "type": "object" },
+        "host": { "type": "string", "minLength": 1 },
+        "path": { "type": "string", "pattern": "^/" },
+        "pathType": {
+          "type": "string",
+          "enum": ["Exact", "Prefix", "ImplementationSpecific"]
+        },
+        "tls": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["hosts", "secretName"],
+            "properties": {
+              "hosts": {
+                "type": "array",
+                "items": { "type": "string" },
+                "minItems": 1
+              },
+              "secretName": { "type": "string", "minLength": 1 }
+            }
+          }
+        }
+      }
+    }
+  }
+}

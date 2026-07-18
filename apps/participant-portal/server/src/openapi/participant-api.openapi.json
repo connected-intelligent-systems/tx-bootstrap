@@ -1,0 +1,3796 @@
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "tx-bootstrap Participant API",
+    "version": "1.0.0",
+    "description": "Participant-facing API for scoped API clients. It exposes only the operations listed here; other native EDC management operations are rejected by the gateway.",
+    "license": {
+      "name": "The Apache License, Version 2.0",
+      "url": "http://www.apache.org/licenses/LICENSE-2.0.txt"
+    }
+  },
+  "externalDocs": {
+    "description": "Tractus-X EDC 0.12.1 control-plane API documentation",
+    "url": "https://eclipse-tractusx.github.io/tractusx-edc/openapi/control-plane-api/0.12.1/"
+  },
+  "servers": [{ "url": "/", "description": "This participant" }],
+  "tags": [
+    {
+      "name": "Federated Catalog",
+      "description": "Search the participant-local catalog cache."
+    },
+    {
+      "name": "Federated Catalog SPARQL",
+      "description": "Run bounded, read-only semantic queries."
+    }
+  ],
+  "paths": {
+    "/api/management/v3/catalog/request": {
+      "post": {
+        "tags": ["Catalog V3"],
+        "operationId": "requestCatalogV3",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CatalogRequestV3" }
+            }
+          }
+        },
+        "responses": {
+          "401": {
+            "description": "A valid API-client token is required.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "403": {
+            "description": "The API client does not have the required scope.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "404": {
+            "description": "The operation or resource is not exposed by this participant.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "default": {
+            "description": "Gets contract offers (=catalog) of a single connector",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/CatalogV3" }
+              }
+            }
+          }
+        },
+        "security": [{ "apiClientToken": [] }],
+        "x-required-scope": "catalog:read"
+      }
+    },
+    "/api/management/v3/catalog/dataset/request": {
+      "post": {
+        "tags": ["Catalog V3"],
+        "operationId": "getDatasetV3",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/DatasetRequestV3" }
+            }
+          }
+        },
+        "responses": {
+          "401": {
+            "description": "A valid API-client token is required.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "403": {
+            "description": "The API client does not have the required scope.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "404": {
+            "description": "The operation or resource is not exposed by this participant.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "default": {
+            "description": "Gets single dataset from a connector",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/DatasetV3" }
+              }
+            }
+          }
+        },
+        "security": [{ "apiClientToken": [] }],
+        "x-required-scope": "catalog:read"
+      }
+    },
+    "/api/management/v3/assets/request": {
+      "post": {
+        "tags": ["Asset V3"],
+        "description": "Request all assets according to a particular query",
+        "operationId": "requestAssetsV3",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/QuerySpec" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The assets matching the query",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/AssetOutputV3" }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request body was malformed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/ApiErrorDetail" }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A valid API-client token is required.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "403": {
+            "description": "The API client does not have the required scope.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "404": {
+            "description": "The operation or resource is not exposed by this participant.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          }
+        },
+        "security": [{ "apiClientToken": [] }],
+        "x-required-scope": "assets:read"
+      }
+    },
+    "/api/management/v3/assets/{id}": {
+      "get": {
+        "tags": ["Asset V3"],
+        "description": "Gets an asset with the given ID",
+        "operationId": "getAssetV3",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "style": "simple",
+            "explode": false,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The asset",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/AssetOutputV3" }
+              }
+            }
+          },
+          "400": {
+            "description": "Request was malformed, e.g. id was null",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/ApiErrorDetail" }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A valid API-client token is required.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "403": {
+            "description": "The API client does not have the required scope.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "404": {
+            "description": "The operation or resource is not exposed by this participant.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          }
+        },
+        "security": [{ "apiClientToken": [] }],
+        "x-required-scope": "assets:read"
+      },
+      "delete": {
+        "tags": ["Asset V3"],
+        "description": "Removes an asset with the given ID if possible. Deleting an asset is only possible if that asset is not yet referenced by a contract agreement, in which case an error is returned. DANGER ZONE: Note that deleting assets can have unexpected results, especially for contract offers that have been sent out or ongoing or contract negotiations.",
+        "operationId": "removeAssetV3",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "style": "simple",
+            "explode": false,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "204": { "description": "Asset was deleted successfully" },
+          "400": {
+            "description": "Request was malformed, e.g. id was null",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/ApiErrorDetail" }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A valid API-client token is required.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "403": {
+            "description": "The API client does not have the required scope.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "404": {
+            "description": "The operation or resource is not exposed by this participant.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "409": {
+            "description": "The asset cannot be deleted, because it is referenced by a contract agreement",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/ApiErrorDetail" }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "apiClientToken": [] }],
+        "x-required-scope": "assets:write"
+      }
+    },
+    "/api/management/v3/assets": {
+      "post": {
+        "tags": ["Asset V3"],
+        "description": "Creates a new asset together with a data address",
+        "operationId": "createAssetV3",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/AssetInputV3" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Asset was created successfully. Returns the asset Id and created timestamp",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/IdResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "Request body was malformed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/ApiErrorDetail" }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A valid API-client token is required.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "403": {
+            "description": "The API client does not have the required scope.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "404": {
+            "description": "The operation or resource is not exposed by this participant.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "409": {
+            "description": "Could not create asset, because an asset with that ID already exists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/ApiErrorDetail" }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "apiClientToken": [] }],
+        "x-required-scope": "assets:write"
+      },
+      "put": {
+        "tags": ["Asset V3"],
+        "description": "Updates an asset with the given ID if it exists. If the asset is not found, no further action is taken. DANGER ZONE: Note that updating assets can have unexpected results, especially for contract offers that have been sent out or are ongoing in contract negotiations.",
+        "operationId": "updateAssetV3",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/AssetInputV3" }
+            }
+          }
+        },
+        "responses": {
+          "204": { "description": "Asset was updated successfully" },
+          "400": {
+            "description": "Request was malformed, e.g. id was null",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/ApiErrorDetail" }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A valid API-client token is required.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "403": {
+            "description": "The API client does not have the required scope.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "404": {
+            "description": "The operation or resource is not exposed by this participant.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          }
+        },
+        "security": [{ "apiClientToken": [] }],
+        "x-required-scope": "assets:write"
+      }
+    },
+    "/api/management/v3/policydefinitions/request": {
+      "post": {
+        "tags": ["Policy Definition v3"],
+        "description": "Returns all policy definitions according to a query",
+        "operationId": "queryPolicyDefinitionsV3",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/QuerySpec" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The policy definitions matching the query",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PolicyDefinitionOutputV3"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request was malformed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/ApiErrorDetail" }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A valid API-client token is required.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "403": {
+            "description": "The API client does not have the required scope.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "404": {
+            "description": "The operation or resource is not exposed by this participant.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          }
+        },
+        "security": [{ "apiClientToken": [] }],
+        "x-required-scope": "policies:read"
+      }
+    },
+    "/api/management/v3/policydefinitions/{id}": {
+      "get": {
+        "tags": ["Policy Definition v3"],
+        "description": "Gets a policy definition with the given ID",
+        "operationId": "getPolicyDefinitionV3",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "style": "simple",
+            "explode": false,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The  policy definition",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PolicyDefinitionOutputV3"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request was malformed, e.g. id was null",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/ApiErrorDetail" }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A valid API-client token is required.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "403": {
+            "description": "The API client does not have the required scope.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "404": {
+            "description": "The operation or resource is not exposed by this participant.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          }
+        },
+        "security": [{ "apiClientToken": [] }],
+        "x-required-scope": "policies:read"
+      },
+      "put": {
+        "tags": ["Policy Definition v3"],
+        "description": "Updates an existing Policy, If the Policy is not found, an error is reported",
+        "operationId": "updatePolicyDefinitionV3",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "style": "simple",
+            "explode": false,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PolicyDefinitionInputV3"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "policy definition was updated successfully."
+          },
+          "400": {
+            "description": "Request body was malformed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/ApiErrorDetail" }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A valid API-client token is required.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "403": {
+            "description": "The API client does not have the required scope.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "404": {
+            "description": "The operation or resource is not exposed by this participant.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          }
+        },
+        "security": [{ "apiClientToken": [] }],
+        "x-required-scope": "policies:write"
+      },
+      "delete": {
+        "tags": ["Policy Definition v3"],
+        "description": "Removes a policy definition with the given ID if possible. Deleting a policy definition is only possible if that policy definition is not yet referenced by a contract definition, in which case an error is returned. DANGER ZONE: Note that deleting policy definitions can have unexpected results, do this at your own risk!",
+        "operationId": "deletePolicyDefinitionV3",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "style": "simple",
+            "explode": false,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Policy definition was deleted successfully"
+          },
+          "400": {
+            "description": "Request was malformed, e.g. id was null",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/ApiErrorDetail" }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A valid API-client token is required.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "403": {
+            "description": "The API client does not have the required scope.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "404": {
+            "description": "The operation or resource is not exposed by this participant.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "409": {
+            "description": "The policy definition cannot be deleted, because it is referenced by a contract definition",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/ApiErrorDetail" }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "apiClientToken": [] }],
+        "x-required-scope": "policies:write"
+      }
+    },
+    "/api/management/v3/policydefinitions": {
+      "post": {
+        "tags": ["Policy Definition v3"],
+        "description": "Creates a new policy definition",
+        "operationId": "createPolicyDefinitionV3",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PolicyDefinitionInputV3"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "policy definition was created successfully. Returns the Policy Definition Id and created timestamp",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/IdResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "Request body was malformed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/ApiErrorDetail" }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A valid API-client token is required.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "403": {
+            "description": "The API client does not have the required scope.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "404": {
+            "description": "The operation or resource is not exposed by this participant.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "409": {
+            "description": "Could not create policy definition, because a contract definition with that ID already exists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/ApiErrorDetail" }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "apiClientToken": [] }],
+        "x-required-scope": "policies:write"
+      }
+    },
+    "/api/management/v3/business-partner-groups/groups": {
+      "get": {
+        "tags": ["Business Partner Group"],
+        "description": "Resolves all BPN Groups",
+        "operationId": "resolveGroupsV3",
+        "responses": {
+          "200": {
+            "description": "An object containing an array with the all BPN groups"
+          },
+          "400": {
+            "description": "Request body was malformed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/ApiErrorDetail_1" }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A valid API-client token is required.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "403": {
+            "description": "The API client does not have the required scope.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "404": {
+            "description": "The operation or resource is not exposed by this participant.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          }
+        },
+        "security": [{ "apiClientToken": [] }],
+        "x-required-scope": "business-partner-groups:read"
+      }
+    },
+    "/api/management/v3/business-partner-groups/group/{group}": {
+      "get": {
+        "tags": ["Business Partner Group"],
+        "description": "Resolves all BPNs for a particular BPN group",
+        "operationId": "resolveGroupV3",
+        "parameters": [
+          {
+            "name": "group",
+            "in": "path",
+            "description": "The business partner group",
+            "required": true,
+            "style": "simple",
+            "explode": false,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "An object containing an array with the bpns assigned to the group"
+          },
+          "400": {
+            "description": "Request body was malformed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/ApiErrorDetail_1" }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A valid API-client token is required.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "403": {
+            "description": "The API client does not have the required scope.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "404": {
+            "description": "The operation or resource is not exposed by this participant.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          }
+        },
+        "security": [{ "apiClientToken": [] }],
+        "x-required-scope": "business-partner-groups:read"
+      }
+    },
+    "/api/management/v3/business-partner-groups/{bpn}": {
+      "get": {
+        "tags": ["Business Partner Group"],
+        "description": "Resolves all groups for a particular BPN",
+        "operationId": "resolveV3",
+        "parameters": [
+          {
+            "name": "bpn",
+            "in": "path",
+            "description": "The business partner number",
+            "required": true,
+            "style": "simple",
+            "explode": false,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "An object containing an array with the assigned groups"
+          },
+          "400": {
+            "description": "Request body was malformed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/ApiErrorDetail_1" }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A valid API-client token is required.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "403": {
+            "description": "The API client does not have the required scope.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "404": {
+            "description": "The operation or resource is not exposed by this participant.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          }
+        },
+        "security": [{ "apiClientToken": [] }],
+        "x-required-scope": "business-partner-groups:read"
+      },
+      "delete": {
+        "tags": ["Business Partner Group"],
+        "description": "Deletes the entry for a particular BPN",
+        "operationId": "deleteEntryV3",
+        "parameters": [
+          {
+            "name": "bpn",
+            "in": "path",
+            "description": "The business partner number",
+            "required": true,
+            "style": "simple",
+            "explode": false,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "204": { "description": "The object was successfully deleted" },
+          "400": {
+            "description": "Request body was malformed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/ApiErrorDetail_1" }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A valid API-client token is required.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "403": {
+            "description": "The API client does not have the required scope.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "404": {
+            "description": "The operation or resource is not exposed by this participant.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          }
+        },
+        "security": [{ "apiClientToken": [] }],
+        "x-required-scope": "business-partner-groups:write"
+      }
+    },
+    "/api/management/v3/business-partner-groups": {
+      "post": {
+        "tags": ["Business Partner Group"],
+        "description": "Creates an entry for a particular BPN",
+        "operationId": "createEntryV3",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/List" }
+            }
+          }
+        },
+        "responses": {
+          "204": { "description": "The object was successfully created" },
+          "400": {
+            "description": "Request body was malformed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/ApiErrorDetail_1" }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A valid API-client token is required.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "403": {
+            "description": "The API client does not have the required scope.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "404": {
+            "description": "The operation or resource is not exposed by this participant.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "409": { "description": "An entry already exists for that BPN" }
+        },
+        "security": [{ "apiClientToken": [] }],
+        "x-required-scope": "business-partner-groups:write"
+      },
+      "put": {
+        "tags": ["Business Partner Group"],
+        "description": "Updates the entry for a particular BPN",
+        "operationId": "updateEntryV3",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/List" }
+            }
+          }
+        },
+        "responses": {
+          "204": { "description": "The object was successfully updated" },
+          "400": {
+            "description": "Request body was malformed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/ApiErrorDetail_1" }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A valid API-client token is required.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "403": {
+            "description": "The API client does not have the required scope.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "404": {
+            "description": "The operation or resource is not exposed by this participant.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          }
+        },
+        "security": [{ "apiClientToken": [] }],
+        "x-required-scope": "business-partner-groups:write"
+      }
+    },
+    "/api/management/v3/contractdefinitions/request": {
+      "post": {
+        "tags": ["Contract Definition V3"],
+        "description": "Returns all contract definitions according to a query",
+        "operationId": "queryContractDefinitionsV3",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/QuerySpec" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The contract definitions matching the query",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ContractDefinitionOutputV3"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request was malformed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/ApiErrorDetail" }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A valid API-client token is required.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "403": {
+            "description": "The API client does not have the required scope.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "404": {
+            "description": "The operation or resource is not exposed by this participant.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          }
+        },
+        "security": [{ "apiClientToken": [] }],
+        "x-required-scope": "contract-definitions:read"
+      }
+    },
+    "/api/management/v3/contractdefinitions/{id}": {
+      "get": {
+        "tags": ["Contract Definition V3"],
+        "description": "Gets an contract definition with the given ID",
+        "operationId": "getContractDefinitionV3",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "style": "simple",
+            "explode": false,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The contract definition",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContractDefinitionOutputV3"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request was malformed, e.g. id was null",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/ApiErrorDetail" }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A valid API-client token is required.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "403": {
+            "description": "The API client does not have the required scope.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "404": {
+            "description": "The operation or resource is not exposed by this participant.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          }
+        },
+        "security": [{ "apiClientToken": [] }],
+        "x-required-scope": "contract-definitions:read"
+      },
+      "delete": {
+        "tags": ["Contract Definition V3"],
+        "description": "Removes a contract definition with the given ID if possible. DANGER ZONE: Note that deleting contract definitions can have unexpected results, especially for contract offers that have been sent out or ongoing or contract negotiations.",
+        "operationId": "deleteContractDefinitionV3",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "style": "simple",
+            "explode": false,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Contract definition was deleted successfully"
+          },
+          "400": {
+            "description": "Request was malformed, e.g. id was null",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/ApiErrorDetail" }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A valid API-client token is required.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "403": {
+            "description": "The API client does not have the required scope.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "404": {
+            "description": "The operation or resource is not exposed by this participant.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          }
+        },
+        "security": [{ "apiClientToken": [] }],
+        "x-required-scope": "contract-definitions:write"
+      }
+    },
+    "/api/management/v3/contractdefinitions": {
+      "post": {
+        "tags": ["Contract Definition V3"],
+        "description": "Creates a new contract definition",
+        "operationId": "createContractDefinitionV3",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContractDefinitionInputV3"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "contract definition was created successfully. Returns the Contract Definition Id and created timestamp",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/IdResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "Request body was malformed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/ApiErrorDetail" }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A valid API-client token is required.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "403": {
+            "description": "The API client does not have the required scope.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "404": {
+            "description": "The operation or resource is not exposed by this participant.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "409": {
+            "description": "Could not create contract definition, because a contract definition with that ID already exists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/ApiErrorDetail" }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "apiClientToken": [] }],
+        "x-required-scope": "contract-definitions:write"
+      },
+      "put": {
+        "tags": ["Contract Definition V3"],
+        "description": "Updated a contract definition with the given ID. The supplied JSON structure must be a valid JSON-LD object",
+        "operationId": "updateContractDefinitionV3",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContractDefinitionInputV3"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Contract definition was updated successfully"
+          },
+          "400": {
+            "description": "Request was malformed, e.g. id was null",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/ApiErrorDetail" }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A valid API-client token is required.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "403": {
+            "description": "The API client does not have the required scope.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "404": {
+            "description": "The operation or resource is not exposed by this participant.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          }
+        },
+        "security": [{ "apiClientToken": [] }],
+        "x-required-scope": "contract-definitions:write"
+      }
+    },
+    "/api/management/v3/contractnegotiations/request": {
+      "post": {
+        "tags": ["Contract Negotiation V3"],
+        "description": "Returns all contract negotiations according to a query",
+        "operationId": "queryNegotiationsV3",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/QuerySpec" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The contract negotiations that match the query",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ContractNegotiation"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request was malformed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/ApiErrorDetail" }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A valid API-client token is required.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "403": {
+            "description": "The API client does not have the required scope.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "404": {
+            "description": "The operation or resource is not exposed by this participant.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          }
+        },
+        "security": [{ "apiClientToken": [] }],
+        "x-required-scope": "contract-negotiations:read"
+      }
+    },
+    "/api/management/v3/contractnegotiations/{id}": {
+      "get": {
+        "tags": ["Contract Negotiation V3"],
+        "description": "Gets a contract negotiation with the given ID",
+        "operationId": "getNegotiationV3",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "style": "simple",
+            "explode": false,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The contract negotiation",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ContractNegotiation" }
+              }
+            }
+          },
+          "400": {
+            "description": "Request was malformed, e.g. id was null",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/ApiErrorDetail" }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A valid API-client token is required.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "403": {
+            "description": "The API client does not have the required scope.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "404": {
+            "description": "The operation or resource is not exposed by this participant.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          }
+        },
+        "security": [{ "apiClientToken": [] }],
+        "x-required-scope": "contract-negotiations:read"
+      }
+    },
+    "/api/management/v3/contractnegotiations": {
+      "post": {
+        "tags": ["Contract Negotiation V3"],
+        "description": "Initiates a contract negotiation for a given offer and with the given counter part. Please note that successfully invoking this endpoint only means that the negotiation was initiated. Clients must poll the /{id}/state endpoint to track the state",
+        "operationId": "initiateContractNegotiationV3",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ContractRequestV3" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The negotiation was successfully initiated. Returns the contract negotiation ID and created timestamp",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/IdResponse" }
+              }
+            },
+            "links": {
+              "poll-state": {
+                "operationId": "getNegotiationStateV3",
+                "parameters": { "id": "$response.body#/id" }
+              }
+            }
+          },
+          "400": {
+            "description": "Request body was malformed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/ApiErrorDetail" }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A valid API-client token is required.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "403": {
+            "description": "The API client does not have the required scope.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "404": {
+            "description": "The operation or resource is not exposed by this participant.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          }
+        },
+        "security": [{ "apiClientToken": [] }],
+        "x-required-scope": "contract-negotiations:write"
+      }
+    },
+    "/api/management/v3/contractnegotiations/{id}/terminate": {
+      "post": {
+        "tags": ["Contract Negotiation V3"],
+        "description": "Terminates the contract negotiation.",
+        "operationId": "terminateNegotiationV3",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "style": "simple",
+            "explode": false,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TerminateNegotiationV3"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "ContractNegotiation is terminating",
+            "links": {
+              "poll-state": { "operationId": "getNegotiationStateV3" }
+            }
+          },
+          "400": {
+            "description": "Request was malformed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/ApiErrorDetail" }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A valid API-client token is required.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "403": {
+            "description": "The API client does not have the required scope.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "404": {
+            "description": "The operation or resource is not exposed by this participant.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          }
+        },
+        "security": [{ "apiClientToken": [] }],
+        "x-required-scope": "contract-negotiations:write"
+      }
+    },
+    "/api/management/v3/contractagreements/request": {
+      "post": {
+        "tags": ["Contract Agreement V3"],
+        "description": "Gets all contract agreements according to a particular query",
+        "operationId": "queryAgreementsV3",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/QuerySpec" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The contract agreements matching the query",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ContractAgreement_1"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request body was malformed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/ApiErrorDetail" }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A valid API-client token is required.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "403": {
+            "description": "The API client does not have the required scope.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "404": {
+            "description": "The operation or resource is not exposed by this participant.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          }
+        },
+        "security": [{ "apiClientToken": [] }],
+        "x-required-scope": "contract-agreements:read"
+      }
+    },
+    "/api/management/v3/contractagreements/{id}": {
+      "get": {
+        "tags": ["Contract Agreement V3"],
+        "description": "Gets an contract agreement with the given ID",
+        "operationId": "getAgreementByIdV3",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "style": "simple",
+            "explode": false,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The contract agreement",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ContractAgreement" }
+              }
+            }
+          },
+          "400": {
+            "description": "Request was malformed, e.g. id was null",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/ApiErrorDetail" }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A valid API-client token is required.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "403": {
+            "description": "The API client does not have the required scope.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "404": {
+            "description": "The operation or resource is not exposed by this participant.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          }
+        },
+        "security": [{ "apiClientToken": [] }],
+        "x-required-scope": "contract-agreements:read"
+      }
+    },
+    "/api/management/v3/contractagreements/{id}/negotiation": {
+      "get": {
+        "tags": ["Contract Agreement V3"],
+        "description": "Gets a contract negotiation with the given contract agreement ID",
+        "operationId": "getNegotiationByAgreementIdV3",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "style": "simple",
+            "explode": false,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The contract negotiation",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ContractNegotiation" }
+              }
+            }
+          },
+          "400": {
+            "description": "Request was malformed, e.g. id was null",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/ApiErrorDetail" }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A valid API-client token is required.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "403": {
+            "description": "The API client does not have the required scope.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "404": {
+            "description": "The operation or resource is not exposed by this participant.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          }
+        },
+        "security": [{ "apiClientToken": [] }],
+        "x-required-scope": "contract-agreements:read"
+      }
+    },
+    "/api/management/v3/contractagreements/retirements/request": {
+      "post": {
+        "tags": ["Agreements Retirement"],
+        "description": "Get all retired contract agreements.",
+        "operationId": "getAllRetiredV3",
+        "responses": {
+          "200": { "description": "A list of retired contract agreements" },
+          "400": {
+            "description": "Request body was malformed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/ApiErrorDetail_1" }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A valid API-client token is required.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "403": {
+            "description": "The API client does not have the required scope.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "404": {
+            "description": "The operation or resource is not exposed by this participant.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          }
+        },
+        "security": [{ "apiClientToken": [] }],
+        "x-required-scope": "contract-agreements:read"
+      }
+    },
+    "/api/management/v3/contractagreements/retirements": {
+      "post": {
+        "tags": ["Agreements Retirement"],
+        "description": "Retires an active contract agreement.",
+        "operationId": "retireAgreementV3",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/RetirementExample" }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "The contract agreement was successfully retired"
+          },
+          "400": {
+            "description": "Request body was malformed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/ApiErrorDetail_1" }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A valid API-client token is required.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "403": {
+            "description": "The API client does not have the required scope.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "404": {
+            "description": "The operation or resource is not exposed by this participant.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "409": { "description": "The contract agreement is already retired" }
+        },
+        "security": [{ "apiClientToken": [] }],
+        "x-required-scope": "contract-agreements:retire"
+      }
+    },
+    "/api/management/v3/contractagreements/retirements/{agreementId}": {
+      "delete": {
+        "tags": ["Agreements Retirement"],
+        "description": "Removes a contract agreement from the retired list, reactivating it.",
+        "operationId": "reactivateRetiredV3",
+        "parameters": [
+          {
+            "name": "agreementId",
+            "in": "path",
+            "description": "The contract agreement id",
+            "required": true,
+            "style": "simple",
+            "explode": false,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "204": { "description": "The contract agreement is reactivated" },
+          "400": {
+            "description": "Request body was malformed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/ApiErrorDetail_1" }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A valid API-client token is required.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "403": {
+            "description": "The API client does not have the required scope.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "404": {
+            "description": "The operation or resource is not exposed by this participant.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          }
+        },
+        "security": [{ "apiClientToken": [] }],
+        "x-required-scope": "contract-agreements:retire"
+      }
+    },
+    "/api/management/v3/transferprocesses/request": {
+      "post": {
+        "tags": ["Transfer Process V3"],
+        "description": "Returns all transfer process according to a query",
+        "operationId": "queryTransferProcessesV3",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/QuerySpec" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The transfer processes matching the query",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/TransferProcessV3" }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request was malformed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/ApiErrorDetail" }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A valid API-client token is required.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "403": {
+            "description": "The API client does not have the required scope.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "404": {
+            "description": "The operation or resource is not exposed by this participant.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          }
+        },
+        "security": [{ "apiClientToken": [] }],
+        "x-required-scope": "transfers:read"
+      }
+    },
+    "/api/management/v3/transferprocesses/{id}": {
+      "get": {
+        "tags": ["Transfer Process V3"],
+        "description": "Gets an transfer process with the given ID",
+        "operationId": "getTransferProcessV3",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "style": "simple",
+            "explode": false,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The transfer process",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/TransferProcessV3" }
+              }
+            }
+          },
+          "400": {
+            "description": "Request was malformed, e.g. id was null",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/ApiErrorDetail" }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A valid API-client token is required.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "403": {
+            "description": "The API client does not have the required scope.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "404": {
+            "description": "The operation or resource is not exposed by this participant.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          }
+        },
+        "security": [{ "apiClientToken": [] }],
+        "x-required-scope": "transfers:read"
+      }
+    },
+    "/api/management/v3/transferprocesses": {
+      "post": {
+        "tags": ["Transfer Process V3"],
+        "description": "Initiates a data transfer with the given parameters. Due to the asynchronous nature of transfers, a successful response only indicates that the request was successfully received. This may take a long time, so clients must poll the /{id}/state endpoint to track the state.",
+        "operationId": "initiateTransferProcessV3",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/TransferRequestV3" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The transfer was successfully initiated. Returns the transfer process ID and created timestamp",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/IdResponse" }
+              }
+            },
+            "links": {
+              "poll-state": {
+                "operationId": "getTransferProcessStateV3",
+                "parameters": { "id": "$response.body#/id" }
+              }
+            }
+          },
+          "400": {
+            "description": "Request body was malformed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/ApiErrorDetail" }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A valid API-client token is required.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "403": {
+            "description": "The API client does not have the required scope.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "404": {
+            "description": "The operation or resource is not exposed by this participant.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          }
+        },
+        "security": [{ "apiClientToken": [] }],
+        "x-required-scope": "transfers:write"
+      }
+    },
+    "/api/management/v3/transferprocesses/{id}/terminate": {
+      "post": {
+        "tags": ["Transfer Process V3"],
+        "description": "Requests the termination of a transfer process. Due to the asynchronous nature of transfers, a successful response only indicates that the request was successfully received. This may take a long time, so clients must poll the /{id}/state endpoint to track the state.",
+        "operationId": "terminateTransferProcessV3",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "style": "simple",
+            "explode": false,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/TerminateTransferV3" }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Request to terminate the transfer process was successfully received",
+            "links": {
+              "poll-state": { "operationId": "terminateTransferProcessV3" }
+            }
+          },
+          "400": {
+            "description": "Request was malformed, e.g. id was null",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/ApiErrorDetail" }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A valid API-client token is required.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "403": {
+            "description": "The API client does not have the required scope.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "404": {
+            "description": "The operation or resource is not exposed by this participant.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "409": {
+            "description": "Could not terminate transfer process, because it is already completed or terminated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/ApiErrorDetail" }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "apiClientToken": [] }],
+        "x-required-scope": "transfers:write"
+      }
+    },
+    "/api/management/v3/edrs/{transferProcessId}/dataaddress": {
+      "get": {
+        "tags": ["Control Plane EDR Api"],
+        "description": "Gets the EDR data address with the given transfer process ID",
+        "operationId": "getEdrEntryDataAddressV3",
+        "parameters": [
+          {
+            "name": "transferProcessId",
+            "in": "path",
+            "required": true,
+            "style": "simple",
+            "explode": false,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "auto_refresh",
+            "in": "query",
+            "required": false,
+            "style": "form",
+            "explode": true,
+            "schema": { "type": "boolean", "default": true }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The data address",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/DataAddress" }
+              }
+            }
+          },
+          "400": {
+            "description": "Request was malformed, e.g. id was null",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/ApiErrorDetail" }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A valid API-client token is required.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "403": {
+            "description": "The API client does not have the required scope.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "404": {
+            "description": "The operation or resource is not exposed by this participant.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          }
+        },
+        "security": [{ "apiClientToken": [] }],
+        "x-required-scope": "edr:data-address:read"
+      }
+    },
+    "/api/federated-catalog/v1/datasets": {
+      "get": {
+        "tags": ["Federated Catalog"],
+        "summary": "Search cached datasets",
+        "operationId": "searchFederatedCatalogDatasets",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "description": "Case-insensitive substring search over title, description, abstract, keywords, and theme.",
+            "schema": { "type": "string", "maxLength": 200 }
+          },
+          {
+            "name": "participantBpn",
+            "in": "query",
+            "required": false,
+            "description": "Filter by participant BPN.",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "theme",
+            "in": "query",
+            "required": false,
+            "description": "Filter by dataset theme/category.",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "contentType",
+            "in": "query",
+            "required": false,
+            "description": "Filter by dataset content type.",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "description": "Zero-based result offset.",
+            "schema": { "type": "integer", "minimum": 0, "default": 0 }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "Maximum number of results.",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of matching datasets.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FederatedDatasetPage"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A valid API-client token is required.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "403": {
+            "description": "The API client does not have the required scope.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "404": {
+            "description": "The operation or resource is not exposed by this participant.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          }
+        },
+        "security": [{ "apiClientToken": [] }],
+        "x-required-scope": "federated-catalog:read"
+      }
+    },
+    "/api/federated-catalog/v1/datasets/{entryId}": {
+      "get": {
+        "tags": ["Federated Catalog"],
+        "summary": "Get one cached dataset",
+        "operationId": "getFederatedCatalogDataset",
+        "parameters": [
+          {
+            "name": "entryId",
+            "in": "path",
+            "required": true,
+            "description": "Stable federated-catalog entry identifier.",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The cached dataset and negotiation metadata.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FederatedDatasetEntry"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A valid API-client token is required.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "403": {
+            "description": "The API client does not have the required scope.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "404": {
+            "description": "The operation or resource is not exposed by this participant.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          }
+        },
+        "security": [{ "apiClientToken": [] }],
+        "x-required-scope": "federated-catalog:read"
+      }
+    },
+    "/api/federated-catalog/v1/participants": {
+      "get": {
+        "tags": ["Federated Catalog"],
+        "summary": "List participant crawl state",
+        "operationId": "listFederatedCatalogParticipants",
+        "responses": {
+          "200": {
+            "description": "Crawl state for known participants.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FederatedParticipantPage"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A valid API-client token is required.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "403": {
+            "description": "The API client does not have the required scope.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "404": {
+            "description": "The operation or resource is not exposed by this participant.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          }
+        },
+        "security": [{ "apiClientToken": [] }],
+        "x-required-scope": "federated-catalog:read"
+      }
+    },
+    "/api/federated-catalog/v1/sparql": {
+      "get": {
+        "tags": ["Federated Catalog SPARQL"],
+        "summary": "Execute a read-only SPARQL query",
+        "description": "Runs SELECT, ASK, CONSTRUCT, or DESCRIBE against the participant-local snapshots. SPARQL Update and SERVICE are rejected. Result-producing queries require an outer LIMIT no greater than 1000. Query text is limited to 64 KiB and serialized output to 5 MiB.",
+        "operationId": "queryFederatedCatalogSparqlGet",
+        "parameters": [
+          {
+            "name": "query",
+            "in": "query",
+            "required": true,
+            "description": "SPARQL query text.",
+            "schema": { "type": "string", "maxLength": 65536 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "SPARQL query result. The representation depends on the query form and Accept header.",
+            "content": {
+              "application/sparql-results+json": {
+                "schema": { "type": "object", "additionalProperties": true }
+              },
+              "text/csv": { "schema": { "type": "string" } },
+              "text/tab-separated-values": { "schema": { "type": "string" } },
+              "text/turtle": { "schema": { "type": "string" } },
+              "application/ld+json": {
+                "schema": { "type": "object", "additionalProperties": true }
+              },
+              "application/n-triples": { "schema": { "type": "string" } }
+            }
+          },
+          "400": {
+            "description": "The SPARQL query is missing, invalid, unbounded, or contains a forbidden operation.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "401": {
+            "description": "A valid API-client token is required.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "403": {
+            "description": "The API client does not have the required scope.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "404": {
+            "description": "The operation or resource is not exposed by this participant.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "413": {
+            "description": "The query or serialized result exceeds the configured limit.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "503": {
+            "description": "Another SPARQL query is still occupying this replica.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "504": {
+            "description": "The 30-second response deadline was exceeded.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          }
+        },
+        "security": [{ "apiClientToken": [] }],
+        "x-required-scope": "federated-catalog:sparql"
+      },
+      "post": {
+        "tags": ["Federated Catalog SPARQL"],
+        "summary": "Execute a read-only SPARQL query",
+        "description": "Runs SELECT, ASK, CONSTRUCT, or DESCRIBE against the participant-local snapshots. SPARQL Update and SERVICE are rejected. Result-producing queries require an outer LIMIT no greater than 1000. Query text is limited to 64 KiB and serialized output to 5 MiB.",
+        "operationId": "queryFederatedCatalogSparqlPost",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/sparql-query": {
+              "schema": { "type": "string", "maxLength": 65536 }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "required": ["query"],
+                "properties": {
+                  "query": { "type": "string", "maxLength": 65536 }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "SPARQL query result. The representation depends on the query form and Accept header.",
+            "content": {
+              "application/sparql-results+json": {
+                "schema": { "type": "object", "additionalProperties": true }
+              },
+              "text/csv": { "schema": { "type": "string" } },
+              "text/tab-separated-values": { "schema": { "type": "string" } },
+              "text/turtle": { "schema": { "type": "string" } },
+              "application/ld+json": {
+                "schema": { "type": "object", "additionalProperties": true }
+              },
+              "application/n-triples": { "schema": { "type": "string" } }
+            }
+          },
+          "400": {
+            "description": "The SPARQL query is missing, invalid, unbounded, or contains a forbidden operation.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "401": {
+            "description": "A valid API-client token is required.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "403": {
+            "description": "The API client does not have the required scope.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "404": {
+            "description": "The operation or resource is not exposed by this participant.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "413": {
+            "description": "The query or serialized result exceeds the configured limit.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "503": {
+            "description": "Another SPARQL query is still occupying this replica.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "504": {
+            "description": "The 30-second response deadline was exceeded.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          }
+        },
+        "security": [{ "apiClientToken": [] }],
+        "x-required-scope": "federated-catalog:sparql"
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "CatalogRequestV3": {
+        "required": ["@context", "counterPartyAddress", "protocol"],
+        "type": "object",
+        "properties": {
+          "@context": { "type": "object" },
+          "@type": {
+            "type": "string",
+            "example": "https://w3id.org/edc/v0.0.1/ns/CatalogRequest"
+          },
+          "additionalScopes": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "counterPartyAddress": { "type": "string" },
+          "counterPartyId": { "type": "string" },
+          "protocol": { "type": "string" },
+          "querySpec": { "$ref": "#/components/schemas/QuerySpec" }
+        },
+        "example": {
+          "@context": { "@vocab": "https://w3id.org/edc/v0.0.1/ns/" },
+          "@type": "CatalogRequest",
+          "counterPartyAddress": "http://provider-address",
+          "counterPartyId": "providerId",
+          "protocol": "dataspace-protocol-http",
+          "additionalScopes": [
+            "org.eclipse.edc.vc.type:SomeCredential:read",
+            "org.eclipse.edc.vc.type:AnotherCredential:write"
+          ],
+          "querySpec": {
+            "offset": 0,
+            "limit": 50,
+            "sortOrder": "DESC",
+            "sortField": "fieldName",
+            "filterExpression": []
+          }
+        }
+      },
+      "CatalogV3": {
+        "type": "object",
+        "description": "DCAT catalog",
+        "example": {
+          "@id": "7df65569-8c59-4013-b1c0-fa14f6641bf2",
+          "@type": "dcat:Catalog",
+          "dcat:dataset": {
+            "@id": "bcca61be-e82e-4da6-bfec-9716a56cef35",
+            "@type": "dcat:Dataset",
+            "odrl:hasPolicy": {
+              "@id": "OGU0ZTMzMGMtODQ2ZS00ZWMxLThmOGQtNWQxNWM0NmI2NmY4:YmNjYTYxYmUtZTgyZS00ZGE2LWJmZWMtOTcxNmE1NmNlZjM1:NDY2ZTZhMmEtNjQ1Yy00ZGQ0LWFlZDktMjdjNGJkZTU4MDNj",
+              "@type": "odrl:Set",
+              "odrl:permission": {
+                "odrl:target": "bcca61be-e82e-4da6-bfec-9716a56cef35",
+                "odrl:action": {
+                  "odrl:type": "http://www.w3.org/ns/odrl/2/use"
+                },
+                "odrl:constraint": {
+                  "odrl:and": [
+                    {
+                      "odrl:leftOperand": "https://w3id.org/edc/v0.0.1/ns/inForceDate",
+                      "odrl:operator": { "@id": "odrl:gteq" },
+                      "odrl:rightOperand": "2023-07-07T07:19:58.585601395Z"
+                    },
+                    {
+                      "odrl:leftOperand": "https://w3id.org/edc/v0.0.1/ns/inForceDate",
+                      "odrl:operator": { "@id": "odrl:lteq" },
+                      "odrl:rightOperand": "2023-07-12T07:19:58.585601395Z"
+                    }
+                  ]
+                }
+              },
+              "odrl:prohibition": [],
+              "odrl:obligation": []
+            },
+            "dcat:distribution": [
+              {
+                "@type": "dcat:Distribution",
+                "dct:format": { "@id": "HttpData" },
+                "dcat:accessService": "5e839777-d93e-4785-8972-1005f51cf367"
+              }
+            ],
+            "description": "description",
+            "id": "bcca61be-e82e-4da6-bfec-9716a56cef35"
+          },
+          "dcat:service": {
+            "@id": "5e839777-d93e-4785-8972-1005f51cf367",
+            "@type": "dcat:DataService",
+            "dct:terms": "connector",
+            "dcat:endpointURL": "http://localhost:16806/protocol"
+          },
+          "dspace:participantId": "urn:connector:provider",
+          "@context": {
+            "@vocab": "https://w3id.org/edc/v0.0.1/ns/",
+            "dct": "http://purl.org/dc/terms/",
+            "edc": "https://w3id.org/edc/v0.0.1/ns/",
+            "dcat": "http://www.w3.org/ns/dcat#",
+            "odrl": "http://www.w3.org/ns/odrl/2/",
+            "dspace": "https://w3id.org/dspace/v0.8/"
+          }
+        }
+      },
+      "DatasetRequestV3": {
+        "type": "object",
+        "properties": {
+          "@type": {
+            "type": "string",
+            "example": "https://w3id.org/edc/v0.0.1/ns/CatalogRequest"
+          },
+          "counterPartyAddress": { "type": "string" },
+          "counterPartyId": { "type": "string" },
+          "protocol": { "type": "string" },
+          "querySpec": { "$ref": "#/components/schemas/QuerySpec" }
+        },
+        "example": {
+          "@context": { "@vocab": "https://w3id.org/edc/v0.0.1/ns/" },
+          "@type": "DatasetRequest",
+          "@id": "dataset-id",
+          "counterPartyAddress": "http://counter-party-address",
+          "counterPartyId": "counter-party-id",
+          "protocol": "dataspace-protocol-http"
+        }
+      },
+      "DatasetV3": {
+        "type": "object",
+        "description": "DCAT dataset",
+        "example": {
+          "@id": "bcca61be-e82e-4da6-bfec-9716a56cef35",
+          "@type": "dcat:Dataset",
+          "odrl:hasPolicy": {
+            "@id": "OGU0ZTMzMGMtODQ2ZS00ZWMxLThmOGQtNWQxNWM0NmI2NmY4:YmNjYTYxYmUtZTgyZS00ZGE2LWJmZWMtOTcxNmE1NmNlZjM1:NDY2ZTZhMmEtNjQ1Yy00ZGQ0LWFlZDktMjdjNGJkZTU4MDNj",
+            "@type": "odrl:Set",
+            "odrl:permission": {
+              "odrl:target": "bcca61be-e82e-4da6-bfec-9716a56cef35",
+              "odrl:action": { "odrl:type": "http://www.w3.org/ns/odrl/2/use" },
+              "odrl:constraint": {
+                "odrl:and": [
+                  {
+                    "odrl:leftOperand": "https://w3id.org/edc/v0.0.1/ns/inForceDate",
+                    "odrl:operator": { "@id": "odrl:gteq" },
+                    "odrl:rightOperand": "2023-07-07T07:19:58.585601395Z"
+                  },
+                  {
+                    "odrl:leftOperand": "https://w3id.org/edc/v0.0.1/ns/inForceDate",
+                    "odrl:operator": { "@id": "odrl:lteq" },
+                    "odrl:rightOperand": "2023-07-12T07:19:58.585601395Z"
+                  }
+                ]
+              }
+            },
+            "odrl:prohibition": [],
+            "odrl:obligation": [],
+            "odrl:target": "bcca61be-e82e-4da6-bfec-9716a56cef35"
+          },
+          "dcat:distribution": [
+            {
+              "@type": "dcat:Distribution",
+              "dct:format": { "@id": "HttpData" },
+              "dcat:accessService": "5e839777-d93e-4785-8972-1005f51cf367"
+            }
+          ],
+          "description": "description",
+          "id": "bcca61be-e82e-4da6-bfec-9716a56cef35",
+          "@context": {
+            "@vocab": "https://w3id.org/edc/v0.0.1/ns/",
+            "dct": "http://purl.org/dc/terms/",
+            "edc": "https://w3id.org/edc/v0.0.1/ns/",
+            "dcat": "http://www.w3.org/ns/dcat#",
+            "odrl": "http://www.w3.org/ns/odrl/2/",
+            "dspace": "https://w3id.org/dspace/v0.8/"
+          }
+        }
+      },
+      "QuerySpec": {
+        "type": "object",
+        "properties": {
+          "@type": {
+            "type": "string",
+            "example": "https://w3id.org/edc/v0.0.1/ns/QuerySpec"
+          },
+          "filterExpression": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/Criterion" }
+          },
+          "limit": { "type": "integer", "format": "int32" },
+          "offset": { "type": "integer", "format": "int32" },
+          "sortField": { "type": "string" },
+          "sortOrder": { "type": "string", "enum": ["ASC", "DESC"] }
+        },
+        "example": {
+          "@context": { "@vocab": "https://w3id.org/edc/v0.0.1/ns/" },
+          "@type": "QuerySpec",
+          "offset": 5,
+          "limit": 10,
+          "sortOrder": "DESC",
+          "sortField": "fieldName",
+          "filterExpression": []
+        }
+      },
+      "AssetOutputV3": {
+        "type": "object",
+        "properties": {
+          "@id": { "type": "string" },
+          "@type": {
+            "type": "string",
+            "example": "https://w3id.org/edc/v0.0.1/ns/Asset"
+          },
+          "createdAt": { "type": "integer", "format": "int64" },
+          "dataAddress": { "$ref": "#/components/schemas/DataAddress" },
+          "privateProperties": { "type": "object" },
+          "properties": { "type": "object" }
+        },
+        "example": {
+          "@context": { "@vocab": "https://w3id.org/edc/v0.0.1/ns/" },
+          "@id": "asset-id",
+          "properties": { "key": "value" },
+          "privateProperties": { "privateKey": "privateValue" },
+          "dataAddress": {
+            "type": "HttpData",
+            "baseUrl": "https://jsonplaceholder.typicode.com/todos"
+          },
+          "createdAt": 1688465655
+        }
+      },
+      "ApiErrorDetail": {
+        "type": "object",
+        "properties": {
+          "invalidValue": { "type": "string" },
+          "message": { "type": "string" },
+          "path": { "type": "string" },
+          "type": { "type": "string" }
+        },
+        "example": {
+          "message": "error message",
+          "type": "ErrorType",
+          "path": "object.error.path",
+          "invalidValue": "this value is not valid"
+        }
+      },
+      "AssetInputV3": {
+        "required": ["@context", "dataAddress", "properties"],
+        "type": "object",
+        "properties": {
+          "@context": { "type": "object" },
+          "@id": { "type": "string" },
+          "@type": {
+            "type": "string",
+            "example": "https://w3id.org/edc/v0.0.1/ns/Asset"
+          },
+          "dataAddress": { "$ref": "#/components/schemas/DataAddress" },
+          "privateProperties": { "type": "object" },
+          "properties": { "type": "object" }
+        },
+        "example": {
+          "@context": { "@vocab": "https://w3id.org/edc/v0.0.1/ns/" },
+          "@id": "asset-id",
+          "properties": { "key": "value" },
+          "privateProperties": { "privateKey": "privateValue" },
+          "dataAddress": {
+            "type": "HttpData",
+            "baseUrl": "https://jsonplaceholder.typicode.com/todos"
+          }
+        }
+      },
+      "IdResponse": {
+        "type": "object",
+        "properties": {
+          "@id": { "type": "string" },
+          "createdAt": { "type": "integer", "format": "int64" }
+        },
+        "example": {
+          "@context": { "@vocab": "https://w3id.org/edc/v0.0.1/ns/" },
+          "@id": "id-value",
+          "createdAt": 1688465655
+        }
+      },
+      "PolicyDefinitionOutputV3": {
+        "type": "object",
+        "properties": {
+          "@id": { "type": "string" },
+          "@type": {
+            "type": "string",
+            "example": "https://w3id.org/edc/v0.0.1/ns/PolicyDefinition"
+          },
+          "policy": {
+            "type": "object",
+            "description": "ODRL policy",
+            "example": {
+              "@context": "http://www.w3.org/ns/odrl.jsonld",
+              "@id": "0949ba30-680c-44e6-bc7d-1688cbe1847e",
+              "@type": "odrl:Set",
+              "permission": {
+                "target": "http://example.com/asset:9898.movie",
+                "action": { "type": "http://www.w3.org/ns/odrl/2/use" },
+                "constraint": {
+                  "leftOperand": "https://w3id.org/edc/v0.0.1/ns/left",
+                  "operator": "eq",
+                  "rightOperand": "value"
+                }
+              },
+              "prohibition": [],
+              "obligation": []
+            }
+          }
+        },
+        "example": {
+          "@context": { "@vocab": "https://w3id.org/edc/v0.0.1/ns/" },
+          "@id": "definition-id",
+          "policy": {
+            "@context": "http://www.w3.org/ns/odrl.jsonld",
+            "@type": "Set",
+            "uid": "http://example.com/policy:1010",
+            "permission": [
+              {
+                "target": "http://example.com/asset:9898.movie",
+                "action": "display",
+                "constraint": [
+                  {
+                    "leftOperand": "spatial",
+                    "operator": "eq",
+                    "rightOperand": "https://www.wikidata.org/wiki/Q183",
+                    "comment": "i.e Germany"
+                  }
+                ]
+              }
+            ]
+          },
+          "createdAt": 1688465655
+        }
+      },
+      "PolicyDefinitionInputV3": {
+        "required": ["@context", "policy"],
+        "type": "object",
+        "properties": {
+          "@context": { "type": "object" },
+          "@id": { "type": "string" },
+          "@type": {
+            "type": "string",
+            "example": "https://w3id.org/edc/v0.0.1/ns/PolicyDefinition"
+          },
+          "policy": {
+            "type": "object",
+            "description": "ODRL policy",
+            "example": {
+              "@context": "http://www.w3.org/ns/odrl.jsonld",
+              "@id": "0949ba30-680c-44e6-bc7d-1688cbe1847e",
+              "@type": "odrl:Set",
+              "permission": {
+                "target": "http://example.com/asset:9898.movie",
+                "action": { "type": "http://www.w3.org/ns/odrl/2/use" },
+                "constraint": {
+                  "leftOperand": "https://w3id.org/edc/v0.0.1/ns/left",
+                  "operator": "eq",
+                  "rightOperand": "value"
+                }
+              },
+              "prohibition": [],
+              "obligation": []
+            }
+          }
+        },
+        "example": {
+          "@context": { "@vocab": "https://w3id.org/edc/v0.0.1/ns/" },
+          "@id": "definition-id",
+          "policy": {
+            "@context": "http://www.w3.org/ns/odrl.jsonld",
+            "@type": "Set",
+            "uid": "http://example.com/policy:1010",
+            "profile": "http://example.com/odrl:profile:02",
+            "permission": [
+              {
+                "target": "http://example.com/asset:9898.movie",
+                "action": "display",
+                "constraint": [
+                  {
+                    "leftOperand": "spatial",
+                    "operator": "eq",
+                    "rightOperand": "https://www.wikidata.org/wiki/Q183",
+                    "comment": "i.e Germany"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "ApiErrorDetail_1": {
+        "type": "object",
+        "properties": {
+          "invalidValue": { "type": "object" },
+          "message": { "type": "string" },
+          "path": { "type": "string" },
+          "type": { "type": "string" }
+        },
+        "example": {
+          "path": "path",
+          "message": "message",
+          "type": "type",
+          "invalidValue": "{}"
+        }
+      },
+      "List": {
+        "type": "object",
+        "properties": {
+          "@id": { "type": "string" },
+          "groups": {
+            "uniqueItems": true,
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        },
+        "example": {
+          "@context": { "tx": "https://w3id.org/tractusx/v0.0.1/ns/" },
+          "@id": "BPN000001234",
+          "tx:groups": "group1,group2,group3"
+        }
+      },
+      "ContractDefinitionOutputV3": {
+        "type": "object",
+        "properties": {
+          "@id": { "type": "string" },
+          "@type": {
+            "type": "string",
+            "example": "https://w3id.org/edc/v0.0.1/ns/ContractDefinition"
+          },
+          "accessPolicyId": { "type": "string" },
+          "assetsSelector": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/Criterion" }
+          },
+          "contractPolicyId": { "type": "string" },
+          "createdAt": { "type": "integer", "format": "int64" }
+        },
+        "example": {
+          "@context": { "@vocab": "https://w3id.org/edc/v0.0.1/ns/" },
+          "@id": "definition-id",
+          "accessPolicyId": "asset-policy-id",
+          "contractPolicyId": "contract-policy-id",
+          "assetsSelector": [],
+          "createdAt": 1688465655
+        }
+      },
+      "ContractDefinitionInputV3": {
+        "required": ["@context", "accessPolicyId", "assetsSelector", "contractPolicyId"],
+        "type": "object",
+        "properties": {
+          "@context": { "type": "object" },
+          "@id": { "type": "string" },
+          "@type": {
+            "type": "string",
+            "example": "https://w3id.org/edc/v0.0.1/ns/ContractDefinition"
+          },
+          "accessPolicyId": { "type": "string" },
+          "assetsSelector": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/Criterion" }
+          },
+          "contractPolicyId": { "type": "string" }
+        },
+        "example": {
+          "@context": { "@vocab": "https://w3id.org/edc/v0.0.1/ns/" },
+          "@id": "definition-id",
+          "accessPolicyId": "asset-policy-id",
+          "contractPolicyId": "contract-policy-id",
+          "assetsSelector": []
+        }
+      },
+      "ContractNegotiation": {
+        "type": "object",
+        "properties": {
+          "@id": { "type": "string" },
+          "@type": {
+            "type": "string",
+            "example": "https://w3id.org/edc/v0.0.1/ns/ContractNegotiation"
+          },
+          "callbackAddresses": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/CallbackAddress" }
+          },
+          "contractAgreementId": { "type": "string" },
+          "counterPartyAddress": { "type": "string" },
+          "counterPartyId": { "type": "string" },
+          "errorDetail": { "type": "string" },
+          "protocol": { "type": "string" },
+          "state": { "type": "string" },
+          "type": { "type": "string", "enum": ["CONSUMER", "PROVIDER"] }
+        },
+        "example": {
+          "@context": { "@vocab": "https://w3id.org/edc/v0.0.1/ns/" },
+          "@type": "https://w3id.org/edc/v0.0.1/ns/ContractNegotiation",
+          "@id": "negotiation-id",
+          "type": "PROVIDER",
+          "protocol": "dataspace-protocol-http",
+          "counterPartyId": "counter-party-id",
+          "counterPartyAddress": "http://counter/party/address",
+          "state": "VERIFIED",
+          "contractAgreementId": "contract:agreement:id",
+          "errorDetail": "eventual-error-detail",
+          "createdAt": 1688465655,
+          "callbackAddresses": [
+            {
+              "transactional": false,
+              "uri": "http://callback/url",
+              "events": ["contract.negotiation", "transfer.process"],
+              "authKey": "auth-key",
+              "authCodeId": "auth-code-id"
+            }
+          ]
+        }
+      },
+      "ContractRequestV3": {
+        "required": ["@context", "counterPartyAddress", "policy", "protocol"],
+        "type": "object",
+        "properties": {
+          "@context": { "type": "object" },
+          "@type": {
+            "type": "string",
+            "example": "https://w3id.org/edc/v0.0.1/ns/ContractRequest"
+          },
+          "callbackAddresses": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/CallbackAddress" }
+          },
+          "counterPartyAddress": { "type": "string" },
+          "policy": { "$ref": "#/components/schemas/OfferV3" },
+          "protocol": { "type": "string" }
+        },
+        "example": {
+          "@context": { "@vocab": "https://w3id.org/edc/v0.0.1/ns/" },
+          "@type": "https://w3id.org/edc/v0.0.1/ns/ContractRequest",
+          "counterPartyAddress": "http://provider-address",
+          "protocol": "dataspace-protocol-http",
+          "policy": {
+            "@context": "http://www.w3.org/ns/odrl.jsonld",
+            "@type": "odrl:Offer",
+            "@id": "offer-id",
+            "assigner": "providerId",
+            "permission": [],
+            "prohibition": [],
+            "obligation": [],
+            "target": "assetId"
+          },
+          "callbackAddresses": [
+            {
+              "transactional": false,
+              "uri": "http://callback/url",
+              "events": ["contract.negotiation", "transfer.process"],
+              "authKey": "auth-key",
+              "authCodeId": "auth-code-id"
+            }
+          ]
+        }
+      },
+      "TerminateNegotiationV3": {
+        "type": "object",
+        "properties": {
+          "@id": { "type": "string" },
+          "@type": {
+            "type": "string",
+            "example": "https://w3id.org/edc/v0.0.1/ns/TerminateNegotiation"
+          },
+          "reason": { "type": "string" }
+        },
+        "example": {
+          "@context": { "@vocab": "https://w3id.org/edc/v0.0.1/ns/" },
+          "@type": "https://w3id.org/edc/v0.0.1/ns/TerminateNegotiation",
+          "@id": "negotiation-id",
+          "reason": "a reason to terminate"
+        }
+      },
+      "ContractAgreement_1": {
+        "type": "object",
+        "properties": {
+          "@id": { "type": "string" },
+          "@type": {
+            "type": "string",
+            "example": "https://w3id.org/edc/v0.0.1/ns/ContractAgreement"
+          },
+          "assetId": { "type": "string" },
+          "consumerId": { "type": "string" },
+          "contractSigningDate": { "type": "integer", "format": "int64" },
+          "policy": {
+            "type": "object",
+            "description": "ODRL policy",
+            "example": {
+              "@context": "http://www.w3.org/ns/odrl.jsonld",
+              "@id": "0949ba30-680c-44e6-bc7d-1688cbe1847e",
+              "@type": "odrl:Set",
+              "permission": {
+                "target": "http://example.com/asset:9898.movie",
+                "action": { "type": "http://www.w3.org/ns/odrl/2/use" },
+                "constraint": {
+                  "leftOperand": "https://w3id.org/edc/v0.0.1/ns/left",
+                  "operator": "eq",
+                  "rightOperand": "value"
+                }
+              },
+              "prohibition": [],
+              "obligation": []
+            }
+          },
+          "providerId": { "type": "string" }
+        },
+        "example": {
+          "@context": { "@vocab": "https://w3id.org/edc/v0.0.1/ns/" },
+          "@type": "https://w3id.org/edc/v0.0.1/ns/ContractAgreement",
+          "@id": "negotiation-id",
+          "providerId": "provider-id",
+          "consumerId": "consumer-id",
+          "assetId": "asset-id",
+          "contractSigningDate": 1688465655,
+          "policy": {
+            "@context": "http://www.w3.org/ns/odrl.jsonld",
+            "@type": "Set",
+            "@id": "offer-id",
+            "permission": [{ "target": "asset-id", "action": "display" }]
+          }
+        }
+      },
+      "ContractAgreement": {
+        "type": "object",
+        "properties": {
+          "@id": { "type": "string" },
+          "@type": {
+            "type": "string",
+            "example": "https://w3id.org/edc/v0.0.1/ns/ContractAgreement"
+          },
+          "assetId": { "type": "string" },
+          "consumerId": { "type": "string" },
+          "contractSigningDate": { "type": "integer", "format": "int64" },
+          "policy": {
+            "type": "object",
+            "description": "ODRL policy",
+            "example": {
+              "@context": "http://www.w3.org/ns/odrl.jsonld",
+              "@id": "0949ba30-680c-44e6-bc7d-1688cbe1847e",
+              "@type": "odrl:Set",
+              "permission": {
+                "target": "http://example.com/asset:9898.movie",
+                "action": { "type": "http://www.w3.org/ns/odrl/2/use" },
+                "constraint": {
+                  "leftOperand": "https://w3id.org/edc/v0.0.1/ns/left",
+                  "operator": "eq",
+                  "rightOperand": "value"
+                }
+              },
+              "prohibition": [],
+              "obligation": []
+            }
+          },
+          "providerId": { "type": "string" }
+        },
+        "example": {
+          "@context": { "@vocab": "https://w3id.org/edc/v0.0.1/ns/" },
+          "@type": "https://w3id.org/edc/v0.0.1/ns/ContractAgreement",
+          "@id": "negotiation-id",
+          "providerId": "provider-id",
+          "consumerId": "consumer-id",
+          "assetId": "asset-id",
+          "contractSigningDate": 1688465655,
+          "policy": {
+            "@context": "http://www.w3.org/ns/odrl.jsonld",
+            "@type": "Set",
+            "@id": "offer-id",
+            "permission": [{ "target": "asset-id", "action": "display" }]
+          }
+        }
+      },
+      "RetirementExample": {
+        "type": "object",
+        "properties": {
+          "@id": { "type": "string" },
+          "reason": { "type": "string" }
+        },
+        "example": {
+          "@context": {
+            "tx": "https://w3id.org/tractusx/v0.0.1/ns/",
+            "edc": "https://w3id.org/edc/v0.0.1/ns/"
+          },
+          "edc:agreementId": "contract-agreement-id",
+          "tx:reason": "This contract agreement was retired since the physical counterpart is no longer valid."
+        }
+      },
+      "TransferProcessV3": {
+        "type": "object",
+        "properties": {
+          "@id": { "type": "string" },
+          "@type": {
+            "type": "string",
+            "example": "https://w3id.org/edc/v0.0.1/ns/TransferProcess"
+          },
+          "callbackAddresses": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/CallbackAddress" }
+          },
+          "contractAgreementId": { "type": "string" },
+          "counterPartyAddress": { "type": "string" },
+          "counterPartyId": { "type": "string" },
+          "dataDestination": { "$ref": "#/components/schemas/DataAddress" },
+          "errorDetail": { "type": "string" },
+          "privateProperties": { "type": "object" },
+          "protocol": { "type": "string" },
+          "state": { "type": "string" },
+          "type": { "type": "string", "enum": ["CONSUMER", "PROVIDER"] }
+        },
+        "example": {
+          "@context": { "@vocab": "https://w3id.org/edc/v0.0.1/ns/" },
+          "@type": "https://w3id.org/edc/v0.0.1/ns/TransferProcess",
+          "@id": "process-id",
+          "correlationId": "correlation-id",
+          "type": "PROVIDER",
+          "state": "STARTED",
+          "stateTimestamp": 1688465655,
+          "assetId": "asset-id",
+          "contractId": "contractId",
+          "dataDestination": { "type": "data-destination-type" },
+          "privateProperties": { "private-key": "private-value" },
+          "errorDetail": "eventual-error-detail",
+          "createdAt": 1688465655,
+          "callbackAddresses": [
+            {
+              "transactional": false,
+              "uri": "http://callback/url",
+              "events": ["contract.negotiation", "transfer.process"],
+              "authKey": "auth-key",
+              "authCodeId": "auth-code-id"
+            }
+          ]
+        }
+      },
+      "TransferRequestV3": {
+        "required": ["@context", "contractId", "counterPartyAddress", "protocol", "transferType"],
+        "type": "object",
+        "properties": {
+          "@context": { "type": "object" },
+          "@type": {
+            "type": "string",
+            "example": "https://w3id.org/edc/v0.0.1/ns/TransferRequest"
+          },
+          "assetId": { "type": "string", "deprecated": true },
+          "callbackAddresses": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/CallbackAddress" }
+          },
+          "contractId": { "type": "string" },
+          "counterPartyAddress": { "type": "string" },
+          "dataDestination": { "$ref": "#/components/schemas/DataAddress" },
+          "privateProperties": { "type": "object" },
+          "protocol": { "type": "string" },
+          "transferType": { "type": "string" }
+        },
+        "example": {
+          "@context": { "@vocab": "https://w3id.org/edc/v0.0.1/ns/" },
+          "@type": "https://w3id.org/edc/v0.0.1/ns/TransferRequest",
+          "protocol": "dataspace-protocol-http",
+          "counterPartyAddress": "http://provider-address",
+          "contractId": "contract-id",
+          "transferType": "transferType",
+          "dataDestination": { "type": "data-destination-type" },
+          "privateProperties": { "private-key": "private-value" },
+          "callbackAddresses": [
+            {
+              "transactional": false,
+              "uri": "http://callback/url",
+              "events": ["contract.negotiation", "transfer.process"],
+              "authKey": "auth-key",
+              "authCodeId": "auth-code-id"
+            }
+          ]
+        }
+      },
+      "TerminateTransferV3": {
+        "type": "object",
+        "properties": {
+          "@type": {
+            "type": "string",
+            "example": "https://w3id.org/edc/v0.0.1/ns/TerminateTransfer"
+          },
+          "state": { "type": "string" }
+        },
+        "example": {
+          "@context": { "@vocab": "https://w3id.org/edc/v0.0.1/ns/" },
+          "@type": "https://w3id.org/edc/v0.0.1/ns/TerminateTransfer",
+          "reason": "a reason to terminate"
+        }
+      },
+      "DataAddress": {
+        "type": "object",
+        "properties": {
+          "@type": {
+            "type": "string",
+            "example": "https://w3id.org/edc/v0.0.1/ns/DataAddress"
+          },
+          "type": { "type": "string" }
+        },
+        "example": {
+          "@type": "https://w3id.org/edc/v0.0.1/ns/DataAddress",
+          "type": "type"
+        }
+      },
+      "Criterion": {
+        "required": ["operandLeft", "operandRight", "operator"],
+        "type": "object",
+        "properties": {
+          "@type": {
+            "type": "string",
+            "example": "https://w3id.org/edc/v0.0.1/ns/Criterion"
+          },
+          "operandLeft": { "type": "object" },
+          "operandRight": { "type": "object" },
+          "operator": { "type": "string" }
+        },
+        "example": {
+          "@context": { "@vocab": "https://w3id.org/edc/v0.0.1/ns/" },
+          "@type": "Criterion",
+          "operandLeft": "fieldName",
+          "operator": "=",
+          "operandRight": "some value"
+        }
+      },
+      "CallbackAddress": {
+        "type": "object",
+        "properties": {
+          "@type": {
+            "type": "string",
+            "example": "https://w3id.org/edc/v0.0.1/ns/CallbackAddress"
+          },
+          "authCodeId": { "type": "string" },
+          "authKey": { "type": "string" },
+          "events": {
+            "uniqueItems": true,
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "transactional": { "type": "boolean" },
+          "uri": { "type": "string" }
+        }
+      },
+      "OfferV3": {
+        "required": ["@id", "assigner", "target"],
+        "type": "object",
+        "properties": {
+          "@id": { "type": "string" },
+          "@type": {
+            "type": "string",
+            "example": "http://www.w3.org/ns/odrl/2/Offer"
+          },
+          "assigner": { "type": "string" },
+          "target": { "type": "string" }
+        },
+        "description": "ODRL offer",
+        "example": {
+          "@context": "http://www.w3.org/ns/odrl.jsonld",
+          "@type": "odrl:Offer",
+          "@id": "offer-id",
+          "assigner": "providerId",
+          "target": "assetId",
+          "permission": [],
+          "prohibition": [],
+          "obligation": []
+        }
+      },
+      "FederatedParticipant": {
+        "type": "object",
+        "required": ["name", "bpn", "did", "dspEndpoint"],
+        "properties": {
+          "name": { "type": "string" },
+          "bpn": { "type": "string" },
+          "did": { "type": "string" },
+          "dspEndpoint": { "type": "string", "format": "uri" }
+        }
+      },
+      "JsonLdDocument": {
+        "type": "object",
+        "description": "Native compacted JSON-LD document. Additional semantic properties are preserved.",
+        "additionalProperties": true
+      },
+      "FederatedDatasetEntry": {
+        "type": "object",
+        "required": [
+          "id",
+          "datasetId",
+          "participant",
+          "counterPartyAddress",
+          "counterPartyId",
+          "crawledAt",
+          "stale",
+          "dataset"
+        ],
+        "properties": {
+          "id": { "type": "string" },
+          "datasetId": { "type": "string" },
+          "participant": {
+            "$ref": "#/components/schemas/FederatedParticipant"
+          },
+          "counterPartyAddress": { "type": "string", "format": "uri" },
+          "counterPartyId": { "type": "string" },
+          "crawledAt": { "type": "string", "format": "date-time" },
+          "stale": { "type": "boolean" },
+          "dataset": { "$ref": "#/components/schemas/JsonLdDocument" }
+        }
+      },
+      "FederatedDatasetPage": {
+        "type": "object",
+        "required": ["items", "total", "offset", "limit"],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/FederatedDatasetEntry" }
+          },
+          "total": { "type": "integer", "minimum": 0 },
+          "offset": { "type": "integer", "minimum": 0 },
+          "limit": { "type": "integer", "minimum": 1, "maximum": 100 }
+        }
+      },
+      "FederatedParticipantStatus": {
+        "type": "object",
+        "required": ["participant", "state", "datasetCount", "active", "stale"],
+        "properties": {
+          "participant": {
+            "$ref": "#/components/schemas/FederatedParticipant"
+          },
+          "state": {
+            "type": "string",
+            "enum": ["pending", "fresh", "degraded", "error", "inactive"]
+          },
+          "datasetCount": { "type": "integer", "minimum": 0 },
+          "lastAttemptAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "lastSuccessAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "inactiveSince": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "lastError": {
+            "type": "string",
+            "nullable": true,
+            "description": "Sanitized crawl error."
+          },
+          "active": { "type": "boolean" },
+          "stale": { "type": "boolean" }
+        }
+      },
+      "FederatedParticipantPage": {
+        "type": "object",
+        "required": ["items"],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FederatedParticipantStatus"
+            }
+          }
+        }
+      },
+      "GatewayError": {
+        "type": "object",
+        "required": ["error"],
+        "properties": {
+          "error": { "type": "string" },
+          "details": { "nullable": true }
+        }
+      }
+    },
+    "securitySchemes": {
+      "apiClientToken": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "txb_",
+        "description": "Opaque API-client token created in the participant portal. Each operation also declares its required scope in x-required-scope."
+      }
+    }
+  },
+  "x-api-client-scopes": [
+    "catalog:read",
+    "assets:read",
+    "assets:write",
+    "policies:read",
+    "policies:write",
+    "business-partner-groups:read",
+    "business-partner-groups:write",
+    "contract-definitions:read",
+    "contract-definitions:write",
+    "contract-negotiations:read",
+    "contract-negotiations:write",
+    "contract-agreements:read",
+    "contract-agreements:retire",
+    "transfers:read",
+    "transfers:write",
+    "edr:data-address:read",
+    "federated-catalog:read",
+    "federated-catalog:sparql"
+  ],
+  "x-upstream": {
+    "distribution": "Tractus-X EDC",
+    "distributionVersion": "0.12.1",
+    "eclipseEdcManagementApiVersion": "3.1.4",
+    "openApi": "https://eclipse-tractusx.github.io/tractusx-edc/openapi/control-plane-api/0.12.1/control-plane.yaml"
+  }
+}

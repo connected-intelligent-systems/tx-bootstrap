@@ -1,0 +1,43 @@
+{{- $ingresses := list
+  (dict "name" "public" "settings" .Values.ingress.public "service" "public-gateway" "port" .Values.publicGateway.service.port)
+  (dict "name" "internal" "settings" .Values.ingress.internal "service" "internal-gateway" "port" .Values.internalGateway.service.port)
+-}}
+{{- range $index, $ingress := $ingresses }}
+{{- if $ingress.settings.enabled }}
+{{- if $index }}
+---
+{{- end }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "tx-bootstrap-participant.componentName" (dict "root" $ "component" $ingress.name) }}
+  labels:
+    {{- include "tx-bootstrap-participant.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: {{ $ingress.name }}-gateway
+  {{- with $ingress.settings.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- with $ingress.settings.className }}
+  ingressClassName: {{ . }}
+  {{- end }}
+  rules:
+    {{- range $host := $ingress.settings.hosts }}
+    - host: {{ $host | quote }}
+      http:
+        paths:
+          - path: {{ $ingress.settings.path }}
+            pathType: {{ $ingress.settings.pathType }}
+            backend:
+              service:
+                name: {{ include "tx-bootstrap-participant.componentName" (dict "root" $ "component" $ingress.service) }}
+                port:
+                  number: {{ $ingress.port }}
+    {{- end }}
+  {{- with $ingress.settings.tls }}
+  tls:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+{{- end }}
+{{- end }}

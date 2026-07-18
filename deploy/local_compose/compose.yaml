@@ -1,0 +1,44 @@
+name: ${COMPOSE_PROJECT_PREFIX:-tx-bootstrap}-local-infrastructure
+
+# Local-only shared PostgreSQL. The reusable operator and participant
+# applications continue to require an externally supplied database endpoint.
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
+      POSTGRES_DB: postgres
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -h 127.0.0.1 -U ${POSTGRES_USER:-postgres} -d postgres",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks:
+      operator-database:
+        aliases: [postgres]
+      provider-database:
+        aliases: [postgres]
+      consumer-database:
+        aliases: [postgres]
+
+networks:
+  operator-database:
+    name: ${COMPOSE_PROJECT_PREFIX:-tx-bootstrap}-operator-database
+    internal: true
+  provider-database:
+    name: ${COMPOSE_PROJECT_PREFIX:-tx-bootstrap}-provider-database
+    internal: true
+  consumer-database:
+    name: ${COMPOSE_PROJECT_PREFIX:-tx-bootstrap}-consumer-database
+    internal: true
+
+volumes:
+  postgres-data:

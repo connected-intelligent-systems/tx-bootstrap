@@ -1,0 +1,267 @@
+nameOverride: ""
+fullnameOverride: ""
+
+imagePullSecrets: []
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+  automountServiceAccountToken: false
+
+podAnnotations: {}
+podLabels: {}
+terminationGracePeriodSeconds: 30
+revisionHistoryLimit: 3
+logLevel: info
+
+podSecurityContext:
+  runAsNonRoot: true
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+
+javaRuntime:
+  javaToolOptions: -Xmx256m
+  otelSdkDisabled: true
+  otelJavaagentEnabled: false
+
+identity:
+  issuerBpn: BPNL000000000001
+  issuerBpnBase64: "QlBOTDAwMDAwMDAwMDAwMQ=="
+  issuerDidHost: issuer.example.invalid
+  useHttpsDidWeb: true
+
+vault:
+  url: https://vault.example.invalid
+  apiSecretPath: /v1/secret
+  healthCheckPath: /v1/sys/health
+
+# The chart never creates this Secret. Provision it before helm install so the
+# pre-install migration hook can use it. See README.md for required keys.
+existingSecret:
+  name: tx-bootstrap-operator-secrets
+  keys:
+    vaultToken: vault-token
+    identityHubJdbcUrl: identityhub-jdbc-url
+    identityHubDbUser: identityhub-db-user
+    identityHubDbPassword: identityhub-db-password
+    issuerServiceJdbcUrl: issuer-service-jdbc-url
+    issuerServiceDbUser: issuer-service-db-user
+    issuerServiceDbPassword: issuer-service-db-password
+    bdrsJdbcUrl: bdrs-jdbc-url
+    bdrsDbUser: bdrs-db-user
+    bdrsDbPassword: bdrs-db-password
+    operatorMigratorDatabaseUrl: operator-migrator-database-url
+    operatorConsoleDatabaseUrl: operator-console-database-url
+    onboardingDatabaseUrl: onboarding-database-url
+    issuerMigratorDatabaseUrl: issuer-migrator-database-url
+    issuerClaimsDatabaseUrl: issuer-claims-database-url
+    bdrsApiKey: bdrs-api-key
+    operatorConsoleApiKey: operator-console-api-key
+    # Leave empty to let the console retrieve the key from Vault.
+    issuerApiKey: ""
+
+jobs:
+  migrator:
+    enabled: true
+    backoffLimit: 2
+    activeDeadlineSeconds: 300
+    # Pre-install hooks run before chart-managed ServiceAccounts exist.
+    serviceAccountName: default
+    migrationDirectory: /app/db/migrations
+    ownerRole: dataspace_admin_owner
+  issuerClaimsGrant:
+    enabled: true
+    backoffLimit: 2
+    activeDeadlineSeconds: 300
+    claimsRole: issuer_claims_writer
+  retryTimeoutMs: 120000
+  retryDelayMs: 2000
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: "1"
+      memory: 512Mi
+
+issuerIdentityHub:
+  replicaCount: 1
+  securityContext:
+    runAsUser: 10100
+    runAsGroup: 101
+  image:
+    repository: tractusx/identityhub
+    tag: 0.3.2
+    digest: ""
+    pullPolicy: IfNotPresent
+  jtiValidation: true
+  encryptionKeyAlias: encryption-key
+  encryptionStrict: true
+  service:
+    type: ClusterIP
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 512Mi
+
+issuerService:
+  replicaCount: 1
+  securityContext:
+    runAsUser: 10100
+    runAsGroup: 101
+  image:
+    repository: tractusx/issuerservice
+    tag: 0.3.2
+    digest: ""
+    pullPolicy: IfNotPresent
+  jtiValidation: true
+  encryptionKeyAlias: encryption-key
+  encryptionStrict: true
+  service:
+    type: ClusterIP
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 512Mi
+
+bdrs:
+  replicaCount: 1
+  securityContext:
+    runAsUser: 10100
+    runAsGroup: 101
+  image:
+    repository: tractusx/bdrs-server
+    tag: 0.5.7
+    digest: ""
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 512Mi
+
+issuerDid:
+  replicaCount: 1
+  securityContext:
+    runAsUser: 101
+    runAsGroup: 101
+  image:
+    repository: nginxinc/nginx-unprivileged
+    tag: 1.30.4-alpine3.24
+    digest: ""
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 80
+  resources:
+    requests:
+      cpu: 25m
+      memory: 32Mi
+    limits:
+      cpu: 500m
+      memory: 128Mi
+
+operatorConsole:
+  replicaCount: 1
+  securityContext:
+    runAsUser: 1000
+    runAsGroup: 1000
+  image:
+    repository: ghcr.io/salberternst/tx-bootstrap-operator-console
+    tag: 0.1.0
+    digest: ""
+    pullPolicy: IfNotPresent
+  auth:
+    mode: api-key
+    header: x-forwarded-user
+    allowedUsers: ""
+  title: ""
+  subtitle: ""
+  configJson: ""
+  themeJson: ""
+  httpsHeaders: true
+  service:
+    type: ClusterIP
+    port: 3000
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: "1"
+      memory: 512Mi
+
+operatorOnboarding:
+  replicaCount: 1
+  securityContext:
+    runAsUser: 1000
+    runAsGroup: 1000
+  image:
+    repository: ghcr.io/salberternst/tx-bootstrap-operator-onboarding-service
+    tag: 0.1.0
+    digest: ""
+    pullPolicy: IfNotPresent
+  allowedOrigins: https://participant.example.invalid
+  enableRateLimit: true
+  rateLimitMax: 60
+  rateLimitWindow: 1 minute
+  title: Operator Onboarding Service
+  configJson: ""
+  themeJson: ""
+  service:
+    type: ClusterIP
+    port: 3000
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: "1"
+      memory: 512Mi
+
+ingress:
+  issuerDid:
+    enabled: false
+    className: ""
+    annotations: {}
+    host: issuer.example.invalid
+    path: /
+    pathType: Prefix
+    tls: []
+  onboarding:
+    enabled: false
+    className: ""
+    annotations: {}
+    host: onboarding.example.invalid
+    path: /
+    pathType: Prefix
+    tls: []
+  console:
+    enabled: false
+    className: ""
+    annotations: {}
+    host: console.example.invalid
+    path: /
+    pathType: Prefix
+    tls: []
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

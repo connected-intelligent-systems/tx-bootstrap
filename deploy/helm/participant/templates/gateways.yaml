@@ -1,0 +1,96 @@
+{{- range $component, $settings := dict "public-gateway" .Values.publicGateway "internal-gateway" .Values.internalGateway }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "tx-bootstrap-participant.componentName" (dict "root" $ "component" $component) }}
+  labels:
+    {{- include "tx-bootstrap-participant.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: {{ $component }}
+spec:
+  replicas: {{ $settings.replicaCount }}
+  revisionHistoryLimit: {{ $.Values.revisionHistoryLimit }}
+  selector:
+    matchLabels:
+      {{- include "tx-bootstrap-participant.selectorLabels" (dict "root" $ "component" $component) | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "tx-bootstrap-participant.selectorLabels" (dict "root" $ "component" $component) | nindent 8 }}
+        {{- with $.Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmaps.yaml") $ | sha256sum }}
+        {{- with $.Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- include "tx-bootstrap-participant.podDefaults" $ | nindent 6 }}
+      containers:
+        - name: {{ $component }}
+          image: {{ include "tx-bootstrap-participant.image" $settings.image | quote }}
+          imagePullPolicy: {{ $settings.image.pullPolicy }}
+          securityContext:
+            {{- include "tx-bootstrap-participant.containerSecurityContext" (dict "root" $ "component" $settings.securityContext) | nindent 12 }}
+          ports:
+            - { name: http, containerPort: 8080 }
+          volumeMounts:
+            - name: nginx-config
+              mountPath: /etc/nginx/conf.d/default.conf
+              subPath: default.conf
+              readOnly: true
+          startupProbe:
+            exec:
+              command: [nginx, -t]
+            periodSeconds: 5
+            timeoutSeconds: 5
+            failureThreshold: 12
+          readinessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -ec
+                - >-
+                  {{- if eq $component "public-gateway" }}
+                  wget -q --spider http://{{ include "tx-bootstrap-participant.componentName" (dict "root" $ "component" "identityhub") }}:8081/api/check/readiness &&
+                  wget -q --spider http://{{ include "tx-bootstrap-participant.componentName" (dict "root" $ "component" "controlplane") }}:8080/api/check/readiness &&
+                  wget -q --spider http://{{ include "tx-bootstrap-participant.componentName" (dict "root" $ "component" "dataplane") }}:8080/api/check/readiness
+                  {{- else }}
+                  wget -q --spider http://{{ include "tx-bootstrap-participant.componentName" (dict "root" $ "component" "identityhub") }}:8081/api/check/readiness &&
+                  wget -q --spider http://{{ include "tx-bootstrap-participant.componentName" (dict "root" $ "component" "controlplane") }}:8080/api/check/readiness &&
+                  wget -q --spider http://{{ include "tx-bootstrap-participant.componentName" (dict "root" $ "component" "dataplane") }}:8080/api/check/readiness &&
+                  wget -q --spider http://{{ include "tx-bootstrap-participant.componentName" (dict "root" $ "component" "portal") }}:3000/health
+                  {{- end }}
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            exec:
+              command: [nginx, -t]
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources:
+            {{- toYaml $settings.resources | nindent 12 }}
+      volumes:
+        - name: nginx-config
+          configMap:
+            name: {{ include "tx-bootstrap-participant.componentName" (dict "root" $ "component" (ternary "public-nginx" "internal-nginx" (eq $component "public-gateway"))) }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "tx-bootstrap-participant.componentName" (dict "root" $ "component" $component) }}
+  labels:
+    {{- include "tx-bootstrap-participant.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: {{ $component }}
+spec:
+  type: {{ $settings.service.type }}
+  selector:
+    {{- include "tx-bootstrap-participant.selectorLabels" (dict "root" $ "component" $component) | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ $settings.service.port }}
+      targetPort: http
+---
+{{- end }}

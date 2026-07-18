@@ -1,0 +1,136 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "tx-bootstrap-participant.componentName" (dict "root" . "component" "identityhub") }}
+  labels:
+    {{- include "tx-bootstrap-participant.labels" . | nindent 4 }}
+    app.kubernetes.io/component: identityhub
+spec:
+  replicas: {{ .Values.identityHub.replicaCount }}
+  revisionHistoryLimit: {{ .Values.revisionHistoryLimit }}
+  selector:
+    matchLabels:
+      {{- include "tx-bootstrap-participant.selectorLabels" (dict "root" . "component" "identityhub") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "tx-bootstrap-participant.selectorLabels" (dict "root" . "component" "identityhub") | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmaps.yaml") . | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- include "tx-bootstrap-participant.podDefaults" . | nindent 6 }}
+      containers:
+        - name: identityhub
+          image: {{ include "tx-bootstrap-participant.image" .Values.identityHub.image | quote }}
+          imagePullPolicy: {{ .Values.identityHub.image.pullPolicy }}
+          securityContext:
+            {{- include "tx-bootstrap-participant.containerSecurityContext" (dict "root" . "component" .Values.identityHub.securityContext) | nindent 12 }}
+          ports:
+            - { name: control, containerPort: 8081 }
+            - { name: identity, containerPort: 8082 }
+            - { name: credentials, containerPort: 8083 }
+            - { name: did, containerPort: 8084 }
+            - { name: accounts, containerPort: 8085 }
+            - { name: version, containerPort: 8086 }
+            - { name: sts, containerPort: 8087 }
+          env:
+            {{- include "tx-bootstrap-participant.javaEnv" . | nindent 12 }}
+            - { name: WEB_HTTP_PORT, value: "8081" }
+            - { name: WEB_HTTP_PATH, value: /api }
+            - { name: WEB_HTTP_IDENTITY_PORT, value: "8082" }
+            - { name: WEB_HTTP_IDENTITY_PATH, value: /api/identity }
+            - { name: WEB_HTTP_IDENTITY_AUTH_ALIAS, value: password }
+            - name: EDC_IH_API_SUPERUSER_KEY
+              {{- include "tx-bootstrap-participant.secretValue" (dict "root" . "key" "identityHubSuperuserApiKey") | nindent 14 }}
+            - { name: WEB_HTTP_CREDENTIALS_PORT, value: "8083" }
+            - { name: WEB_HTTP_CREDENTIALS_PATH, value: /api/credentials }
+            - { name: WEB_HTTP_DID_PORT, value: "8084" }
+            - { name: WEB_HTTP_DID_PATH, value: / }
+            - { name: WEB_HTTP_ACCOUNTS_PORT, value: "8085" }
+            - { name: WEB_HTTP_ACCOUNTS_PATH, value: /api/accounts }
+            - { name: WEB_HTTP_VERSION_PORT, value: "8086" }
+            - { name: WEB_HTTP_VERSION_PATH, value: /.well-known/api }
+            - { name: WEB_HTTP_STS_PORT, value: "8087" }
+            - { name: WEB_HTTP_STS_PATH, value: /api/sts }
+            - name: EDC_IAM_DID_WEB_USE_HTTPS
+              value: {{ .Values.identity.useHttpsDidWeb | quote }}
+            - name: EDC_IH_IAM_ID
+              value: {{ include "tx-bootstrap-participant.participantDid" . | quote }}
+            - name: EDC_IAM_ACCESSTOKEN_JTI_VALIDATION
+              value: {{ .Values.identityHub.jtiValidation | quote }}
+            - { name: EDC_IAM_CREDENTIAL_REVOCATION_MIMETYPE, value: application/json }
+            - name: EDC_ENCRYPTION_AES_KEY_ALIAS
+              value: {{ .Values.identityHub.encryptionKeyAlias | quote }}
+            - name: EDC_ENCRYPTION_STRICT
+              value: {{ .Values.identityHub.encryptionStrict | quote }}
+            {{- include "tx-bootstrap-participant.vaultEnv" . | nindent 12 }}
+            - name: EDC_VAULT_HASHICORP_API_HEALTH_CHECK_PATH
+              value: {{ .Values.vault.healthCheckPath | quote }}
+            - { name: EDC_SQL_STORE_PARTICIPANTCONTEXT_DATASOURCE, value: participantcontext }
+            - { name: EDC_SQL_STORE_KEYPAIR_DATASOURCE, value: keypair }
+            - { name: EDC_SQL_STORE_DIDRESOURCE_DATASOURCE, value: didresource }
+            - { name: EDC_SQL_STORE_STSCLIENT_DATASOURCE, value: stsclient }
+            - { name: EDC_SQL_STORE_CREDENTIALREQUEST_DATASOURCE, value: credentialrequest }
+            - { name: EDC_SQL_STORE_CREDENTIALS_DATASOURCE, value: credentials }
+            - { name: EDC_SQL_STORE_JTI_DATASOURCE, value: jti }
+            - { name: EDC_SQL_STORE_PARTICIPANTCONTEXTCONFIG_DATASOURCE, value: participantcontextconfig }
+            {{- range $source := list "DEFAULT" "PARTICIPANTCONTEXT" "KEYPAIR" "DIDRESOURCE" "STSCLIENT" "CREDENTIALREQUEST" "CREDENTIALS" "JTI" "PARTICIPANTCONTEXTCONFIG" }}
+            - name: EDC_DATASOURCE_{{ $source }}_URL
+              {{- include "tx-bootstrap-participant.secretValue" (dict "root" $ "key" "identityHubJdbcUrl") | nindent 14 }}
+            - name: EDC_DATASOURCE_{{ $source }}_USER
+              {{- include "tx-bootstrap-participant.secretValue" (dict "root" $ "key" "identityHubDbUser") | nindent 14 }}
+            - name: EDC_DATASOURCE_{{ $source }}_PASSWORD
+              {{- include "tx-bootstrap-participant.secretValue" (dict "root" $ "key" "identityHubDbPassword") | nindent 14 }}
+            {{- end }}
+          volumeMounts:
+            - name: logging
+              mountPath: /app/logging.properties
+              subPath: logging.properties
+              readOnly: true
+          startupProbe:
+            httpGet: { path: /api/check/readiness, port: control }
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 30
+          readinessProbe:
+            httpGet: { path: /api/check/readiness, port: control }
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet: { path: /api/check/readiness, port: control }
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.identityHub.resources | nindent 12 }}
+      volumes:
+        - name: logging
+          configMap:
+            name: {{ include "tx-bootstrap-participant.componentName" (dict "root" . "component" "identityhub-logging") }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "tx-bootstrap-participant.componentName" (dict "root" . "component" "identityhub") }}
+  labels:
+    {{- include "tx-bootstrap-participant.labels" . | nindent 4 }}
+    app.kubernetes.io/component: identityhub
+spec:
+  type: {{ .Values.identityHub.service.type }}
+  selector:
+    {{- include "tx-bootstrap-participant.selectorLabels" (dict "root" . "component" "identityhub") | nindent 4 }}
+  ports:
+    - { name: control, port: 8081, targetPort: control }
+    - { name: identity, port: 8082, targetPort: identity }
+    - { name: credentials, port: 8083, targetPort: credentials }
+    - { name: did, port: 8084, targetPort: did }
+    - { name: accounts, port: 8085, targetPort: accounts }
+    - { name: version, port: 8086, targetPort: version }
+    - { name: sts, port: 8087, targetPort: sts }

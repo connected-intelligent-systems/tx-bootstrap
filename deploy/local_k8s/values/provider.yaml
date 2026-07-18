@@ -1,0 +1,80 @@
+identity:
+  participantRole: provider
+  participantBpn: __BPN_PROVIDER__
+  participantBpnBase64: __BPN_PROVIDER_BASE64__
+  participantContextId: __PROVIDER_CONTEXT_ID__
+  identityHubParticipantContextId: __BPN_PROVIDER__
+  participantDidHost: provider.__INGRESS_IP__.nip.io
+  participantPublicHost: provider.__INGRESS_IP__.nip.io
+  issuerBpn: __BPN_ISSUER__
+  issuerDidHost: issuer.__INGRESS_IP__.nip.io
+  useHttpsDidWeb: false
+
+publicEndpoints:
+  dspCallbackAddress: http://provider.__INGRESS_IP__.nip.io/api/v1/dsp
+  credentialServiceEndpoint: http://provider.__INGRESS_IP__.nip.io/api/credentials
+  dataPlaneBaseUrl: http://provider.__INGRESS_IP__.nip.io/api/public/
+  dataPlaneTokenRefreshEndpoint: http://provider.__INGRESS_IP__.nip.io/api/public
+  bdrsServerUrl: http://issuer.__INGRESS_IP__.nip.io/api/directory
+
+vault:
+  url: http://vault.tx-infra.svc.cluster.local:8200
+  apiSecretPath: /v1/provider
+  healthCheckPath: /v1/sys/health
+
+existingSecret:
+  name: tx-bootstrap-provider-secrets
+
+jobs:
+  portalMigrator:
+    ownerRole: provider_portal_owner
+    runtimeRole: provider_portal
+
+identityHub:
+  encryptionKeyAlias: provider-identityhub-encryption-key
+
+participantInit:
+  image:
+    repository: tx-bootstrap-participant-init
+    tag: local
+    pullPolicy: Never
+
+federatedCatalog:
+  image:
+    repository: tx-bootstrap-federated-catalog
+    tag: local
+    pullPolicy: Never
+
+portal:
+  image:
+    repository: tx-bootstrap-participant-portal-backend
+    tag: local
+    pullPolicy: Never
+  title: Portal - Provider
+  name: Local Provider
+  publicEdcEndpoint: http://consumer.__INGRESS_IP__.nip.io/api/v1/dsp
+  httpsHeaders: false
+  auth:
+    mode: none
+    allowInsecure: true
+  onboarding:
+    dataspaceAdminApiUrl: http://onboarding.__INGRESS_IP__.nip.io/api
+    organizationName: Local Provider
+    requestedBpn: __BPN_PROVIDER__
+    contactEmail: provider@local.test
+    requestedRole: participant
+    did: did:web:provider.__INGRESS_IP__.nip.io:__BPN_PROVIDER__
+    dspEndpoint: http://provider.__INGRESS_IP__.nip.io/api/v1/dsp
+    credentialServiceEndpoint: http://provider.__INGRESS_IP__.nip.io/api/credentials
+
+ingress:
+  public:
+    enabled: true
+    className: traefik
+    hosts:
+      - provider.__INGRESS_IP__.nip.io
+  internal:
+    enabled: true
+    className: traefik
+    hosts:
+      - provider-portal.__INGRESS_IP__.nip.io

@@ -1,0 +1,129 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "tx-bootstrap-operator.componentName" (dict "root" . "component" "console") }}
+  labels:
+    {{- include "tx-bootstrap-operator.labels" . | nindent 4 }}
+    app.kubernetes.io/component: console
+spec:
+  replicas: {{ .Values.operatorConsole.replicaCount }}
+  revisionHistoryLimit: {{ .Values.revisionHistoryLimit }}
+  selector:
+    matchLabels:
+      {{- include "tx-bootstrap-operator.selectorLabels" (dict "root" . "component" "console") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "tx-bootstrap-operator.selectorLabels" (dict "root" . "component" "console") | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      {{- include "tx-bootstrap-operator.podDefaults" . | nindent 6 }}
+      containers:
+        - name: console
+          image: {{ include "tx-bootstrap-operator.image" .Values.operatorConsole.image | quote }}
+          imagePullPolicy: {{ .Values.operatorConsole.image.pullPolicy }}
+          securityContext:
+            {{- include "tx-bootstrap-operator.containerSecurityContext" (dict "root" . "component" .Values.operatorConsole.securityContext) | nindent 12 }}
+          ports:
+            - { name: http, containerPort: 3000 }
+          env:
+            - { name: PORT, value: "3000" }
+            - name: OPERATOR_CONSOLE_DATABASE_URL
+              {{- include "tx-bootstrap-operator.secretValue" (dict "root" . "key" "operatorConsoleDatabaseUrl") | nindent 14 }}
+            - name: DATABASE_URL
+              {{- include "tx-bootstrap-operator.secretValue" (dict "root" . "key" "operatorConsoleDatabaseUrl") | nindent 14 }}
+            - name: OPERATOR_CONSOLE_AUTH_MODE
+              value: {{ .Values.operatorConsole.auth.mode | quote }}
+            - name: OPERATOR_CONSOLE_AUTH_HEADER
+              value: {{ .Values.operatorConsole.auth.header | quote }}
+            - name: OPERATOR_CONSOLE_AUTH_ALLOWED_USERS
+              value: {{ .Values.operatorConsole.auth.allowedUsers | quote }}
+            - name: OPERATOR_CONSOLE_TITLE
+              value: {{ .Values.operatorConsole.title | quote }}
+            - name: OPERATOR_CONSOLE_SUBTITLE
+              value: {{ .Values.operatorConsole.subtitle | quote }}
+            - name: OPERATOR_CONSOLE_CONFIG_JSON
+              value: {{ .Values.operatorConsole.configJson | quote }}
+            - name: OPERATOR_CONSOLE_THEME_JSON
+              value: {{ .Values.operatorConsole.themeJson | quote }}
+            - name: OPERATOR_CONSOLE_API_KEY
+              {{- if .Values.existingSecret.keys.operatorConsoleApiKey }}
+              {{- include "tx-bootstrap-operator.secretValue" (dict "root" . "key" "operatorConsoleApiKey") | nindent 14 }}
+              {{- else }}
+              value: ""
+              {{- end }}
+            - name: OPERATOR_CONSOLE_HTTPS_HEADERS
+              value: {{ .Values.operatorConsole.httpsHeaders | quote }}
+            - name: BDRS_MANAGEMENT_URL
+              value: "http://{{ include "tx-bootstrap-operator.componentName" (dict "root" . "component" "bdrs") }}:8081/api/management"
+            - name: BDRS_API_KEY
+              {{- include "tx-bootstrap-operator.secretValue" (dict "root" . "key" "bdrsApiKey") | nindent 14 }}
+            - name: ISSUER_DID
+              value: {{ include "tx-bootstrap-operator.issuerDid" . | quote }}
+            - name: ISSUER_ADMIN_URL
+              value: "http://{{ include "tx-bootstrap-operator.componentName" (dict "root" . "component" "issuer-service") }}:8086/api/admin"
+            - name: ISSUER_IDENTITY_URL
+              value: "http://{{ include "tx-bootstrap-operator.componentName" (dict "root" . "component" "issuer-service") }}:8087/api/identity"
+            - name: ISSUER_ISSUANCE_URL
+              value: "http://{{ include "tx-bootstrap-operator.componentName" (dict "root" . "component" "issuer-service") }}:8082/api/issuance"
+            - name: ISSUER_CLAIMS_DATABASE_URL
+              {{- include "tx-bootstrap-operator.secretValue" (dict "root" . "key" "issuerClaimsDatabaseUrl") | nindent 14 }}
+            - name: ISSUER_CONTEXT
+              value: {{ .Values.identity.issuerBpn | quote }}
+            - name: ISSUER_CONTEXT_PATH_ID
+              value: {{ .Values.identity.issuerBpnBase64 | quote }}
+            - name: ISSUER_API_KEY
+              {{- if .Values.existingSecret.keys.issuerApiKey }}
+              {{- include "tx-bootstrap-operator.secretValue" (dict "root" . "key" "issuerApiKey") | nindent 14 }}
+              {{- else }}
+              value: ""
+              {{- end }}
+            - name: ISSUER_API_KEY_ALIAS
+              value: {{ printf "%s-apikey" .Values.identity.issuerBpn | quote }}
+            - name: ISSUER_API_KEY_VAULT_URL
+              value: {{ .Values.vault.url | quote }}
+            - name: ISSUER_API_KEY_VAULT_TOKEN
+              {{- include "tx-bootstrap-operator.secretValue" (dict "root" . "key" "vaultToken") | nindent 14 }}
+            - name: ISSUER_API_KEY_VAULT_PATH
+              value: {{ printf "%s/data/data/%s-apikey" .Values.vault.apiSecretPath .Values.identity.issuerBpn | quote }}
+            - name: ISSUER_SUPERUSER_API_KEY_VAULT_PATH
+              value: {{ printf "%s/data/data/super-user-apikey" .Values.vault.apiSecretPath | quote }}
+          startupProbe:
+            httpGet: { path: /api/health, port: http }
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 30
+          readinessProbe:
+            httpGet: { path: /api/health, port: http }
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet: { path: /api/health, port: http }
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.operatorConsole.resources | nindent 12 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "tx-bootstrap-operator.componentName" (dict "root" . "component" "console") }}
+  labels:
+    {{- include "tx-bootstrap-operator.labels" . | nindent 4 }}
+    app.kubernetes.io/component: console
+spec:
+  type: {{ .Values.operatorConsole.service.type }}
+  selector:
+    {{- include "tx-bootstrap-operator.selectorLabels" (dict "root" . "component" "console") | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ .Values.operatorConsole.service.port }}
+      targetPort: http

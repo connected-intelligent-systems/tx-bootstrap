@@ -1,0 +1,12 @@
+apiVersion: v2
+name: tx-bootstrap-participant
+description: Tractus-X participant services for tx-bootstrap
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+kubeVersion: ">=1.27.0-0"
+home: https://github.com/salberternst/tx-bootstrap
+sources:
+  - https://github.com/salberternst/tx-bootstrap
+annotations:
+  artifacthub.io/license: MIT

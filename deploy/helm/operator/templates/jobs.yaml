@@ -1,0 +1,90 @@
+{{- if .Values.jobs.migrator.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "tx-bootstrap-operator.componentName" (dict "root" . "component" (printf "db-migrator-r%d" .Release.Revision)) }}
+  labels:
+    {{- include "tx-bootstrap-operator.labels" . | nindent 4 }}
+    app.kubernetes.io/component: db-migrator
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: "-10"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: {{ .Values.jobs.migrator.backoffLimit }}
+  activeDeadlineSeconds: {{ .Values.jobs.migrator.activeDeadlineSeconds }}
+  template:
+    metadata:
+      labels:
+        {{- include "tx-bootstrap-operator.selectorLabels" (dict "root" . "component" "db-migrator") | nindent 8 }}
+    spec:
+      {{- include "tx-bootstrap-operator.preInstallPodDefaults" (dict "root" . "serviceAccountName" .Values.jobs.migrator.serviceAccountName) | nindent 6 }}
+      restartPolicy: Never
+      containers:
+        - name: db-migrator
+          image: {{ include "tx-bootstrap-operator.image" .Values.operatorConsole.image | quote }}
+          imagePullPolicy: {{ .Values.operatorConsole.image.pullPolicy }}
+          command: [node, dist-server/apps/operator-console/server/migrate.js]
+          securityContext:
+            {{- include "tx-bootstrap-operator.containerSecurityContext" (dict "root" . "component" .Values.operatorConsole.securityContext) | nindent 12 }}
+          env:
+            - { name: PORT, value: "3000" }
+            - name: OPERATOR_MIGRATIONS_DIR
+              value: {{ .Values.jobs.migrator.migrationDirectory | quote }}
+            - name: OPERATOR_MIGRATOR_DATABASE_URL
+              {{- include "tx-bootstrap-operator.secretValue" (dict "root" . "key" "operatorMigratorDatabaseUrl") | nindent 14 }}
+            - name: OPERATOR_MIGRATOR_ROLE
+              value: {{ .Values.jobs.migrator.ownerRole | quote }}
+            - name: DB_MIGRATION_RETRY_TIMEOUT_MS
+              value: {{ .Values.jobs.retryTimeoutMs | quote }}
+            - name: DB_MIGRATION_RETRY_DELAY_MS
+              value: {{ .Values.jobs.retryDelayMs | quote }}
+            - name: LOG_LEVEL
+              value: {{ .Values.logLevel | quote }}
+          resources:
+            {{- toYaml .Values.jobs.resources | nindent 12 }}
+{{- end }}
+{{- if and .Values.jobs.migrator.enabled .Values.jobs.issuerClaimsGrant.enabled }}
+---
+{{- end }}
+{{- if .Values.jobs.issuerClaimsGrant.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "tx-bootstrap-operator.componentName" (dict "root" . "component" (printf "issuer-claims-grant-r%d" .Release.Revision)) }}
+  labels:
+    {{- include "tx-bootstrap-operator.labels" . | nindent 4 }}
+    app.kubernetes.io/component: issuer-claims-grant
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "10"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: {{ .Values.jobs.issuerClaimsGrant.backoffLimit }}
+  activeDeadlineSeconds: {{ .Values.jobs.issuerClaimsGrant.activeDeadlineSeconds }}
+  template:
+    metadata:
+      labels:
+        {{- include "tx-bootstrap-operator.selectorLabels" (dict "root" . "component" "issuer-claims-grant") | nindent 8 }}
+    spec:
+      {{- include "tx-bootstrap-operator.podDefaults" . | nindent 6 }}
+      restartPolicy: Never
+      containers:
+        - name: issuer-claims-grant
+          image: {{ include "tx-bootstrap-operator.image" .Values.operatorConsole.image | quote }}
+          imagePullPolicy: {{ .Values.operatorConsole.image.pullPolicy }}
+          command: [node, dist-server/apps/operator-console/server/grant-issuer-claims.js]
+          securityContext:
+            {{- include "tx-bootstrap-operator.containerSecurityContext" (dict "root" . "component" .Values.operatorConsole.securityContext) | nindent 12 }}
+          env:
+            - name: ISSUER_MIGRATOR_DATABASE_URL
+              {{- include "tx-bootstrap-operator.secretValue" (dict "root" . "key" "issuerMigratorDatabaseUrl") | nindent 14 }}
+            - name: ISSUER_CLAIMS_DB_ROLE
+              value: {{ .Values.jobs.issuerClaimsGrant.claimsRole | quote }}
+            - name: DB_MIGRATION_RETRY_TIMEOUT_MS
+              value: {{ .Values.jobs.retryTimeoutMs | quote }}
+            - name: DB_MIGRATION_RETRY_DELAY_MS
+              value: {{ .Values.jobs.retryDelayMs | quote }}
+          resources:
+            {{- toYaml .Values.jobs.resources | nindent 12 }}
+{{- end }}

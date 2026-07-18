@@ -1,0 +1,15 @@
+The tx-bootstrap operator release has been rendered.
+
+External prerequisites:
+  PostgreSQL: supplied through Secret {{ .Values.existingSecret.name }}
+  Vault:      {{ .Values.vault.url }}
+  Issuer DID: {{ include "tx-bootstrap-operator.issuerDid" . }}
+
+The Secret must exist before installation because the database migrator is a
+pre-install/pre-upgrade hook. Use --wait-for-jobs and the Helm-version-specific
+rollback/wait flags documented in this chart's README.
+
+{{- if not (or .Values.ingress.issuerDid.enabled .Values.ingress.onboarding.enabled .Values.ingress.console.enabled) }}
+No Ingress is enabled. Configure ingress.* or expose the ClusterIP Services
+through infrastructure managed outside this chart.
+{{- end }}

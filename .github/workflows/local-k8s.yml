@@ -1,0 +1,70 @@
+name: Local Kubernetes
+
+on:
+  pull_request:
+    paths:
+      - "deploy/local_k8s/**"
+      - "deploy/helm/**"
+      - "deploy/database/**"
+      - ".github/workflows/local-k8s.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "deploy/local_k8s/**"
+      - "deploy/helm/**"
+      - "deploy/database/**"
+      - ".github/workflows/local-k8s.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: local-k8s-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate Rancher Desktop environment
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v4.2.1
+
+      - name: Check shell syntax
+        run: bash -n deploy/local_k8s/scripts/*.sh
+
+      - name: Render environment values
+        shell: bash
+        run: |
+          source deploy/local_k8s/scripts/lib.sh
+          render_values deploy/local_k8s/values/operator.yaml deploy/local_k8s/.generated/operator-values.yaml
+          render_values deploy/local_k8s/values/provider.yaml deploy/local_k8s/.generated/provider-values.yaml
+          render_values deploy/local_k8s/values/consumer.yaml deploy/local_k8s/.generated/consumer-values.yaml
+
+      - name: Validate operator release
+        run: |
+          helm lint --strict deploy/helm/operator \
+            --values deploy/local_k8s/.generated/operator-values.yaml
+          helm template operator deploy/helm/operator \
+            --namespace tx-operator \
+            --values deploy/local_k8s/.generated/operator-values.yaml \
+            > /tmp/operator.yaml
+
+      - name: Validate participant releases
+        run: |
+          for participant in provider consumer; do
+            helm lint --strict deploy/helm/participant \
+              --values "deploy/local_k8s/.generated/${participant}-values.yaml"
+            helm template "$participant" deploy/helm/participant \
+              --namespace "tx-${participant}" \
+              --values "deploy/local_k8s/.generated/${participant}-values.yaml" \
+              > "/tmp/${participant}.yaml"
+          done

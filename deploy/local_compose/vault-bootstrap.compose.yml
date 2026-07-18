@@ -1,0 +1,102 @@
+# Shared local-only Vault initialization and unseal logic.
+configs:
+  local-vault-bootstrap:
+    content: |
+      #!/bin/sh
+      set -eu
+
+      : "$${VAULT_ADDR:?VAULT_ADDR must be set}"
+      : "$${VAULT_APP_TOKEN:?VAULT_APP_TOKEN must be set}"
+
+      bootstrap_file="$${VAULT_BOOTSTRAP_FILE:-/vault/bootstrap/credentials}"
+
+      wait_for_vault() {
+          while :; do
+              status_json="$$(vault status -format=json 2>/dev/null || true)"
+              if [ -n "$$status_json" ]; then
+                  printf '%s\n' "$$status_json"
+                  return 0
+              fi
+              sleep 1
+          done
+      }
+
+      status_json="$$(wait_for_vault)"
+      if printf '%s\n' "$$status_json" | grep -q '"initialized"[[:space:]]*:[[:space:]]*false'; then
+          init_output="$$(vault operator init -key-shares=1 -key-threshold=1)"
+          unseal_key="$$(printf '%s\n' "$$init_output" | sed -n 's/^Unseal Key 1: //p')"
+          initial_root_token="$$(printf '%s\n' "$$init_output" | sed -n 's/^Initial Root Token: //p')"
+          [ -n "$$unseal_key" ] && [ -n "$$initial_root_token" ] || {
+              echo "Failed to parse Vault initialization output" >&2
+              exit 1
+          }
+
+          umask 077
+          mkdir -p "$$(dirname "$$bootstrap_file")"
+          {
+              printf 'UNSEAL_KEY=%s\n' "$$unseal_key"
+              printf 'INITIAL_ROOT_TOKEN=%s\n' "$$initial_root_token"
+          } >"$$bootstrap_file"
+      else
+          [ -s "$$bootstrap_file" ] || {
+              echo "Vault is initialized but local unseal material is missing" >&2
+              exit 1
+          }
+      fi
+
+      # Vault emits both values using its URL-safe token alphabet.
+      # shellcheck disable=SC1090
+      . "$$bootstrap_file"
+
+      status_json="$$(vault status -format=json 2>/dev/null || true)"
+      if printf '%s\n' "$$status_json" | grep -q '"sealed"[[:space:]]*:[[:space:]]*true'; then
+          vault operator unseal "$$UNSEAL_KEY" >/dev/null
+      fi
+
+      export VAULT_TOKEN="$$INITIAL_ROOT_TOKEN"
+      if ! vault secrets list -format=json | grep -q '"secret/"'; then
+          vault secrets enable -path=secret kv-v2 >/dev/null
+      fi
+
+      vault policy write local-dev-full-access - >/dev/null <<-'EOPOLICY'
+      path "*" {
+        capabilities = ["create", "read", "update", "patch", "delete", "list", "sudo"]
+      }
+      EOPOLICY
+      vault token revoke "$$VAULT_APP_TOKEN" >/dev/null 2>&1 || true
+      vault token create \
+          -id="$$VAULT_APP_TOKEN" \
+          -policy=local-dev-full-access \
+          -orphan \
+          >/dev/null
+
+      export VAULT_TOKEN="$$VAULT_APP_TOKEN"
+      vault kv put secret/password content="$${VAULT_PASSWORD_VALUE:-password}" >/dev/null
+
+      for aes_key_alias in $${VAULT_AES_KEY_ALIASES:-}; do
+          case "$$aes_key_alias" in
+              *[!a-zA-Z0-9._-]*|'')
+                  echo "Invalid local AES key alias: $$aes_key_alias" >&2
+                  exit 1
+                  ;;
+          esac
+
+          if ! vault kv get -field=content "secret/$$aes_key_alias" >/dev/null 2>&1; then
+              aes_key="$$(head -c 32 /dev/urandom | base64)"
+              vault kv put "secret/$$aes_key_alias" content="$$aes_key" >/dev/null
+          fi
+      done
+
+      if [ -n "$${BDRS_API_KEY:-}" ]; then
+          : "$${BDRS_DB_USER:?BDRS_DB_USER must be set}"
+          : "$${BDRS_DB_PASSWORD:?BDRS_DB_PASSWORD must be set}"
+          vault kv put secret/mgmt-api-key content="$$BDRS_API_KEY" >/dev/null
+          vault kv put secret/edc.datasource.didentry.user content="$$BDRS_DB_USER" >/dev/null
+          vault kv put secret/edc.datasource.didentry.password content="$$BDRS_DB_PASSWORD" >/dev/null
+      fi
+
+      if [ -n "$${IDENTITYHUB_SUPERUSER_API_KEY:-}" ]; then
+          vault kv put secret/super-user-apikey content="$$IDENTITYHUB_SUPERUSER_API_KEY" >/dev/null
+      fi
+
+      echo "Local Vault is initialized, unsealed, and seeded."

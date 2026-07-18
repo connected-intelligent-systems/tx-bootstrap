@@ -1,0 +1,587 @@
+name: ${COMPOSE_PROJECT_NAME:-tx-bootstrap-participant}
+
+x-java-env: &java-env
+  JAVA_TOOL_OPTIONS: "${JAVA_TOOL_OPTIONS:--Xmx256m}"
+  OTEL_SDK_DISABLED: "${OTEL_SDK_DISABLED:-true}"
+  OTEL_JAVAAGENT_ENABLED: "${OTEL_JAVAAGENT_ENABLED:-false}"
+
+x-runtime-defaults: &runtime-defaults
+  restart: "${RESTART_POLICY:-unless-stopped}"
+  init: true
+  pids_limit: 512
+  stop_grace_period: 30s
+  security_opt:
+    - no-new-privileges:true
+  logging:
+    driver: "${LOG_DRIVER:-json-file}"
+    options:
+      max-size: "${LOG_MAX_SIZE:-10m}"
+      max-file: "${LOG_MAX_FILES:-3}"
+
+x-java-runtime: &java-runtime
+  <<: *runtime-defaults
+  mem_limit: 512m
+  cpus: 1.0
+
+x-node-runtime: &node-runtime
+  <<: *runtime-defaults
+  mem_limit: 512m
+  cpus: 1.0
+
+x-python-runtime: &python-runtime
+  <<: *runtime-defaults
+  mem_limit: 1g
+  cpus: 1.0
+
+x-gateway-runtime: &gateway-runtime
+  <<: *runtime-defaults
+  mem_limit: 128m
+  cpus: 0.5
+  cap_drop:
+    - ALL
+  cap_add:
+    - NET_BIND_SERVICE
+
+services:
+  identityhub:
+    <<: *java-runtime
+    image: tractusx/identityhub:${IDENTITYHUB_TAG:-0.3.2}
+    configs:
+      - source: ih-logging
+        target: /app/logging.properties
+    environment:
+      <<: *java-env
+      WEB_HTTP_PORT: "8081"
+      WEB_HTTP_PATH: "/api"
+      WEB_HTTP_IDENTITY_PORT: "8082"
+      WEB_HTTP_IDENTITY_PATH: "/api/identity"
+      WEB_HTTP_IDENTITY_AUTH_ALIAS: "password"
+      EDC_IH_API_SUPERUSER_KEY: ${IDENTITYHUB_SUPERUSER_API_KEY:?IDENTITYHUB_SUPERUSER_API_KEY must be set}
+      WEB_HTTP_CREDENTIALS_PORT: "8083"
+      WEB_HTTP_CREDENTIALS_PATH: "/api/credentials"
+      WEB_HTTP_DID_PORT: "8084"
+      WEB_HTTP_DID_PATH: "/"
+      WEB_HTTP_ACCOUNTS_PORT: "8085"
+      WEB_HTTP_ACCOUNTS_PATH: "/api/accounts"
+      WEB_HTTP_VERSION_PORT: "8086"
+      WEB_HTTP_VERSION_PATH: "/.well-known/api"
+      WEB_HTTP_STS_PORT: "8087"
+      WEB_HTTP_STS_PATH: "/api/sts"
+      EDC_IAM_DID_WEB_USE_HTTPS: "${USE_HTTPS_DID_WEB:-true}"
+      EDC_IH_IAM_ID: "did:web:${PARTICIPANT_DID_HOST:?PARTICIPANT_DID_HOST must be set}:${PARTICIPANT_BPN:?PARTICIPANT_BPN must be set}"
+      # Reject reused DCP token identifiers to protect against replay attacks.
+      EDC_IAM_ACCESSTOKEN_JTI_VALIDATION: "${PARTICIPANT_IDENTITYHUB_JTI_VALIDATION:-true}"
+      EDC_IAM_CREDENTIAL_REVOCATION_MIMETYPE: "application/json"
+      # AES is registered only when this alias resolves to a compatible Vault key.
+      EDC_ENCRYPTION_AES_KEY_ALIAS: "${PARTICIPANT_IDENTITYHUB_ENCRYPTION_KEY_ALIAS:?PARTICIPANT_IDENTITYHUB_ENCRYPTION_KEY_ALIAS must be set}"
+      EDC_ENCRYPTION_STRICT: "${PARTICIPANT_IDENTITYHUB_ENCRYPTION_STRICT:-true}"
+      EDC_VAULT_HASHICORP_URL: "${VAULT_URL:?VAULT_URL must be set}"
+      EDC_VAULT_HASHICORP_TOKEN: "${VAULT_TOKEN:?VAULT_TOKEN must be set}"
+      EDC_VAULT_HASHICORP_API_SECRET_PATH: "/v1/secret"
+      EDC_VAULT_HASHICORP_API_HEALTH_CHECK_PATH: "/v1/sys/health"
+      EDC_SQL_STORE_PARTICIPANTCONTEXT_DATASOURCE: "participantcontext"
+      EDC_SQL_STORE_KEYPAIR_DATASOURCE: "keypair"
+      EDC_SQL_STORE_DIDRESOURCE_DATASOURCE: "didresource"
+      EDC_SQL_STORE_STSCLIENT_DATASOURCE: "stsclient"
+      EDC_SQL_STORE_CREDENTIALREQUEST_DATASOURCE: "credentialrequest"
+      EDC_SQL_STORE_CREDENTIALS_DATASOURCE: "credentials"
+      EDC_SQL_STORE_JTI_DATASOURCE: "jti"
+      EDC_SQL_STORE_PARTICIPANTCONTEXTCONFIG_DATASOURCE: "participantcontextconfig"
+      EDC_DATASOURCE_DEFAULT_URL: "${PARTICIPANT_IDENTITYHUB_JDBC_URL:?PARTICIPANT_IDENTITYHUB_JDBC_URL must be set}"
+      EDC_DATASOURCE_DEFAULT_USER: "${PARTICIPANT_IDENTITYHUB_DB_USER:?PARTICIPANT_IDENTITYHUB_DB_USER must be set}"
+      EDC_DATASOURCE_DEFAULT_PASSWORD: "${PARTICIPANT_IDENTITYHUB_DB_PASSWORD:?PARTICIPANT_IDENTITYHUB_DB_PASSWORD must be set}"
+      EDC_DATASOURCE_PARTICIPANTCONTEXT_URL: "${PARTICIPANT_IDENTITYHUB_JDBC_URL:?PARTICIPANT_IDENTITYHUB_JDBC_URL must be set}"
+      EDC_DATASOURCE_PARTICIPANTCONTEXT_USER: "${PARTICIPANT_IDENTITYHUB_DB_USER:?PARTICIPANT_IDENTITYHUB_DB_USER must be set}"
+      EDC_DATASOURCE_PARTICIPANTCONTEXT_PASSWORD: "${PARTICIPANT_IDENTITYHUB_DB_PASSWORD:?PARTICIPANT_IDENTITYHUB_DB_PASSWORD must be set}"
+      EDC_DATASOURCE_KEYPAIR_URL: "${PARTICIPANT_IDENTITYHUB_JDBC_URL:?PARTICIPANT_IDENTITYHUB_JDBC_URL must be set}"
+      EDC_DATASOURCE_KEYPAIR_USER: "${PARTICIPANT_IDENTITYHUB_DB_USER:?PARTICIPANT_IDENTITYHUB_DB_USER must be set}"
+      EDC_DATASOURCE_KEYPAIR_PASSWORD: "${PARTICIPANT_IDENTITYHUB_DB_PASSWORD:?PARTICIPANT_IDENTITYHUB_DB_PASSWORD must be set}"
+      EDC_DATASOURCE_DIDRESOURCE_URL: "${PARTICIPANT_IDENTITYHUB_JDBC_URL:?PARTICIPANT_IDENTITYHUB_JDBC_URL must be set}"
+      EDC_DATASOURCE_DIDRESOURCE_USER: "${PARTICIPANT_IDENTITYHUB_DB_USER:?PARTICIPANT_IDENTITYHUB_DB_USER must be set}"
+      EDC_DATASOURCE_DIDRESOURCE_PASSWORD: "${PARTICIPANT_IDENTITYHUB_DB_PASSWORD:?PARTICIPANT_IDENTITYHUB_DB_PASSWORD must be set}"
+      EDC_DATASOURCE_STSCLIENT_URL: "${PARTICIPANT_IDENTITYHUB_JDBC_URL:?PARTICIPANT_IDENTITYHUB_JDBC_URL must be set}"
+      EDC_DATASOURCE_STSCLIENT_USER: "${PARTICIPANT_IDENTITYHUB_DB_USER:?PARTICIPANT_IDENTITYHUB_DB_USER must be set}"
+      EDC_DATASOURCE_STSCLIENT_PASSWORD: "${PARTICIPANT_IDENTITYHUB_DB_PASSWORD:?PARTICIPANT_IDENTITYHUB_DB_PASSWORD must be set}"
+      EDC_DATASOURCE_CREDENTIALREQUEST_URL: "${PARTICIPANT_IDENTITYHUB_JDBC_URL:?PARTICIPANT_IDENTITYHUB_JDBC_URL must be set}"
+      EDC_DATASOURCE_CREDENTIALREQUEST_USER: "${PARTICIPANT_IDENTITYHUB_DB_USER:?PARTICIPANT_IDENTITYHUB_DB_USER must be set}"
+      EDC_DATASOURCE_CREDENTIALREQUEST_PASSWORD: "${PARTICIPANT_IDENTITYHUB_DB_PASSWORD:?PARTICIPANT_IDENTITYHUB_DB_PASSWORD must be set}"
+      EDC_DATASOURCE_CREDENTIALS_URL: "${PARTICIPANT_IDENTITYHUB_JDBC_URL:?PARTICIPANT_IDENTITYHUB_JDBC_URL must be set}"
+      EDC_DATASOURCE_CREDENTIALS_USER: "${PARTICIPANT_IDENTITYHUB_DB_USER:?PARTICIPANT_IDENTITYHUB_DB_USER must be set}"
+      EDC_DATASOURCE_CREDENTIALS_PASSWORD: "${PARTICIPANT_IDENTITYHUB_DB_PASSWORD:?PARTICIPANT_IDENTITYHUB_DB_PASSWORD must be set}"
+      EDC_DATASOURCE_JTI_URL: "${PARTICIPANT_IDENTITYHUB_JDBC_URL:?PARTICIPANT_IDENTITYHUB_JDBC_URL must be set}"
+      EDC_DATASOURCE_JTI_USER: "${PARTICIPANT_IDENTITYHUB_DB_USER:?PARTICIPANT_IDENTITYHUB_DB_USER must be set}"
+      EDC_DATASOURCE_JTI_PASSWORD: "${PARTICIPANT_IDENTITYHUB_DB_PASSWORD:?PARTICIPANT_IDENTITYHUB_DB_PASSWORD must be set}"
+      EDC_DATASOURCE_PARTICIPANTCONTEXTCONFIG_URL: "${PARTICIPANT_IDENTITYHUB_JDBC_URL:?PARTICIPANT_IDENTITYHUB_JDBC_URL must be set}"
+      EDC_DATASOURCE_PARTICIPANTCONTEXTCONFIG_USER: "${PARTICIPANT_IDENTITYHUB_DB_USER:?PARTICIPANT_IDENTITYHUB_DB_USER must be set}"
+      EDC_DATASOURCE_PARTICIPANTCONTEXTCONFIG_PASSWORD: "${PARTICIPANT_IDENTITYHUB_DB_PASSWORD:?PARTICIPANT_IDENTITYHUB_DB_PASSWORD must be set}"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget -q --spider http://localhost:8081/api/check/readiness || exit 1",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+    networks:
+      backend: {}
+      egress: {}
+      internal:
+        aliases:
+          - ${PARTICIPANT_ROLE:?PARTICIPANT_ROLE must be set}-identityhub
+
+  participant-init:
+    <<: *node-runtime
+    image: ${PARTICIPANT_INIT_IMAGE:?PARTICIPANT_INIT_IMAGE must be set to a versioned tag or digest}
+    restart: "no"
+    environment:
+      PARTICIPANT_ROLE: ${PARTICIPANT_ROLE:?PARTICIPANT_ROLE must be set}
+      PARTICIPANT_BPN: ${PARTICIPANT_BPN:?PARTICIPANT_BPN must be set}
+      PARTICIPANT_BPN_BASE64: ${PARTICIPANT_BPN_BASE64:?PARTICIPANT_BPN_BASE64 must be set}
+      IDENTITYHUB_PARTICIPANT_CONTEXT_ID: ${IDENTITYHUB_PARTICIPANT_CONTEXT_ID:-${PARTICIPANT_BPN:?PARTICIPANT_BPN must be set}}
+      PARTICIPANT_DID_HOST: ${PARTICIPANT_DID_HOST:?PARTICIPANT_DID_HOST must be set}
+      PARTICIPANT_PUBLIC_HOST: ${PARTICIPANT_PUBLIC_HOST:?PARTICIPANT_PUBLIC_HOST must be set}
+      PUBLIC_DSP_CALLBACK_ADDRESS: ${PUBLIC_DSP_CALLBACK_ADDRESS:-https://${PARTICIPANT_PUBLIC_HOST:?PARTICIPANT_PUBLIC_HOST must be set}/api/v1/dsp}
+      PUBLIC_CREDENTIAL_SERVICE_ENDPOINT: ${PUBLIC_CREDENTIAL_SERVICE_ENDPOINT:-https://${PARTICIPANT_PUBLIC_HOST:?PARTICIPANT_PUBLIC_HOST must be set}/api/credentials/v1/participants/${PARTICIPANT_BPN_BASE64:?PARTICIPANT_BPN_BASE64 must be set}}
+      IDENTITYHUB_API_KEY: ${IDENTITYHUB_API_KEY:-}
+      IDENTITYHUB_SUPERUSER_API_KEY_ALIAS: ${IDENTITYHUB_SUPERUSER_API_KEY_ALIAS:-super-user-apikey}
+      VAULT_TOKEN: "${VAULT_TOKEN:?VAULT_TOKEN must be set}"
+      IDENTITYHUB_IDENTITY_URL: "http://identityhub:8082/api/identity"
+      IDENTITYHUB_HEALTH_URL: "http://identityhub:8081/api/check/readiness"
+      VAULT_ADDR: "${VAULT_URL:?VAULT_URL must be set}"
+      VAULT_SECRET_PATH: "/v1/secret"
+      PARTICIPANT_INIT_MARKER_ALIAS: "${PARTICIPANT_INIT_MARKER_ALIAS:-}"
+    depends_on:
+      identityhub:
+        condition: service_healthy
+    networks:
+      backend:
+        aliases:
+          - ${PARTICIPANT_ROLE:?PARTICIPANT_ROLE must be set}-init
+      egress: {}
+
+  controlplane:
+    <<: *java-runtime
+    image: tractusx/edc-controlplane-postgresql-hashicorp-vault:${TRACTUSX_EDC_TAG:-0.12.1}
+    configs:
+      - source: edc-logging
+        target: /app/logging.properties
+      - source: opentelemetry
+        target: /app/opentelemetry.properties
+    environment:
+      <<: *java-env
+      EDC_HOSTNAME: "controlplane"
+      EDC_PARTICIPANT_ID: "did:web:${PARTICIPANT_DID_HOST:?PARTICIPANT_DID_HOST must be set}:${PARTICIPANT_BPN:?PARTICIPANT_BPN must be set}"
+      EDC_PARTICIPANT_CONTEXT_ID: "${PARTICIPANT_CONTEXT_ID:?PARTICIPANT_CONTEXT_ID must be set}"
+      TRACTUSX_EDC_PARTICIPANT_BPN: "${PARTICIPANT_BPN:?PARTICIPANT_BPN must be set}"
+      EDC_IAM_ISSUER_ID: "did:web:${PARTICIPANT_DID_HOST:?PARTICIPANT_DID_HOST must be set}:${PARTICIPANT_BPN:?PARTICIPANT_BPN must be set}"
+      EDC_IAM_DID_WEB_USE_HTTPS: "${USE_HTTPS_DID_WEB:-true}"
+      EDC_IAM_CREDENTIAL_REVOCATION_MIMETYPE: "application/json"
+      EDC_IAM_STS_OAUTH_TOKEN_URL: "http://identityhub:8087/api/sts/token"
+      EDC_IAM_STS_OAUTH_CLIENT_ID: "did:web:${PARTICIPANT_DID_HOST:?PARTICIPANT_DID_HOST must be set}:${PARTICIPANT_BPN:?PARTICIPANT_BPN must be set}"
+      EDC_IAM_STS_OAUTH_CLIENT_SECRET_ALIAS: "sts-oauth-client-secret"
+      TX_EDC_IAM_IATP_CREDENTIALSERVICE_URL: "http://identityhub:8083/api/credentials/v1/participants/${PARTICIPANT_BPN_BASE64:?PARTICIPANT_BPN_BASE64 must be set}"
+      TX_EDC_IAM_IATP_DEFAULT_SCOPES_MEMBERSHIP_ALIAS: "org.eclipse.tractusx.vc.type"
+      TX_EDC_IAM_IATP_DEFAULT_SCOPES_MEMBERSHIP_TYPE: "MembershipCredential"
+      TX_EDC_IAM_IATP_DEFAULT_SCOPES_MEMBERSHIP_OPERATION: "read"
+      TX_EDC_IAM_IATP_DEFAULT_SCOPES_DATAEXCHANGE_ALIAS: "org.eclipse.tractusx.vc.type"
+      TX_EDC_IAM_IATP_DEFAULT_SCOPES_DATAEXCHANGE_TYPE: "DataExchangeGovernanceCredential"
+      TX_EDC_IAM_IATP_DEFAULT_SCOPES_DATAEXCHANGE_OPERATION: "read"
+      EDC_DSP_CALLBACK_ADDRESS: "${PUBLIC_DSP_CALLBACK_ADDRESS:-https://${PARTICIPANT_PUBLIC_HOST:?PARTICIPANT_PUBLIC_HOST must be set}/api/v1/dsp}"
+      TX_EDC_IAM_IATP_BDRS_SERVER_URL: "${BDRS_SERVER_URL:?BDRS_SERVER_URL must be set}"
+      TX_EDC_IAM_IATP_BDRS_CACHE_VALIDITY: "600"
+      TX_EDC_DID_SERVICE_SELF_REGISTRATION_ENABLED: "false"
+      "EDC_IAM_TRUSTED-ISSUER_0-ISSUER_ID": "did:web:${ISSUER_DID_HOST:?ISSUER_DID_HOST must be set}:${BPN_ISSUER:?BPN_ISSUER must be set}"
+      "EDC_IAM_TRUSTED-ISSUER_0-ISSUER_SUPPORTEDTYPES": '["MembershipCredential","FrameworkCredential","BpnCredential","DataExchangeGovernanceCredential","DismantlerCredential"]'
+      WEB_HTTP_PORT: "8080"
+      WEB_HTTP_PATH: "/api"
+      WEB_HTTP_MANAGEMENT_PORT: "8081"
+      WEB_HTTP_MANAGEMENT_PATH: "/management"
+      WEB_HTTP_MANAGEMENT_AUTH_KEY: "${EDC_API_KEY:?EDC_API_KEY must be set}"
+      WEB_HTTP_CATALOG_PORT: "8082"
+      WEB_HTTP_CATALOG_PATH: "/catalog"
+      WEB_HTTP_CONTROL_PORT: "8083"
+      WEB_HTTP_CONTROL_PATH: "/control"
+      WEB_HTTP_PROTOCOL_PORT: "8084"
+      WEB_HTTP_PROTOCOL_PATH: "/api/v1/dsp"
+      WEB_HTTP_VERSION_PORT: "8085"
+      WEB_HTTP_VERSION_PATH: "/.well-known/api"
+      EDC_DATASOURCE_DEFAULT_URL: "${PARTICIPANT_EDC_JDBC_URL:?PARTICIPANT_EDC_JDBC_URL must be set}"
+      EDC_DATASOURCE_DEFAULT_USER: "${PARTICIPANT_EDC_DB_USER:?PARTICIPANT_EDC_DB_USER must be set}"
+      EDC_DATASOURCE_DEFAULT_PASSWORD: "${PARTICIPANT_EDC_DB_PASSWORD:?PARTICIPANT_EDC_DB_PASSWORD must be set}"
+      EDC_VAULT_HASHICORP_URL: "${VAULT_URL:?VAULT_URL must be set}"
+      EDC_VAULT_HASHICORP_TOKEN: "${VAULT_TOKEN:?VAULT_TOKEN must be set}"
+      EDC_VAULT_HASHICORP_API_SECRET_PATH: "/v1/secret"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget -q --spider http://localhost:8080/api/check/readiness || exit 1",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+    depends_on:
+      identityhub:
+        condition: service_healthy
+      participant-init:
+        condition: service_completed_successfully
+    networks:
+      backend: {}
+      egress: {}
+      internal:
+        aliases:
+          - ${PARTICIPANT_ROLE:?PARTICIPANT_ROLE must be set}-controlplane
+
+  dataplane:
+    <<: *java-runtime
+    image: tractusx/edc-dataplane-hashicorp-vault:${TRACTUSX_EDC_TAG:-0.12.1}
+    configs:
+      - source: opentelemetry
+        target: /app/opentelemetry.properties
+    environment:
+      <<: *java-env
+      EDC_HOSTNAME: "dataplane"
+      EDC_PARTICIPANT_ID: "${PARTICIPANT_BPN:?PARTICIPANT_BPN must be set}"
+      EDC_PARTICIPANT_CONTEXT_ID: "${PARTICIPANT_CONTEXT_ID:?PARTICIPANT_CONTEXT_ID must be set}"
+      EDC_IAM_ISSUER_ID: "did:web:${PARTICIPANT_DID_HOST:?PARTICIPANT_DID_HOST must be set}:${PARTICIPANT_BPN:?PARTICIPANT_BPN must be set}"
+      EDC_IAM_DID_WEB_USE_HTTPS: "${USE_HTTPS_DID_WEB:-true}"
+      EDC_IAM_CREDENTIAL_REVOCATION_MIMETYPE: "application/json"
+      EDC_IAM_STS_OAUTH_TOKEN_URL: "http://identityhub:8087/api/sts/token"
+      EDC_IAM_STS_OAUTH_CLIENT_ID: "did:web:${PARTICIPANT_DID_HOST:?PARTICIPANT_DID_HOST must be set}:${PARTICIPANT_BPN:?PARTICIPANT_BPN must be set}"
+      EDC_IAM_STS_OAUTH_CLIENT_SECRET_ALIAS: "sts-oauth-client-secret"
+      WEB_HTTP_PORT: "8080"
+      WEB_HTTP_PATH: "/api"
+      WEB_HTTP_PUBLIC_PORT: "8081"
+      WEB_HTTP_PUBLIC_PATH: "/api/public"
+      WEB_HTTP_CONTROL_PORT: "8083"
+      WEB_HTTP_CONTROL_PATH: "/api/dataplane/control"
+      WEB_HTTP_VERSION_PORT: "8084"
+      WEB_HTTP_VERSION_PATH: "/.well-known/api"
+      EDC_DATAPLANE_API_PUBLIC_BASEURL: "${PUBLIC_DATAPLANE_BASE_URL:-https://${PARTICIPANT_PUBLIC_HOST:?PARTICIPANT_PUBLIC_HOST must be set}/api/public/}"
+      # Persisted EDRs use this advertised endpoint to refresh their short-lived
+      # authorization token. The data plane's internal default (http://dataplane)
+      # resolves to the consumer data plane after a restart and cannot refresh a
+      # token issued by the provider.
+      TX_EDC_DATAPLANE_TOKEN_REFRESH_ENDPOINT: "${PUBLIC_DATAPLANE_TOKEN_REFRESH_ENDPOINT:-https://${PARTICIPANT_PUBLIC_HOST:?PARTICIPANT_PUBLIC_HOST must be set}/api/public}"
+      EDC_TRANSFER_PROXY_TOKEN_SIGNER_PRIVATEKEY_ALIAS: "token-signer-key"
+      EDC_TRANSFER_PROXY_TOKEN_VERIFIER_PUBLICKEY_ALIAS: "token-signer-key"
+      EDC_DPF_SELECTOR_URL: "http://controlplane:8083/control/v1/dataplanes"
+      EDC_DATASOURCE_DEFAULT_URL: "${PARTICIPANT_EDC_JDBC_URL:?PARTICIPANT_EDC_JDBC_URL must be set}"
+      EDC_DATASOURCE_DEFAULT_USER: "${PARTICIPANT_EDC_DB_USER:?PARTICIPANT_EDC_DB_USER must be set}"
+      EDC_DATASOURCE_DEFAULT_PASSWORD: "${PARTICIPANT_EDC_DB_PASSWORD:?PARTICIPANT_EDC_DB_PASSWORD must be set}"
+      EDC_VAULT_HASHICORP_URL: "${VAULT_URL:?VAULT_URL must be set}"
+      EDC_VAULT_HASHICORP_TOKEN: "${VAULT_TOKEN:?VAULT_TOKEN must be set}"
+      EDC_VAULT_HASHICORP_API_SECRET_PATH: "/v1/secret"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget -q --spider http://localhost:8080/api/check/readiness || exit 1",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+    depends_on:
+      controlplane:
+        condition: service_healthy
+    networks:
+      backend: {}
+      egress: {}
+      internal:
+        aliases:
+          - ${PARTICIPANT_ROLE:?PARTICIPANT_ROLE must be set}-dataplane
+
+  participant-db-migrator:
+    <<: *node-runtime
+    image: ${PARTICIPANT_PORTAL_BACKEND_IMAGE:?PARTICIPANT_PORTAL_BACKEND_IMAGE must be set to a versioned tag or digest}
+    command: ["node", "dist-server/server/migrate.js"]
+    environment:
+      PARTICIPANT_PORTAL_MIGRATIONS_DIR: "/app/db/migrations"
+      PARTICIPANT_PORTAL_MIGRATOR_DATABASE_URL: "${PARTICIPANT_PORTAL_MIGRATOR_DATABASE_URL:?PARTICIPANT_PORTAL_MIGRATOR_DATABASE_URL must be set}"
+      PARTICIPANT_PORTAL_OWNER_ROLE: "${PARTICIPANT_PORTAL_OWNER_ROLE:?PARTICIPANT_PORTAL_OWNER_ROLE must be set}"
+      PARTICIPANT_PORTAL_DB_ROLE: "${PARTICIPANT_PORTAL_DB_ROLE:?PARTICIPANT_PORTAL_DB_ROLE must be set}"
+      DB_MIGRATION_RETRY_TIMEOUT_MS: "${DB_MIGRATION_RETRY_TIMEOUT_MS:-120000}"
+      DB_MIGRATION_RETRY_DELAY_MS: "${DB_MIGRATION_RETRY_DELAY_MS:-2000}"
+    restart: "no"
+    networks:
+      backend:
+      egress: {}
+
+  federated-catalog:
+    <<: *python-runtime
+    image: ${FEDERATED_CATALOG_IMAGE:?FEDERATED_CATALOG_IMAGE must be set to a versioned tag or digest}
+    environment:
+      FEDERATED_CATALOG_STORE_PATH: "/data/oxigraph"
+      FEDERATED_CATALOG_API_KEY: "${FEDERATED_CATALOG_API_KEY:?FEDERATED_CATALOG_API_KEY must be set}"
+      PARTICIPANT_BPN: "${PARTICIPANT_BPN:?PARTICIPANT_BPN must be set}"
+      PARTICIPANT_DIRECTORY_URL: "${ONBOARDING_DATASPACE_ADMIN_API_URL:-http://operator-onboarding-service:3000/api}"
+      EDC_MANAGEMENT_API_URL: "http://controlplane:8081/management"
+      EDC_API_KEY: "${EDC_API_KEY:?EDC_API_KEY must be set}"
+      DIRECTORY_REFRESH_INTERVAL_SECONDS: "${DIRECTORY_REFRESH_INTERVAL_SECONDS:-300}"
+      CATALOG_REFRESH_INTERVAL_SECONDS: "${CATALOG_REFRESH_INTERVAL_SECONDS:-900}"
+      CATALOG_CRAWL_CONCURRENCY: "${CATALOG_CRAWL_CONCURRENCY:-4}"
+    volumes:
+      - federated-catalog-data:/data
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready', timeout=3)",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+    depends_on:
+      controlplane:
+        condition: service_healthy
+    networks:
+      backend: {}
+      egress: {}
+
+  participant-portal-backend:
+    <<: *node-runtime
+    image: ${PARTICIPANT_PORTAL_BACKEND_IMAGE:?PARTICIPANT_PORTAL_BACKEND_IMAGE must be set to a versioned tag or digest}
+    environment:
+      PORT: "3000"
+      EDC_MANAGEMENT_API_URL: "http://${PARTICIPANT_ROLE:?PARTICIPANT_ROLE must be set}-controlplane:8081/management/"
+      EDC_API_KEY: "${EDC_API_KEY:?EDC_API_KEY must be set}"
+      FEDERATED_CATALOG_API_URL: "http://federated-catalog:8000/"
+      FEDERATED_CATALOG_API_KEY: "${FEDERATED_CATALOG_API_KEY:?FEDERATED_CATALOG_API_KEY must be set}"
+      PARTICIPANT_PORTAL_AUTH_MODE: "${PARTICIPANT_PORTAL_AUTH_MODE:?PARTICIPANT_PORTAL_AUTH_MODE must be set to forwarded-header, or explicitly to none for isolated development}"
+      PARTICIPANT_PORTAL_ALLOW_INSECURE_AUTH: "${PARTICIPANT_PORTAL_ALLOW_INSECURE_AUTH:-false}"
+      PARTICIPANT_PORTAL_AUTH_HEADER: "${PARTICIPANT_PORTAL_AUTH_HEADER:-x-forwarded-user}"
+      PARTICIPANT_PORTAL_AUTH_ALLOWED_USERS: "${PARTICIPANT_PORTAL_AUTH_ALLOWED_USERS:-}"
+      PARTICIPANT_PORTAL_HTTPS_HEADERS: "${PARTICIPANT_PORTAL_HTTPS_HEADERS:-true}"
+      PARTICIPANT_PORTAL_ENABLE_RATE_LIMIT: "${PARTICIPANT_PORTAL_ENABLE_RATE_LIMIT:-true}"
+      PARTICIPANT_PORTAL_RATE_LIMIT_MAX: "${PARTICIPANT_PORTAL_RATE_LIMIT_MAX:-300}"
+      PARTICIPANT_PORTAL_RATE_LIMIT_WINDOW: "${PARTICIPANT_PORTAL_RATE_LIMIT_WINDOW:-1 minute}"
+      PARTICIPANT_PORTAL_UPSTREAM_TIMEOUT_MS: "${PARTICIPANT_PORTAL_UPSTREAM_TIMEOUT_MS:-10000}"
+      PORTAL_TITLE: "${PORTAL_TITLE:-Participant Portal}"
+      PARTICIPANT_PORTAL_NAME: "${PARTICIPANT_PORTAL_NAME:-${PORTAL_TITLE:-Participant Portal}}"
+      PORTAL_PUBLIC_EDC_ENDPOINT: "${PORTAL_PUBLIC_EDC_ENDPOINT:-}"
+      DATABASE_URL: "${PARTICIPANT_PORTAL_DATABASE_URL:?PARTICIPANT_PORTAL_DATABASE_URL must be set}"
+      ONBOARDING_DATASPACE_ADMIN_API_URL: "${ONBOARDING_DATASPACE_ADMIN_API_URL:-http://operator-onboarding-service:3000/api}"
+      ONBOARDING_REGISTRATION_TOKEN: "${ONBOARDING_REGISTRATION_TOKEN:-}"
+      ONBOARDING_ORGANIZATION_NAME: "${ONBOARDING_ORGANIZATION_NAME:-}"
+      ONBOARDING_REQUESTED_BPN: "${ONBOARDING_REQUESTED_BPN:-${PARTICIPANT_BPN:?PARTICIPANT_BPN must be set}}"
+      ONBOARDING_CONTACT_EMAIL: "${ONBOARDING_CONTACT_EMAIL:-}"
+      ONBOARDING_REQUESTED_ROLE: "${ONBOARDING_REQUESTED_ROLE:-participant}"
+      ONBOARDING_DID: "${ONBOARDING_DID:-did:web:${PARTICIPANT_DID_HOST:?PARTICIPANT_DID_HOST must be set}:${PARTICIPANT_BPN:?PARTICIPANT_BPN must be set}}"
+      ONBOARDING_DSP_ENDPOINT: "${ONBOARDING_DSP_ENDPOINT:-${PUBLIC_DSP_CALLBACK_ADDRESS:-https://${PARTICIPANT_PUBLIC_HOST:?PARTICIPANT_PUBLIC_HOST must be set}/api/v1/dsp}}"
+      ONBOARDING_CREDENTIAL_SERVICE_ENDPOINT: "${ONBOARDING_CREDENTIAL_SERVICE_ENDPOINT:-https://${PARTICIPANT_PUBLIC_HOST:?PARTICIPANT_PUBLIC_HOST must be set}/api/credentials}"
+      IDENTITYHUB_IDENTITY_API_URL: "http://identityhub:8082/api/identity"
+      IDENTITYHUB_PARTICIPANT_CONTEXT_ID: "${IDENTITYHUB_PARTICIPANT_CONTEXT_ID:-${PARTICIPANT_BPN:?PARTICIPANT_BPN must be set}}"
+      IDENTITYHUB_PARTICIPANT_CONTEXT_PATH_ID: "${PARTICIPANT_BPN_BASE64:?PARTICIPANT_BPN_BASE64 must be set}"
+      IDENTITYHUB_API_KEY: "${IDENTITYHUB_API_KEY:-}"
+      IDENTITYHUB_VAULT_URL: "${VAULT_URL:?VAULT_URL must be set}"
+      IDENTITYHUB_VAULT_TOKEN: "${VAULT_TOKEN:?VAULT_TOKEN must be set}"
+      IDENTITYHUB_API_KEY_VAULT_PATH: "/v1/secret/data/${IDENTITYHUB_PARTICIPANT_CONTEXT_ID:-${PARTICIPANT_BPN:?PARTICIPANT_BPN must be set}}-apikey"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    depends_on:
+      participant-db-migrator:
+        condition: service_completed_successfully
+      federated-catalog:
+        condition: service_healthy
+      identityhub:
+        condition: service_healthy
+      participant-init:
+        condition: service_completed_successfully
+      controlplane:
+        condition: service_healthy
+        restart: true
+      dataplane:
+        condition: service_healthy
+        restart: true
+    networks:
+      backend: {}
+      egress: {}
+      internal:
+        aliases:
+          - ${PARTICIPANT_ROLE:?PARTICIPANT_ROLE must be set}-participant-portal-backend
+
+  public-gateway:
+    <<: *gateway-runtime
+    image: nginxinc/nginx-unprivileged:1.30.4-alpine3.24
+    configs:
+      - source: nginx-participant-public
+        target: /etc/nginx/conf.d/default.conf
+    healthcheck:
+      test: ["CMD", "nginx", "-t"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    depends_on:
+      identityhub:
+        condition: service_healthy
+      controlplane:
+        condition: service_healthy
+      dataplane:
+        condition: service_healthy
+    networks:
+      internal:
+        aliases:
+          - ${PARTICIPANT_ROLE:?PARTICIPANT_ROLE must be set}-public-gateway
+          # The data plane resolves its own did:web issuer while refreshing
+          # persisted EDR tokens. Keep the canonical public/DID hostnames
+          # available on the private participant network as well.
+          - ${PARTICIPANT_PUBLIC_HOST:?PARTICIPANT_PUBLIC_HOST must be set}
+          - ${PARTICIPANT_DID_HOST:?PARTICIPANT_DID_HOST must be set}
+          - ${PARTICIPANT_ROLE:?PARTICIPANT_ROLE must be set}-did
+          - ${PARTICIPANT_ROLE:?PARTICIPANT_ROLE must be set}-public
+      public:
+        aliases:
+          - ${PARTICIPANT_PUBLIC_HOST:?PARTICIPANT_PUBLIC_HOST must be set}
+          - ${PARTICIPANT_DID_HOST:?PARTICIPANT_DID_HOST must be set}
+          - ${PARTICIPANT_ROLE:?PARTICIPANT_ROLE must be set}-did
+          - ${PARTICIPANT_ROLE:?PARTICIPANT_ROLE must be set}-public
+
+  internal-gateway:
+    <<: *gateway-runtime
+    image: nginxinc/nginx-unprivileged:1.30.4-alpine3.24
+    configs:
+      - source: nginx-participant-internal
+        target: /etc/nginx/conf.d/default.conf
+    healthcheck:
+      test: ["CMD", "nginx", "-t"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    depends_on:
+      identityhub:
+        condition: service_healthy
+      controlplane:
+        condition: service_healthy
+      dataplane:
+        condition: service_healthy
+      participant-portal-backend:
+        condition: service_healthy
+    networks:
+      internal:
+        aliases:
+          - ${PARTICIPANT_INTERNAL_HOST:-participant.internal.test}
+          - ${PARTICIPANT_PORTAL_INTERNAL_HOST:-portal.internal.test}
+          - ${PARTICIPANT_ROLE:?PARTICIPANT_ROLE must be set}-internal
+
+configs:
+  ih-logging:
+    content: |
+      .level=INFO
+      org.eclipse.edc.level=INFO
+  edc-logging:
+    content: |
+      .level=INFO
+      org.eclipse.edc.level=INFO
+  opentelemetry:
+    content: |
+      otel.sdk.disabled=true
+  nginx-participant-public:
+    content: |
+      server {
+          listen 80;
+          server_name ${PARTICIPANT_PUBLIC_HOST:?PARTICIPANT_PUBLIC_HOST must be set} ${PARTICIPANT_DID_HOST:?PARTICIPANT_DID_HOST must be set} _;
+
+          location /api/v1/dsp/ {
+              proxy_pass http://${PARTICIPANT_ROLE:?PARTICIPANT_ROLE must be set}-controlplane:8084/api/v1/dsp/;
+              proxy_set_header Host $$host;
+              proxy_set_header X-Real-IP $$remote_addr;
+          }
+
+          location /api/public/ {
+              proxy_pass http://${PARTICIPANT_ROLE:?PARTICIPANT_ROLE must be set}-dataplane:8081/api/public/;
+              proxy_set_header Host $$host;
+              proxy_set_header X-Real-IP $$remote_addr;
+          }
+
+          location /api/credentials/ {
+              proxy_pass http://${PARTICIPANT_ROLE:?PARTICIPANT_ROLE must be set}-identityhub:8083/api/credentials/;
+              proxy_set_header Host $$host;
+              proxy_set_header X-Real-IP $$remote_addr;
+          }
+
+          location /.well-known/api/ {
+              proxy_pass http://${PARTICIPANT_ROLE:?PARTICIPANT_ROLE must be set}-controlplane:8085/.well-known/api/;
+              proxy_set_header Host $$host;
+              proxy_set_header X-Real-IP $$remote_addr;
+          }
+
+          location / {
+              proxy_pass http://${PARTICIPANT_ROLE:?PARTICIPANT_ROLE must be set}-identityhub:8084;
+              proxy_set_header Host $$host;
+              proxy_set_header X-Real-IP $$remote_addr;
+          }
+      }
+  nginx-participant-internal:
+    content: |
+      server {
+          listen 80;
+          server_name ${PARTICIPANT_INTERNAL_HOST:-participant.internal.test} ${PARTICIPANT_PORTAL_INTERNAL_HOST:-portal.internal.test} _;
+          resolver 127.0.0.11 valid=10s ipv6=off;
+          set $$portal_backend http://${PARTICIPANT_ROLE:?PARTICIPANT_ROLE must be set}-participant-portal-backend:3000;
+
+          location ~ ^/(management|catalog)(/|$$) {
+              return 404;
+          }
+
+          location /api/identity/ {
+              proxy_pass http://${PARTICIPANT_ROLE:?PARTICIPANT_ROLE must be set}-identityhub:8082/api/identity/;
+              proxy_set_header Host $$host;
+              proxy_set_header X-Real-IP $$remote_addr;
+          }
+
+          location /identity/ {
+              proxy_pass http://${PARTICIPANT_ROLE:?PARTICIPANT_ROLE must be set}-identityhub:8082/api/identity/;
+              proxy_set_header Host $$host;
+              proxy_set_header X-Real-IP $$remote_addr;
+          }
+
+          location /.well-known/api/ {
+              proxy_pass http://${PARTICIPANT_ROLE:?PARTICIPANT_ROLE must be set}-controlplane:8085/.well-known/api/;
+              proxy_set_header Host $$host;
+              proxy_set_header X-Real-IP $$remote_addr;
+          }
+
+          location / {
+              proxy_pass $$portal_backend;
+              proxy_http_version 1.1;
+              proxy_set_header Host $$host;
+              proxy_set_header X-Real-IP $$remote_addr;
+              proxy_set_header X-Forwarded-For $$proxy_add_x_forwarded_for;
+              proxy_set_header X-Forwarded-Proto $$scheme;
+          }
+      }
+
+networks:
+  backend:
+    name: ${COMPOSE_PROJECT_PREFIX:-tx-bootstrap}-${PARTICIPANT_ROLE:?PARTICIPANT_ROLE must be set}-backend
+    internal: true
+  internal:
+    name: ${COMPOSE_PROJECT_PREFIX:-tx-bootstrap}-${PARTICIPANT_ROLE:?PARTICIPANT_ROLE must be set}-internal
+    internal: true
+  egress:
+    name: ${PARTICIPANT_EGRESS_NETWORK:-${COMPOSE_PROJECT_PREFIX:-tx-bootstrap}-${PARTICIPANT_ROLE:?PARTICIPANT_ROLE must be set}-egress}
+  public:
+    name: ${PARTICIPANT_PUBLIC_NETWORK:-tx-bootstrap-public}
+    external: ${PARTICIPANT_PUBLIC_NETWORK_EXTERNAL:-false}
+
+volumes:
+  federated-catalog-data:

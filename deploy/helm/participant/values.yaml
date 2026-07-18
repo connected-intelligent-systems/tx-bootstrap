@@ -1,0 +1,320 @@
+nameOverride: ""
+fullnameOverride: ""
+
+imagePullSecrets: []
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+  automountServiceAccountToken: false
+
+podAnnotations: {}
+podLabels: {}
+terminationGracePeriodSeconds: 30
+revisionHistoryLimit: 3
+logLevel: info
+
+podSecurityContext:
+  runAsNonRoot: true
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+
+javaRuntime:
+  javaToolOptions: -Xmx256m
+  otelSdkDisabled: true
+  otelJavaagentEnabled: false
+
+identity:
+  participantRole: participant
+  participantBpn: BPNL000000000002
+  participantBpnBase64: "QlBOTDAwMDAwMDAwMDAwMg=="
+  participantContextId: 00000000-0000-0000-0000-000000000002
+  identityHubParticipantContextId: BPNL000000000002
+  participantDidHost: participant.example.invalid
+  participantPublicHost: participant.example.invalid
+  issuerBpn: BPNL000000000001
+  issuerDidHost: issuer.example.invalid
+  useHttpsDidWeb: true
+
+publicEndpoints:
+  # Empty values are derived from identity.participantPublicHost.
+  dspCallbackAddress: ""
+  credentialServiceEndpoint: ""
+  dataPlaneBaseUrl: ""
+  dataPlaneTokenRefreshEndpoint: ""
+  bdrsServerUrl: https://issuer.example.invalid/api/directory
+
+vault:
+  url: https://vault.example.invalid
+  apiSecretPath: /v1/secret
+  healthCheckPath: /v1/sys/health
+
+# Provision this Secret before installing the chart. The chart never creates it.
+existingSecret:
+  name: tx-bootstrap-participant-secrets
+  keys:
+    vaultToken: vault-token
+    identityHubSuperuserApiKey: identityhub-superuser-api-key
+    identityHubJdbcUrl: identityhub-jdbc-url
+    identityHubDbUser: identityhub-db-user
+    identityHubDbPassword: identityhub-db-password
+    edcJdbcUrl: edc-jdbc-url
+    edcDbUser: edc-db-user
+    edcDbPassword: edc-db-password
+    portalMigratorDatabaseUrl: portal-migrator-database-url
+    portalDatabaseUrl: portal-database-url
+    edcApiKey: edc-api-key
+    federatedCatalogApiKey: federated-catalog-api-key
+    # Optional: when empty, participant-init and the portal retrieve keys from Vault.
+    identityHubApiKey: ""
+    onboardingRegistrationToken: ""
+
+jobs:
+  portalMigrator:
+    enabled: true
+    backoffLimit: 2
+    activeDeadlineSeconds: 300
+    serviceAccountName: default
+    migrationDirectory: /app/db/migrations
+    ownerRole: participant_portal_owner
+    runtimeRole: participant_portal
+  participantInit:
+    enabled: true
+    backoffLimit: 2
+    activeDeadlineSeconds: 600
+  retryTimeoutMs: 120000
+  retryDelayMs: 2000
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: "1"
+      memory: 256Mi
+
+identityHub:
+  replicaCount: 1
+  securityContext:
+    runAsUser: 10100
+    runAsGroup: 101
+  image:
+    repository: tractusx/identityhub
+    tag: 0.3.2
+    digest: ""
+    pullPolicy: IfNotPresent
+  jtiValidation: true
+  encryptionKeyAlias: encryption-key
+  encryptionStrict: true
+  service:
+    type: ClusterIP
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 512Mi
+
+participantInit:
+  securityContext:
+    runAsUser: 100
+    runAsGroup: 101
+  image:
+    repository: ghcr.io/salberternst/tx-bootstrap-participant-init
+    tag: 0.1.0
+    digest: ""
+    pullPolicy: IfNotPresent
+  superuserApiKeyAlias: super-user-apikey
+
+controlPlane:
+  replicaCount: 1
+  securityContext:
+    runAsUser: 10100
+    runAsGroup: 101
+  image:
+    repository: tractusx/edc-controlplane-postgresql-hashicorp-vault
+    tag: 0.12.1
+    digest: ""
+    pullPolicy: IfNotPresent
+  bdrsCacheValiditySeconds: 600
+  trustedIssuerSupportedTypes:
+    - MembershipCredential
+    - FrameworkCredential
+    - BpnCredential
+    - DataExchangeGovernanceCredential
+    - DismantlerCredential
+  service:
+    type: ClusterIP
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 512Mi
+
+dataPlane:
+  replicaCount: 1
+  securityContext:
+    runAsUser: 10100
+    runAsGroup: 101
+  image:
+    repository: tractusx/edc-dataplane-hashicorp-vault
+    tag: 0.12.1
+    digest: ""
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 512Mi
+
+federatedCatalog:
+  replicaCount: 1
+  securityContext:
+    runAsUser: 10001
+    runAsGroup: 10001
+  image:
+    repository: ghcr.io/salberternst/tx-bootstrap-federated-catalog
+    tag: 0.1.0
+    digest: ""
+    pullPolicy: IfNotPresent
+  directoryRefreshIntervalSeconds: 300
+  catalogRefreshIntervalSeconds: 900
+  crawlConcurrency: 4
+  service:
+    type: ClusterIP
+    port: 8000
+  persistence:
+    storageClass: ""
+    size: 2Gi
+    accessModes:
+      - ReadWriteOnce
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+
+portal:
+  replicaCount: 1
+  securityContext:
+    runAsUser: 1000
+    runAsGroup: 1000
+  image:
+    repository: ghcr.io/salberternst/tx-bootstrap-participant-portal-backend
+    tag: 0.1.0
+    digest: ""
+    pullPolicy: IfNotPresent
+  title: Participant Portal
+  name: Participant Portal
+  publicEdcEndpoint: ""
+  upstreamTimeoutMs: 10000
+  httpsHeaders: true
+  rateLimit:
+    enabled: true
+    max: 300
+    window: 1 minute
+  auth:
+    mode: forwarded-header
+    header: x-forwarded-user
+    allowedUsers: []
+    allowInsecure: false
+  onboarding:
+    dataspaceAdminApiUrl: https://onboarding.example.invalid/api
+    organizationName: ""
+    requestedBpn: ""
+    contactEmail: ""
+    requestedRole: participant
+    did: ""
+    dspEndpoint: ""
+    credentialServiceEndpoint: ""
+  service:
+    type: ClusterIP
+    port: 3000
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: "1"
+      memory: 512Mi
+
+publicGateway:
+  replicaCount: 1
+  securityContext:
+    runAsUser: 101
+    runAsGroup: 101
+  image:
+    repository: nginxinc/nginx-unprivileged
+    tag: 1.30.4-alpine3.24
+    digest: ""
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 80
+  resources:
+    requests:
+      cpu: 25m
+      memory: 32Mi
+    limits:
+      cpu: 500m
+      memory: 128Mi
+
+internalGateway:
+  replicaCount: 1
+  securityContext:
+    runAsUser: 101
+    runAsGroup: 101
+  image:
+    repository: nginxinc/nginx-unprivileged
+    tag: 1.30.4-alpine3.24
+    digest: ""
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 80
+  resources:
+    requests:
+      cpu: 25m
+      memory: 32Mi
+    limits:
+      cpu: 500m
+      memory: 128Mi
+
+ingress:
+  public:
+    enabled: false
+    className: ""
+    annotations: {}
+    hosts:
+      - participant.example.invalid
+    path: /
+    pathType: Prefix
+    tls: []
+  internal:
+    enabled: false
+    className: ""
+    annotations: {}
+    hosts:
+      - portal.example.invalid
+    path: /
+    pathType: Prefix
+    tls: []
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

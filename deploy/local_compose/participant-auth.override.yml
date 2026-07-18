@@ -1,0 +1,179 @@
+x-local-auth-runtime: &local-auth-runtime
+  restart: unless-stopped
+  init: true
+  pids_limit: 128
+  stop_grace_period: 10s
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+  cap_add:
+    - NET_BIND_SERVICE
+  logging:
+    driver: json-file
+    options:
+      max-size: 5m
+      max-file: "2"
+
+services:
+  participant-portal-backend:
+    environment:
+      PARTICIPANT_PORTAL_AUTH_MODE: forwarded-header
+      PARTICIPANT_PORTAL_AUTH_HEADER: remote-user
+      PARTICIPANT_PORTAL_AUTH_ALLOWED_USERS: "${PORTAL_ADMIN_USERNAME:-admin}"
+
+  portal-gateway:
+    <<: *local-auth-runtime
+    image: nginxinc/nginx-unprivileged:1.30.4-alpine3.24
+    mem_limit: 128m
+    cpus: 0.5
+    configs:
+      - source: nginx-participant-local-portal
+        target: /etc/nginx/conf.d/default.conf
+      - source: participant-local-portal-users
+        target: /etc/nginx/auth/users
+    healthcheck:
+      test: ["CMD", "nginx", "-t"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    depends_on:
+      internal-gateway:
+        condition: service_healthy
+    networks:
+      internal:
+        aliases:
+          - "${PARTICIPANT_ROLE:?PARTICIPANT_ROLE must be set}-portal"
+
+  participant-api-gateway:
+    <<: *local-auth-runtime
+    image: nginxinc/nginx-unprivileged:1.30.4-alpine3.24
+    mem_limit: 128m
+    cpus: 0.5
+    configs:
+      - source: nginx-participant-local-api
+        target: /etc/nginx/conf.d/default.conf
+    healthcheck:
+      test: ["CMD", "nginx", "-t"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    depends_on:
+      internal-gateway:
+        condition: service_healthy
+    networks:
+      internal:
+        aliases:
+          - "${PARTICIPANT_ROLE:?PARTICIPANT_ROLE must be set}-api"
+
+configs:
+  nginx-participant-local-portal:
+    content: |
+      server {
+          listen 80;
+          server_name _;
+
+          location / {
+              auth_basic "Participant portal";
+              auth_basic_user_file /etc/nginx/auth/users;
+
+              proxy_pass http://internal-gateway;
+              proxy_http_version 1.1;
+              proxy_set_header Host $$host;
+              proxy_set_header X-Real-IP $$remote_addr;
+              proxy_set_header X-Forwarded-For $$proxy_add_x_forwarded_for;
+              proxy_set_header X-Forwarded-Proto $$scheme;
+              proxy_set_header Authorization "";
+              proxy_set_header Remote-User $$remote_user;
+              proxy_set_header X-Forwarded-User "";
+              proxy_set_header X-Auth-Request-User "";
+          }
+      }
+
+  participant-local-portal-users:
+    content: |
+      ${PORTAL_BASIC_AUTH_USERS:?PORTAL_BASIC_AUTH_USERS must be set}
+
+  nginx-participant-local-api:
+    content: |
+      server {
+          listen 80;
+          server_name _;
+
+          location = /api/openapi.json {
+              proxy_pass http://internal-gateway;
+              proxy_http_version 1.1;
+              proxy_set_header Host $$host;
+              proxy_set_header X-Real-IP $$remote_addr;
+              proxy_set_header X-Forwarded-For $$proxy_add_x_forwarded_for;
+              proxy_set_header X-Forwarded-Proto $$scheme;
+              proxy_set_header Authorization "";
+              proxy_set_header Remote-User "";
+              proxy_set_header X-Forwarded-User "";
+              proxy_set_header X-Auth-Request-User "";
+              proxy_set_header X-Api-Key "";
+              proxy_set_header Cookie "";
+          }
+
+          location = /api/management {
+              proxy_pass http://internal-gateway;
+              proxy_http_version 1.1;
+              proxy_set_header Host $$host;
+              proxy_set_header X-Real-IP $$remote_addr;
+              proxy_set_header X-Forwarded-For $$proxy_add_x_forwarded_for;
+              proxy_set_header X-Forwarded-Proto $$scheme;
+              proxy_set_header Remote-User "";
+              proxy_set_header X-Forwarded-User "";
+              proxy_set_header X-Auth-Request-User "";
+              proxy_set_header X-Api-Key "";
+              proxy_set_header Cookie "";
+          }
+
+          location ^~ /api/management/ {
+              proxy_pass http://internal-gateway;
+              proxy_http_version 1.1;
+              proxy_set_header Host $$host;
+              proxy_set_header X-Real-IP $$remote_addr;
+              proxy_set_header X-Forwarded-For $$proxy_add_x_forwarded_for;
+              proxy_set_header X-Forwarded-Proto $$scheme;
+              proxy_set_header Remote-User "";
+              proxy_set_header X-Forwarded-User "";
+              proxy_set_header X-Auth-Request-User "";
+              proxy_set_header X-Api-Key "";
+              proxy_set_header Cookie "";
+          }
+
+          location = /api/federated-catalog {
+              proxy_pass http://internal-gateway;
+              proxy_http_version 1.1;
+              proxy_set_header Host $$host;
+              proxy_set_header X-Real-IP $$remote_addr;
+              proxy_set_header X-Forwarded-For $$proxy_add_x_forwarded_for;
+              proxy_set_header X-Forwarded-Proto $$scheme;
+              proxy_set_header Remote-User "";
+              proxy_set_header X-Forwarded-User "";
+              proxy_set_header X-Auth-Request-User "";
+              proxy_set_header X-Api-Key "";
+              proxy_set_header Cookie "";
+          }
+
+          location ^~ /api/federated-catalog/ {
+              proxy_pass http://internal-gateway;
+              proxy_http_version 1.1;
+              proxy_set_header Host $$host;
+              proxy_set_header X-Real-IP $$remote_addr;
+              proxy_set_header X-Forwarded-For $$proxy_add_x_forwarded_for;
+              proxy_set_header X-Forwarded-Proto $$scheme;
+              proxy_set_header Remote-User "";
+              proxy_set_header X-Forwarded-User "";
+              proxy_set_header X-Auth-Request-User "";
+              proxy_set_header X-Api-Key "";
+              proxy_set_header Cookie "";
+          }
+
+          location / {
+              return 404;
+          }
+      }

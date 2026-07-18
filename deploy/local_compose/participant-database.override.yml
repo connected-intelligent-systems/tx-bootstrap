@@ -1,0 +1,67 @@
+# Local database connectivity and convergent cluster provisioning. PostgreSQL
+# itself is owned by deploy/local_compose/compose.yaml and started before this stack.
+services:
+  participant-db-provisioner:
+    image: postgres:16-alpine
+    entrypoint:
+      ["/bin/sh", "/opt/tx-bootstrap/database/participant/provision.sh"]
+    environment:
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGDATABASE: postgres
+      PGUSER: ${POSTGRES_USER:-postgres}
+      PGPASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
+      PARTICIPANT_IDENTITYHUB_DB_NAME: ${PARTICIPANT_IDENTITYHUB_DB_NAME:?PARTICIPANT_IDENTITYHUB_DB_NAME must be set}
+      PARTICIPANT_IDENTITYHUB_DB_USER: ${PARTICIPANT_IDENTITYHUB_DB_USER:?PARTICIPANT_IDENTITYHUB_DB_USER must be set}
+      PARTICIPANT_IDENTITYHUB_DB_PASSWORD: ${PARTICIPANT_IDENTITYHUB_DB_PASSWORD:?PARTICIPANT_IDENTITYHUB_DB_PASSWORD must be set}
+      PARTICIPANT_EDC_DB_NAME: ${PARTICIPANT_EDC_DB_NAME:?PARTICIPANT_EDC_DB_NAME must be set}
+      PARTICIPANT_EDC_DB_USER: ${PARTICIPANT_EDC_DB_USER:?PARTICIPANT_EDC_DB_USER must be set}
+      PARTICIPANT_EDC_DB_PASSWORD: ${PARTICIPANT_EDC_DB_PASSWORD:?PARTICIPANT_EDC_DB_PASSWORD must be set}
+      PARTICIPANT_PORTAL_DB_NAME: ${PARTICIPANT_PORTAL_DB_NAME:?PARTICIPANT_PORTAL_DB_NAME must be set}
+      PARTICIPANT_PORTAL_OWNER_ROLE: ${PARTICIPANT_PORTAL_OWNER_ROLE:?PARTICIPANT_PORTAL_OWNER_ROLE must be set}
+      PARTICIPANT_PORTAL_MIGRATOR_DB_USER: ${PARTICIPANT_PORTAL_MIGRATOR_DB_USER:?PARTICIPANT_PORTAL_MIGRATOR_DB_USER must be set}
+      PARTICIPANT_PORTAL_MIGRATOR_DB_PASSWORD: ${PARTICIPANT_PORTAL_MIGRATOR_DB_PASSWORD:?PARTICIPANT_PORTAL_MIGRATOR_DB_PASSWORD must be set}
+      PARTICIPANT_PORTAL_DB_ROLE: ${PARTICIPANT_PORTAL_DB_ROLE:?PARTICIPANT_PORTAL_DB_ROLE must be set}
+      PARTICIPANT_PORTAL_DB_PASSWORD: ${PARTICIPANT_PORTAL_DB_PASSWORD:?PARTICIPANT_PORTAL_DB_PASSWORD must be set}
+    volumes:
+      - ../database:/opt/tx-bootstrap/database:ro
+    restart: "no"
+    networks:
+      database: {}
+
+  identityhub:
+    depends_on:
+      participant-db-provisioner:
+        condition: service_completed_successfully
+    networks:
+      database: {}
+
+  controlplane:
+    depends_on:
+      participant-db-provisioner:
+        condition: service_completed_successfully
+    networks:
+      database: {}
+
+  dataplane:
+    depends_on:
+      participant-db-provisioner:
+        condition: service_completed_successfully
+    networks:
+      database: {}
+
+  participant-db-migrator:
+    depends_on:
+      participant-db-provisioner:
+        condition: service_completed_successfully
+    networks:
+      database: {}
+
+  participant-portal-backend:
+    networks:
+      database: {}
+
+networks:
+  database:
+    name: ${COMPOSE_PROJECT_PREFIX:-tx-bootstrap}-${PARTICIPANT_ROLE:?PARTICIPANT_ROLE must be set}-database
+    external: true

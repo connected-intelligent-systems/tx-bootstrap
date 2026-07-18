@@ -1,0 +1,91 @@
+# Local development Vault and port overrides
+# This file is automatically loaded by Docker Compose alongside compose.yaml
+
+services:
+  vault:
+    image: hashicorp/vault:1.15
+    environment:
+      VAULT_ADDR: "http://127.0.0.1:8200"
+      VAULT_TOKEN: ${VAULT_TOKEN:?VAULT_TOKEN must be set}
+      VAULT_LOCAL_CONFIG: >-
+        {"storage":{"file":{"path":"/vault/file"}},"listener":[{"tcp":{"address":"0.0.0.0:8200","tls_disable":true}}],"disable_mlock":true,"ui":false}
+    command: server
+    volumes:
+      - operator-vault-data:/vault/file
+    healthcheck:
+      test: ["CMD", "vault", "status"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      operator-internal:
+        aliases: [vault]
+
+  operator-vault-init:
+    image: hashicorp/vault:1.15
+    user: "0:0"
+    entrypoint: ["/bin/sh", "/usr/local/bin/local-vault-bootstrap"]
+    environment:
+      VAULT_ADDR: "http://vault:8200"
+      VAULT_APP_TOKEN: ${VAULT_TOKEN:?VAULT_TOKEN must be set}
+      BDRS_API_KEY: ${BDRS_API_KEY:-password}
+      BDRS_DB_USER: ${BDRS_DB_USER:-bdrs}
+      BDRS_DB_PASSWORD: ${BDRS_DB_PASSWORD:-bdrspassword}
+      VAULT_AES_KEY_ALIASES: >-
+        ${ISSUER_IDENTITYHUB_ENCRYPTION_KEY_ALIAS:?ISSUER_IDENTITYHUB_ENCRYPTION_KEY_ALIAS must be set}
+        ${ISSUER_SERVICE_ENCRYPTION_KEY_ALIAS:?ISSUER_SERVICE_ENCRYPTION_KEY_ALIAS must be set}
+    configs:
+      - source: local-vault-bootstrap
+        target: /usr/local/bin/local-vault-bootstrap
+        mode: 0555
+    volumes:
+      - operator-vault-bootstrap:/vault/bootstrap
+    depends_on:
+      vault:
+        condition: service_started
+    networks:
+      operator-internal:
+        aliases: [operator-vault-init]
+
+  issuer-identityhub:
+    depends_on:
+      operator-vault-init:
+        condition: service_completed_successfully
+    ports:
+      - "${OPERATOR_HTTP_BIND:-127.0.0.1}:${ISSUER_IDENTITY_HOST_PORT:-39082}:8082"
+    networks:
+      admin-access: {}
+      edge: {}
+
+  issuer-did:
+    ports:
+      - "${ISSUER_PUBLIC_HTTP_BIND:-127.0.0.1}:${ISSUER_PUBLIC_HTTP_HOST_PORT:-39084}:80"
+
+  bdrs-server:
+    depends_on:
+      operator-vault-init:
+        condition: service_completed_successfully
+    ports:
+      - "${OPERATOR_HTTP_BIND:-127.0.0.1}:${BDRS_MANAGEMENT_HOST_PORT:-39081}:8081"
+    networks:
+      admin-access: {}
+      edge: {}
+
+  issuerservice:
+    depends_on:
+      operator-vault-init:
+        condition: service_completed_successfully
+    networks:
+      edge: {}
+
+  operator-console:
+    ports:
+      - "${OPERATOR_HTTP_BIND:-127.0.0.1}:${OPERATOR_CONSOLE_HOST_PORT:-39080}:3000"
+
+  operator-onboarding-service:
+    ports:
+      - "${OPERATOR_HTTP_BIND:-127.0.0.1}:${OPERATOR_ONBOARDING_SERVICE_HOST_PORT:-39085}:3000"
+
+volumes:
+  operator-vault-data:
+  operator-vault-bootstrap:

@@ -1,0 +1,81 @@
+# Local database connectivity and convergent cluster provisioning. PostgreSQL
+# itself is owned by deploy/local_compose/compose.yaml and started before this stack.
+services:
+  operator-db-provisioner:
+    image: postgres:16-alpine
+    entrypoint: ["/bin/sh", "/opt/tx-bootstrap/database/operator/provision.sh"]
+    environment:
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGDATABASE: postgres
+      PGUSER: ${POSTGRES_USER:-postgres}
+      PGPASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
+      ISSUER_IDENTITYHUB_DB_NAME: ${ISSUER_IDENTITYHUB_DB_NAME:-issuer_wallet}
+      ISSUER_IDENTITYHUB_DB_USER: ${ISSUER_IDENTITYHUB_DB_USER:-issuer_identityhub}
+      ISSUER_IDENTITYHUB_DB_PASSWORD: ${ISSUER_IDENTITYHUB_DB_PASSWORD:?ISSUER_IDENTITYHUB_DB_PASSWORD must be set}
+      ISSUER_SERVICE_DB_NAME: ${ISSUER_SERVICE_DB_NAME:-issuer}
+      ISSUER_SERVICE_DB_USER: ${ISSUER_SERVICE_DB_USER:-issuer_service}
+      ISSUER_SERVICE_DB_PASSWORD: ${ISSUER_SERVICE_DB_PASSWORD:?ISSUER_SERVICE_DB_PASSWORD must be set}
+      BDRS_DB_NAME: ${BDRS_DB_NAME:-bdrs}
+      BDRS_DB_USER: ${BDRS_DB_USER:-bdrs}
+      BDRS_DB_PASSWORD: ${BDRS_DB_PASSWORD:?BDRS_DB_PASSWORD must be set}
+      DATASPACE_ADMIN_DB_NAME: ${DATASPACE_ADMIN_DB_NAME:-dataspace_admin}
+      DATASPACE_ADMIN_OWNER_ROLE: ${DATASPACE_ADMIN_OWNER_ROLE:-dataspace_admin_owner}
+      OPERATOR_MIGRATOR_DB_USER: ${OPERATOR_MIGRATOR_DB_USER:-operator_migrator}
+      OPERATOR_MIGRATOR_DB_PASSWORD: ${OPERATOR_MIGRATOR_DB_PASSWORD:?OPERATOR_MIGRATOR_DB_PASSWORD must be set}
+      OPERATOR_CONSOLE_DB_USER: ${OPERATOR_CONSOLE_DB_USER:-operator_console_login}
+      OPERATOR_CONSOLE_DB_PASSWORD: ${OPERATOR_CONSOLE_DB_PASSWORD:?OPERATOR_CONSOLE_DB_PASSWORD must be set}
+      REGISTRATION_DB_USER: ${REGISTRATION_DB_USER:-registration_svc_login}
+      REGISTRATION_DB_PASSWORD: ${REGISTRATION_DB_PASSWORD:?REGISTRATION_DB_PASSWORD must be set}
+      ISSUER_CLAIMS_DB_USER: ${ISSUER_CLAIMS_DB_USER:-issuer_claims_writer}
+      ISSUER_CLAIMS_DB_PASSWORD: ${ISSUER_CLAIMS_DB_PASSWORD:?ISSUER_CLAIMS_DB_PASSWORD must be set}
+    volumes:
+      - ../database:/opt/tx-bootstrap/database:ro
+    restart: "no"
+    networks:
+      database: {}
+
+  issuer-identityhub:
+    depends_on:
+      operator-db-provisioner:
+        condition: service_completed_successfully
+    networks:
+      database: {}
+
+  bdrs-server:
+    depends_on:
+      operator-db-provisioner:
+        condition: service_completed_successfully
+    networks:
+      database: {}
+
+  issuerservice:
+    depends_on:
+      operator-db-provisioner:
+        condition: service_completed_successfully
+    networks:
+      database: {}
+
+  db-migrator:
+    depends_on:
+      operator-db-provisioner:
+        condition: service_completed_successfully
+    networks:
+      database: {}
+
+  issuer-claims-grant:
+    networks:
+      database: {}
+
+  operator-console:
+    networks:
+      database: {}
+
+  operator-onboarding-service:
+    networks:
+      database: {}
+
+networks:
+  database:
+    name: ${COMPOSE_PROJECT_PREFIX:-tx-bootstrap}-operator-database
+    external: true

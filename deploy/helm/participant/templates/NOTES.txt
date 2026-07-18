@@ -1,0 +1,16 @@
+The tx-bootstrap participant release has been rendered.
+
+External prerequisites:
+  PostgreSQL:     supplied through Secret {{ .Values.existingSecret.name }}
+  Vault:          {{ .Values.vault.url }}
+  Participant DID: {{ include "tx-bootstrap-participant.participantDid" . }}
+
+The namespace, Secret, PostgreSQL roles/databases, and Vault bootstrap material
+must exist before installation. Use --wait-for-jobs and the Helm-version-specific
+rollback/wait flags documented in this chart's README so portal migration and
+participant initialization failures fail the release.
+
+{{- if not (or .Values.ingress.public.enabled .Values.ingress.internal.enabled) }}
+No Ingress is enabled. Configure ingress.public and explicitly decide whether
+the participant-facing internal portal/API gateway should be exposed.
+{{- end }}

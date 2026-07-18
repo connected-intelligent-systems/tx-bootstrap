@@ -1,0 +1,89 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "tx-bootstrap-operator.componentName" (dict "root" . "component" "onboarding") }}
+  labels:
+    {{- include "tx-bootstrap-operator.labels" . | nindent 4 }}
+    app.kubernetes.io/component: onboarding
+spec:
+  replicas: {{ .Values.operatorOnboarding.replicaCount }}
+  revisionHistoryLimit: {{ .Values.revisionHistoryLimit }}
+  selector:
+    matchLabels:
+      {{- include "tx-bootstrap-operator.selectorLabels" (dict "root" . "component" "onboarding") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "tx-bootstrap-operator.selectorLabels" (dict "root" . "component" "onboarding") | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      {{- include "tx-bootstrap-operator.podDefaults" . | nindent 6 }}
+      containers:
+        - name: onboarding
+          image: {{ include "tx-bootstrap-operator.image" .Values.operatorOnboarding.image | quote }}
+          imagePullPolicy: {{ .Values.operatorOnboarding.image.pullPolicy }}
+          securityContext:
+            {{- include "tx-bootstrap-operator.containerSecurityContext" (dict "root" . "component" .Values.operatorOnboarding.securityContext) | nindent 12 }}
+          ports:
+            - { name: http, containerPort: 3000 }
+          env:
+            - { name: PORT, value: "3000" }
+            - name: OPERATOR_ONBOARDING_SERVICE_DATABASE_URL
+              {{- include "tx-bootstrap-operator.secretValue" (dict "root" . "key" "onboardingDatabaseUrl") | nindent 14 }}
+            - name: OPERATOR_ONBOARDING_SERVICE_ALLOWED_ORIGINS
+              value: {{ .Values.operatorOnboarding.allowedOrigins | quote }}
+            - name: OPERATOR_ONBOARDING_SERVICE_ENABLE_RATE_LIMIT
+              value: {{ .Values.operatorOnboarding.enableRateLimit | quote }}
+            - name: OPERATOR_ONBOARDING_SERVICE_RATE_LIMIT_MAX
+              value: {{ .Values.operatorOnboarding.rateLimitMax | quote }}
+            - name: OPERATOR_ONBOARDING_SERVICE_RATE_LIMIT_WINDOW
+              value: {{ .Values.operatorOnboarding.rateLimitWindow | quote }}
+            - name: OPERATOR_ONBOARDING_SERVICE_TITLE
+              value: {{ .Values.operatorOnboarding.title | quote }}
+            - name: OPERATOR_ONBOARDING_SERVICE_CONFIG_JSON
+              value: {{ .Values.operatorOnboarding.configJson | quote }}
+            - name: OPERATOR_ONBOARDING_SERVICE_THEME_JSON
+              value: {{ .Values.operatorOnboarding.themeJson | quote }}
+            - name: ISSUER_DID
+              value: {{ include "tx-bootstrap-operator.issuerDid" . | quote }}
+            - name: LOG_LEVEL
+              value: {{ .Values.logLevel | quote }}
+          startupProbe:
+            httpGet: { path: /api/health, port: http }
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 30
+          readinessProbe:
+            httpGet: { path: /api/health, port: http }
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet: { path: /api/health, port: http }
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.operatorOnboarding.resources | nindent 12 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "tx-bootstrap-operator.componentName" (dict "root" . "component" "onboarding") }}
+  labels:
+    {{- include "tx-bootstrap-operator.labels" . | nindent 4 }}
+    app.kubernetes.io/component: onboarding
+spec:
+  type: {{ .Values.operatorOnboarding.service.type }}
+  selector:
+    {{- include "tx-bootstrap-operator.selectorLabels" (dict "root" . "component" "onboarding") | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ .Values.operatorOnboarding.service.port }}
+      targetPort: http

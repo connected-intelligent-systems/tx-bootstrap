@@ -1,0 +1,79 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "tx-bootstrap-operator.componentName" (dict "root" . "component" "issuer-did") }}
+  labels:
+    {{- include "tx-bootstrap-operator.labels" . | nindent 4 }}
+    app.kubernetes.io/component: issuer-did
+spec:
+  replicas: {{ .Values.issuerDid.replicaCount }}
+  revisionHistoryLimit: {{ .Values.revisionHistoryLimit }}
+  selector:
+    matchLabels:
+      {{- include "tx-bootstrap-operator.selectorLabels" (dict "root" . "component" "issuer-did") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "tx-bootstrap-operator.selectorLabels" (dict "root" . "component" "issuer-did") | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmaps.yaml") . | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- include "tx-bootstrap-operator.podDefaults" . | nindent 6 }}
+      containers:
+        - name: issuer-did
+          image: {{ include "tx-bootstrap-operator.image" .Values.issuerDid.image | quote }}
+          imagePullPolicy: {{ .Values.issuerDid.image.pullPolicy }}
+          securityContext:
+            {{- include "tx-bootstrap-operator.containerSecurityContext" (dict "root" . "component" .Values.issuerDid.securityContext) | nindent 12 }}
+          ports:
+            - { name: http, containerPort: 8080 }
+          volumeMounts:
+            - name: nginx-config
+              mountPath: /etc/nginx/conf.d/default.conf
+              subPath: default.conf
+              readOnly: true
+          startupProbe:
+            exec:
+              command: [nginx, -t]
+            periodSeconds: 5
+            timeoutSeconds: 5
+            failureThreshold: 12
+          readinessProbe:
+            tcpSocket: { port: http }
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            exec:
+              command: [nginx, -t]
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.issuerDid.resources | nindent 12 }}
+      volumes:
+        - name: nginx-config
+          configMap:
+            name: {{ include "tx-bootstrap-operator.componentName" (dict "root" . "component" "issuer-did-nginx") }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "tx-bootstrap-operator.componentName" (dict "root" . "component" "issuer-did") }}
+  labels:
+    {{- include "tx-bootstrap-operator.labels" . | nindent 4 }}
+    app.kubernetes.io/component: issuer-did
+spec:
+  type: {{ .Values.issuerDid.service.type }}
+  selector:
+    {{- include "tx-bootstrap-operator.selectorLabels" (dict "root" . "component" "issuer-did") | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ .Values.issuerDid.service.port }}
+      targetPort: http

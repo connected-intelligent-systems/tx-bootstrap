@@ -1,0 +1,49 @@
+identity:
+  issuerBpn: __BPN_ISSUER__
+  issuerBpnBase64: __BPN_ISSUER_BASE64__
+  issuerDidHost: issuer.__INGRESS_IP__.nip.io
+  useHttpsDidWeb: false
+
+vault:
+  url: http://vault.tx-infra.svc.cluster.local:8200
+  apiSecretPath: /v1/operator
+  healthCheckPath: /v1/sys/health
+
+existingSecret:
+  name: tx-bootstrap-operator-secrets
+
+issuerIdentityHub:
+  encryptionKeyAlias: issuer-identityhub-encryption-key
+
+issuerService:
+  encryptionKeyAlias: issuer-service-encryption-key
+
+operatorConsole:
+  image:
+    repository: tx-bootstrap-operator-console
+    tag: local
+    pullPolicy: Never
+  auth:
+    mode: api-key
+  httpsHeaders: false
+
+operatorOnboarding:
+  image:
+    repository: tx-bootstrap-operator-onboarding-service
+    tag: local
+    pullPolicy: Never
+  allowedOrigins: http://provider-portal.__INGRESS_IP__.nip.io,http://consumer-portal.__INGRESS_IP__.nip.io
+
+ingress:
+  issuerDid:
+    enabled: true
+    className: traefik
+    host: issuer.__INGRESS_IP__.nip.io
+  onboarding:
+    enabled: true
+    className: traefik
+    host: onboarding.__INGRESS_IP__.nip.io
+  console:
+    enabled: true
+    className: traefik
+    host: console.__INGRESS_IP__.nip.io

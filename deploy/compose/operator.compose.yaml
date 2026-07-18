@@ -1,0 +1,466 @@
+name: ${COMPOSE_PROJECT_NAME:-tx-bootstrap-operator}
+
+x-java-env: &java-env
+  JAVA_TOOL_OPTIONS: "${JAVA_TOOL_OPTIONS:--Xmx256m}"
+  OTEL_SDK_DISABLED: "${OTEL_SDK_DISABLED:-true}"
+  OTEL_JAVAAGENT_ENABLED: "${OTEL_JAVAAGENT_ENABLED:-false}"
+
+x-runtime-defaults: &runtime-defaults
+  restart: "${RESTART_POLICY:-unless-stopped}"
+  init: true
+  pids_limit: 512
+  stop_grace_period: 30s
+  security_opt:
+    - no-new-privileges:true
+  logging:
+    driver: "${LOG_DRIVER:-json-file}"
+    options:
+      max-size: "${LOG_MAX_SIZE:-10m}"
+      max-file: "${LOG_MAX_FILES:-3}"
+
+x-java-runtime: &java-runtime
+  <<: *runtime-defaults
+  mem_limit: 512m
+  cpus: 1.0
+
+x-node-runtime: &node-runtime
+  <<: *runtime-defaults
+  mem_limit: 512m
+  cpus: 1.0
+
+x-gateway-runtime: &gateway-runtime
+  <<: *runtime-defaults
+  mem_limit: 128m
+  cpus: 0.5
+  cap_drop:
+    - ALL
+  cap_add:
+    - NET_BIND_SERVICE
+
+services:
+  issuer-identityhub:
+    <<: *java-runtime
+    image: tractusx/identityhub:${IDENTITYHUB_TAG:-0.3.2}
+    configs:
+      - source: ih-logging
+        target: /app/logging.properties
+    environment:
+      <<: *java-env
+      WEB_HTTP_PORT: "8081"
+      WEB_HTTP_PATH: "/api"
+      WEB_HTTP_IDENTITY_PORT: "8082"
+      WEB_HTTP_IDENTITY_PATH: "/api/identity"
+      WEB_HTTP_IDENTITY_AUTH_ALIAS: "password"
+      WEB_HTTP_CREDENTIALS_PORT: "8083"
+      WEB_HTTP_CREDENTIALS_PATH: "/api/credentials"
+      WEB_HTTP_DID_PORT: "8084"
+      WEB_HTTP_DID_PATH: "/"
+      WEB_HTTP_ACCOUNTS_PORT: "8085"
+      WEB_HTTP_ACCOUNTS_PATH: "/api/accounts"
+      WEB_HTTP_VERSION_PORT: "8086"
+      WEB_HTTP_VERSION_PATH: "/.well-known/api"
+      WEB_HTTP_STS_PORT: "8087"
+      WEB_HTTP_STS_PATH: "/api/sts"
+      EDC_IAM_DID_WEB_USE_HTTPS: "${USE_HTTPS_DID_WEB:-true}"
+      EDC_IH_IAM_ID: "did:web:${ISSUER_DID_HOST:?ISSUER_DID_HOST must be set}:${BPN_ISSUER:?BPN_ISSUER must be set}"
+      EDC_IAM_ACCESSTOKEN_JTI_VALIDATION: "${ISSUER_IDENTITYHUB_JTI_VALIDATION:-true}"
+      EDC_IAM_CREDENTIAL_REVOCATION_MIMETYPE: "application/json"
+      # AES is registered only when this alias resolves to a compatible Vault key.
+      EDC_ENCRYPTION_AES_KEY_ALIAS: "${ISSUER_IDENTITYHUB_ENCRYPTION_KEY_ALIAS:?ISSUER_IDENTITYHUB_ENCRYPTION_KEY_ALIAS must be set}"
+      EDC_ENCRYPTION_STRICT: "${ISSUER_IDENTITYHUB_ENCRYPTION_STRICT:-true}"
+      EDC_VAULT_HASHICORP_URL: "${VAULT_URL:?VAULT_URL must be set}"
+      EDC_VAULT_HASHICORP_TOKEN: "${VAULT_TOKEN:?VAULT_TOKEN must be set}"
+      EDC_VAULT_HASHICORP_API_SECRET_PATH: "/v1/secret"
+      EDC_VAULT_HASHICORP_API_HEALTH_CHECK_PATH: "/v1/sys/health"
+      EDC_SQL_STORE_PARTICIPANTCONTEXT_DATASOURCE: "participantcontext"
+      EDC_SQL_STORE_KEYPAIR_DATASOURCE: "keypair"
+      EDC_SQL_STORE_DIDRESOURCE_DATASOURCE: "didresource"
+      EDC_SQL_STORE_STSCLIENT_DATASOURCE: "stsclient"
+      EDC_SQL_STORE_CREDENTIALREQUEST_DATASOURCE: "credentialrequest"
+      EDC_SQL_STORE_CREDENTIALS_DATASOURCE: "credentials"
+      EDC_SQL_STORE_JTI_DATASOURCE: "jti"
+      EDC_SQL_STORE_PARTICIPANTCONTEXTCONFIG_DATASOURCE: "participantcontextconfig"
+      EDC_DATASOURCE_DEFAULT_URL: "${ISSUER_IDENTITYHUB_JDBC_URL:?ISSUER_IDENTITYHUB_JDBC_URL must be set}"
+      EDC_DATASOURCE_DEFAULT_USER: "${ISSUER_IDENTITYHUB_DB_USER:?ISSUER_IDENTITYHUB_DB_USER must be set}"
+      EDC_DATASOURCE_DEFAULT_PASSWORD: "${ISSUER_IDENTITYHUB_DB_PASSWORD:?ISSUER_IDENTITYHUB_DB_PASSWORD must be set}"
+      EDC_DATASOURCE_PARTICIPANTCONTEXT_URL: "${ISSUER_IDENTITYHUB_JDBC_URL:?ISSUER_IDENTITYHUB_JDBC_URL must be set}"
+      EDC_DATASOURCE_PARTICIPANTCONTEXT_USER: "${ISSUER_IDENTITYHUB_DB_USER:?ISSUER_IDENTITYHUB_DB_USER must be set}"
+      EDC_DATASOURCE_PARTICIPANTCONTEXT_PASSWORD: "${ISSUER_IDENTITYHUB_DB_PASSWORD:?ISSUER_IDENTITYHUB_DB_PASSWORD must be set}"
+      EDC_DATASOURCE_KEYPAIR_URL: "${ISSUER_IDENTITYHUB_JDBC_URL:?ISSUER_IDENTITYHUB_JDBC_URL must be set}"
+      EDC_DATASOURCE_KEYPAIR_USER: "${ISSUER_IDENTITYHUB_DB_USER:?ISSUER_IDENTITYHUB_DB_USER must be set}"
+      EDC_DATASOURCE_KEYPAIR_PASSWORD: "${ISSUER_IDENTITYHUB_DB_PASSWORD:?ISSUER_IDENTITYHUB_DB_PASSWORD must be set}"
+      EDC_DATASOURCE_DIDRESOURCE_URL: "${ISSUER_IDENTITYHUB_JDBC_URL:?ISSUER_IDENTITYHUB_JDBC_URL must be set}"
+      EDC_DATASOURCE_DIDRESOURCE_USER: "${ISSUER_IDENTITYHUB_DB_USER:?ISSUER_IDENTITYHUB_DB_USER must be set}"
+      EDC_DATASOURCE_DIDRESOURCE_PASSWORD: "${ISSUER_IDENTITYHUB_DB_PASSWORD:?ISSUER_IDENTITYHUB_DB_PASSWORD must be set}"
+      EDC_DATASOURCE_STSCLIENT_URL: "${ISSUER_IDENTITYHUB_JDBC_URL:?ISSUER_IDENTITYHUB_JDBC_URL must be set}"
+      EDC_DATASOURCE_STSCLIENT_USER: "${ISSUER_IDENTITYHUB_DB_USER:?ISSUER_IDENTITYHUB_DB_USER must be set}"
+      EDC_DATASOURCE_STSCLIENT_PASSWORD: "${ISSUER_IDENTITYHUB_DB_PASSWORD:?ISSUER_IDENTITYHUB_DB_PASSWORD must be set}"
+      EDC_DATASOURCE_CREDENTIALREQUEST_URL: "${ISSUER_IDENTITYHUB_JDBC_URL:?ISSUER_IDENTITYHUB_JDBC_URL must be set}"
+      EDC_DATASOURCE_CREDENTIALREQUEST_USER: "${ISSUER_IDENTITYHUB_DB_USER:?ISSUER_IDENTITYHUB_DB_USER must be set}"
+      EDC_DATASOURCE_CREDENTIALREQUEST_PASSWORD: "${ISSUER_IDENTITYHUB_DB_PASSWORD:?ISSUER_IDENTITYHUB_DB_PASSWORD must be set}"
+      EDC_DATASOURCE_CREDENTIALS_URL: "${ISSUER_IDENTITYHUB_JDBC_URL:?ISSUER_IDENTITYHUB_JDBC_URL must be set}"
+      EDC_DATASOURCE_CREDENTIALS_USER: "${ISSUER_IDENTITYHUB_DB_USER:?ISSUER_IDENTITYHUB_DB_USER must be set}"
+      EDC_DATASOURCE_CREDENTIALS_PASSWORD: "${ISSUER_IDENTITYHUB_DB_PASSWORD:?ISSUER_IDENTITYHUB_DB_PASSWORD must be set}"
+      EDC_DATASOURCE_JTI_URL: "${ISSUER_IDENTITYHUB_JDBC_URL:?ISSUER_IDENTITYHUB_JDBC_URL must be set}"
+      EDC_DATASOURCE_JTI_USER: "${ISSUER_IDENTITYHUB_DB_USER:?ISSUER_IDENTITYHUB_DB_USER must be set}"
+      EDC_DATASOURCE_JTI_PASSWORD: "${ISSUER_IDENTITYHUB_DB_PASSWORD:?ISSUER_IDENTITYHUB_DB_PASSWORD must be set}"
+      EDC_DATASOURCE_PARTICIPANTCONTEXTCONFIG_URL: "${ISSUER_IDENTITYHUB_JDBC_URL:?ISSUER_IDENTITYHUB_JDBC_URL must be set}"
+      EDC_DATASOURCE_PARTICIPANTCONTEXTCONFIG_USER: "${ISSUER_IDENTITYHUB_DB_USER:?ISSUER_IDENTITYHUB_DB_USER must be set}"
+      EDC_DATASOURCE_PARTICIPANTCONTEXTCONFIG_PASSWORD: "${ISSUER_IDENTITYHUB_DB_PASSWORD:?ISSUER_IDENTITYHUB_DB_PASSWORD must be set}"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget -q --spider http://localhost:8081/api/check/readiness || exit 1",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+    networks:
+      operator-internal:
+        aliases: [issuer-identityhub]
+      egress: {}
+
+  issuer-did:
+    <<: *gateway-runtime
+    image: nginxinc/nginx-unprivileged:1.30.4-alpine3.24
+    configs:
+      - source: nginx-issuer-did
+        target: /etc/nginx/conf.d/default.conf
+    healthcheck:
+      test: ["CMD", "nginx", "-t"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    depends_on:
+      issuerservice:
+        condition: service_healthy
+    networks:
+      operator-internal:
+        aliases: [issuer-did]
+      edge:
+        aliases:
+          - issuer-did
+          - ${ISSUER_DID_HOST:?ISSUER_DID_HOST must be set}
+
+  bdrs-server:
+    <<: *java-runtime
+    image: tractusx/bdrs-server:${BDRS_TAG:-0.5.7}
+    environment:
+      <<: *java-env
+      WEB_HTTP_PORT: "8080"
+      WEB_HTTP_PATH: "/api"
+      WEB_HTTP_MANAGEMENT_PORT: "8081"
+      WEB_HTTP_MANAGEMENT_PATH: "/api/management"
+      WEB_HTTP_MANAGEMENT_AUTH_KEY_ALIAS: "mgmt-api-key"
+      WEB_HTTP_MANAGEMENT_AUTH_TYPE: "tokenbased"
+      WEB_HTTP_DIRECTORY_PORT: "8082"
+      WEB_HTTP_DIRECTORY_PATH: "/api/directory"
+      EDC_IAM_DID_WEB_USE_HTTPS: "${USE_HTTPS_DID_WEB:-true}"
+      EDC_IAM_CREDENTIAL_REVOCATION_MIMETYPE: "application/json"
+      EDC_IAM_ISSUER_ID: "did:web:${ISSUER_DID_HOST:?ISSUER_DID_HOST must be set}:${BPN_ISSUER:?BPN_ISSUER must be set}"
+      "EDC_IAM_TRUSTED-ISSUER_0-ISSUER_ID": "did:web:${ISSUER_DID_HOST:?ISSUER_DID_HOST must be set}:${BPN_ISSUER:?BPN_ISSUER must be set}"
+      EDC_VAULT_HASHICORP_URL: "${VAULT_URL:?VAULT_URL must be set}"
+      EDC_VAULT_HASHICORP_TOKEN: "${VAULT_TOKEN:?VAULT_TOKEN must be set}"
+      EDC_VAULT_HASHICORP_API_SECRET_PATH: "/v1/secret"
+      EDC_DATASOURCE_DIDENTRY_NAME: "didentry"
+      EDC_DATASOURCE_DIDENTRY_URL: "${BDRS_JDBC_URL:?BDRS_JDBC_URL must be set}"
+      EDC_DATASOURCE_DIDENTRY_USER: "${BDRS_DB_USER:?BDRS_DB_USER must be set}"
+      EDC_DATASOURCE_DIDENTRY_PASSWORD: "${BDRS_DB_PASSWORD:?BDRS_DB_PASSWORD must be set}"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget -q --spider http://localhost:8080/api/check/startup || exit 1",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+    networks:
+      operator-internal:
+        aliases: [bdrs-server]
+      egress: {}
+
+  issuerservice:
+    <<: *java-runtime
+    image: tractusx/issuerservice:${ISSUERSERVICE_TAG:-0.3.2}
+    environment:
+      <<: *java-env
+      WEB_HTTP_PORT: "8081"
+      WEB_HTTP_PATH: "/api"
+      WEB_HTTP_ISSUANCE_PORT: "8082"
+      WEB_HTTP_ISSUANCE_PATH: "/api/issuance"
+      WEB_HTTP_DID_PORT: "8083"
+      WEB_HTTP_DID_PATH: "/"
+      WEB_HTTP_VERSION_PORT: "8084"
+      WEB_HTTP_VERSION_PATH: "/.well-known/api"
+      WEB_HTTP_STS_PORT: "8085"
+      WEB_HTTP_STS_PATH: "/api/sts"
+      WEB_HTTP_ISSUERADMIN_PORT: "8086"
+      WEB_HTTP_ISSUERADMIN_PATH: "/api/admin"
+      WEB_HTTP_IDENTITY_PORT: "8087"
+      WEB_HTTP_IDENTITY_PATH: "/api/identity"
+      WEB_HTTP_STATUSLIST_PORT: "8088"
+      WEB_HTTP_STATUSLIST_PATH: "/statuslist"
+      EDC_IAM_DID_WEB_USE_HTTPS: "${USE_HTTPS_DID_WEB:-true}"
+      EDC_IAM_ACCESSTOKEN_JTI_VALIDATION: "${ISSUER_SERVICE_JTI_VALIDATION:-true}"
+      EDC_IAM_CREDENTIAL_REVOCATION_MIMETYPE: "application/json"
+      EDC_ISSUER_STATUSLIST_SIGNING_KEY_ALIAS: "default"
+      EDC_STATUSLIST_CALLBACK_ADDRESS: "http://issuer-did/statuslist"
+      EDC_ENCRYPTION_AES_KEY_ALIAS: "${ISSUER_SERVICE_ENCRYPTION_KEY_ALIAS:?ISSUER_SERVICE_ENCRYPTION_KEY_ALIAS must be set}"
+      EDC_ENCRYPTION_STRICT: "${ISSUER_SERVICE_ENCRYPTION_STRICT:-true}"
+      EDC_VAULT_HASHICORP_URL: "${VAULT_URL:?VAULT_URL must be set}"
+      EDC_VAULT_HASHICORP_TOKEN: "${VAULT_TOKEN:?VAULT_TOKEN must be set}"
+      EDC_VAULT_HASHICORP_API_SECRET_PATH: "/v1/secret"
+      EDC_VAULT_HASHICORP_API_HEALTH_CHECK_PATH: "/v1/sys/health"
+      EDC_DATASOURCE_DEFAULT_URL: "${ISSUER_SERVICE_JDBC_URL:?ISSUER_SERVICE_JDBC_URL must be set}"
+      EDC_DATASOURCE_DEFAULT_USER: "${ISSUER_SERVICE_DB_USER:?ISSUER_SERVICE_DB_USER must be set}"
+      EDC_DATASOURCE_DEFAULT_PASSWORD: "${ISSUER_SERVICE_DB_PASSWORD:?ISSUER_SERVICE_DB_PASSWORD must be set}"
+      EDC_SQL_STORE_ISSUANCEPROCESS_DATASOURCE: "issuanceprocess"
+      EDC_SQL_STORE_ATTESTATIONDEFINITIONS_DATASOURCE: "attestationdefinitions"
+      EDC_SQL_STORE_CREDENTIALDEFINITIONS_DATASOURCE: "credentialdefinitions"
+      EDC_SQL_STORE_DIDRESOURCE_DATASOURCE: "didresource"
+      EDC_SQL_STORE_STSCLIENT_DATASOURCE: "stsclient"
+      EDC_SQL_STORE_PARTICIPANT_DATASOURCE: "participant"
+      EDC_SQL_STORE_PARTICIPANTCONTEXT_DATASOURCE: "participantcontext"
+      EDC_SQL_STORE_KEYPAIR_DATASOURCE: "keypair"
+      EDC_SQL_STORE_JTI_DATASOURCE: "jti"
+      EDC_SQL_STORE_CREDENTIALS_DATASOURCE: "credentials"
+      EDC_SQL_STORE_HOLDER_DATASOURCE: "holder"
+      EDC_SQL_STORE_PARTICIPANTCONTEXTCONFIG_DATASOURCE: "participantcontextconfig"
+      EDC_SQL_STORE_CUSTOMATTESTATIONS_DATASOURCE: "customattestations"
+      EDC_DATASOURCE_ISSUANCEPROCESS_URL: "${ISSUER_SERVICE_JDBC_URL:?ISSUER_SERVICE_JDBC_URL must be set}"
+      EDC_DATASOURCE_ATTESTATIONDEFINITIONS_URL: "${ISSUER_SERVICE_JDBC_URL:?ISSUER_SERVICE_JDBC_URL must be set}"
+      EDC_DATASOURCE_CREDENTIALDEFINITIONS_URL: "${ISSUER_SERVICE_JDBC_URL:?ISSUER_SERVICE_JDBC_URL must be set}"
+      EDC_DATASOURCE_DIDRESOURCE_URL: "${ISSUER_SERVICE_JDBC_URL:?ISSUER_SERVICE_JDBC_URL must be set}"
+      EDC_DATASOURCE_STSCLIENT_URL: "${ISSUER_SERVICE_JDBC_URL:?ISSUER_SERVICE_JDBC_URL must be set}"
+      EDC_DATASOURCE_PARTICIPANT_URL: "${ISSUER_SERVICE_JDBC_URL:?ISSUER_SERVICE_JDBC_URL must be set}"
+      EDC_DATASOURCE_PARTICIPANTCONTEXT_URL: "${ISSUER_SERVICE_JDBC_URL:?ISSUER_SERVICE_JDBC_URL must be set}"
+      EDC_DATASOURCE_KEYPAIR_URL: "${ISSUER_SERVICE_JDBC_URL:?ISSUER_SERVICE_JDBC_URL must be set}"
+      EDC_DATASOURCE_JTI_URL: "${ISSUER_SERVICE_JDBC_URL:?ISSUER_SERVICE_JDBC_URL must be set}"
+      EDC_DATASOURCE_CREDENTIALS_URL: "${ISSUER_SERVICE_JDBC_URL:?ISSUER_SERVICE_JDBC_URL must be set}"
+      EDC_DATASOURCE_HOLDER_URL: "${ISSUER_SERVICE_JDBC_URL:?ISSUER_SERVICE_JDBC_URL must be set}"
+      EDC_DATASOURCE_PARTICIPANTCONTEXTCONFIG_URL: "${ISSUER_SERVICE_JDBC_URL:?ISSUER_SERVICE_JDBC_URL must be set}"
+      EDC_DATASOURCE_CUSTOMATTESTATIONS_URL: "${ISSUER_SERVICE_JDBC_URL:?ISSUER_SERVICE_JDBC_URL must be set}"
+      EDC_DATASOURCE_ISSUANCEPROCESS_USER: "${ISSUER_SERVICE_DB_USER:?ISSUER_SERVICE_DB_USER must be set}"
+      EDC_DATASOURCE_ATTESTATIONDEFINITIONS_USER: "${ISSUER_SERVICE_DB_USER:?ISSUER_SERVICE_DB_USER must be set}"
+      EDC_DATASOURCE_CREDENTIALDEFINITIONS_USER: "${ISSUER_SERVICE_DB_USER:?ISSUER_SERVICE_DB_USER must be set}"
+      EDC_DATASOURCE_DIDRESOURCE_USER: "${ISSUER_SERVICE_DB_USER:?ISSUER_SERVICE_DB_USER must be set}"
+      EDC_DATASOURCE_STSCLIENT_USER: "${ISSUER_SERVICE_DB_USER:?ISSUER_SERVICE_DB_USER must be set}"
+      EDC_DATASOURCE_PARTICIPANT_USER: "${ISSUER_SERVICE_DB_USER:?ISSUER_SERVICE_DB_USER must be set}"
+      EDC_DATASOURCE_PARTICIPANTCONTEXT_USER: "${ISSUER_SERVICE_DB_USER:?ISSUER_SERVICE_DB_USER must be set}"
+      EDC_DATASOURCE_KEYPAIR_USER: "${ISSUER_SERVICE_DB_USER:?ISSUER_SERVICE_DB_USER must be set}"
+      EDC_DATASOURCE_JTI_USER: "${ISSUER_SERVICE_DB_USER:?ISSUER_SERVICE_DB_USER must be set}"
+      EDC_DATASOURCE_CREDENTIALS_USER: "${ISSUER_SERVICE_DB_USER:?ISSUER_SERVICE_DB_USER must be set}"
+      EDC_DATASOURCE_HOLDER_USER: "${ISSUER_SERVICE_DB_USER:?ISSUER_SERVICE_DB_USER must be set}"
+      EDC_DATASOURCE_PARTICIPANTCONTEXTCONFIG_USER: "${ISSUER_SERVICE_DB_USER:?ISSUER_SERVICE_DB_USER must be set}"
+      EDC_DATASOURCE_CUSTOMATTESTATIONS_USER: "${ISSUER_SERVICE_DB_USER:?ISSUER_SERVICE_DB_USER must be set}"
+      EDC_DATASOURCE_ISSUANCEPROCESS_PASSWORD: "${ISSUER_SERVICE_DB_PASSWORD:?ISSUER_SERVICE_DB_PASSWORD must be set}"
+      EDC_DATASOURCE_ATTESTATIONDEFINITIONS_PASSWORD: "${ISSUER_SERVICE_DB_PASSWORD:?ISSUER_SERVICE_DB_PASSWORD must be set}"
+      EDC_DATASOURCE_CREDENTIALDEFINITIONS_PASSWORD: "${ISSUER_SERVICE_DB_PASSWORD:?ISSUER_SERVICE_DB_PASSWORD must be set}"
+      EDC_DATASOURCE_DIDRESOURCE_PASSWORD: "${ISSUER_SERVICE_DB_PASSWORD:?ISSUER_SERVICE_DB_PASSWORD must be set}"
+      EDC_DATASOURCE_STSCLIENT_PASSWORD: "${ISSUER_SERVICE_DB_PASSWORD:?ISSUER_SERVICE_DB_PASSWORD must be set}"
+      EDC_DATASOURCE_PARTICIPANT_PASSWORD: "${ISSUER_SERVICE_DB_PASSWORD:?ISSUER_SERVICE_DB_PASSWORD must be set}"
+      EDC_DATASOURCE_PARTICIPANTCONTEXT_PASSWORD: "${ISSUER_SERVICE_DB_PASSWORD:?ISSUER_SERVICE_DB_PASSWORD must be set}"
+      EDC_DATASOURCE_KEYPAIR_PASSWORD: "${ISSUER_SERVICE_DB_PASSWORD:?ISSUER_SERVICE_DB_PASSWORD must be set}"
+      EDC_DATASOURCE_JTI_PASSWORD: "${ISSUER_SERVICE_DB_PASSWORD:?ISSUER_SERVICE_DB_PASSWORD must be set}"
+      EDC_DATASOURCE_CREDENTIALS_PASSWORD: "${ISSUER_SERVICE_DB_PASSWORD:?ISSUER_SERVICE_DB_PASSWORD must be set}"
+      EDC_DATASOURCE_HOLDER_PASSWORD: "${ISSUER_SERVICE_DB_PASSWORD:?ISSUER_SERVICE_DB_PASSWORD must be set}"
+      EDC_DATASOURCE_PARTICIPANTCONTEXTCONFIG_PASSWORD: "${ISSUER_SERVICE_DB_PASSWORD:?ISSUER_SERVICE_DB_PASSWORD must be set}"
+      EDC_DATASOURCE_CUSTOMATTESTATIONS_PASSWORD: "${ISSUER_SERVICE_DB_PASSWORD:?ISSUER_SERVICE_DB_PASSWORD must be set}"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget -q --spider http://localhost:8081/api/check/startup || exit 1",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+    networks:
+      operator-internal:
+        aliases: [issuerservice]
+      egress: {}
+
+  db-migrator:
+    <<: *node-runtime
+    image: ${OPERATOR_CONSOLE_IMAGE:?OPERATOR_CONSOLE_IMAGE must be set to a versioned tag or digest}
+    command: ["node", "dist-server/apps/operator-console/server/migrate.js"]
+    environment:
+      PORT: "3000"
+      OPERATOR_MIGRATIONS_DIR: "/app/db/migrations"
+      OPERATOR_MIGRATOR_DATABASE_URL: "${OPERATOR_MIGRATOR_DATABASE_URL:?OPERATOR_MIGRATOR_DATABASE_URL must be set}"
+      OPERATOR_MIGRATOR_ROLE: "${DATASPACE_ADMIN_OWNER_ROLE:-dataspace_admin_owner}"
+      DB_MIGRATION_RETRY_TIMEOUT_MS: "${DB_MIGRATION_RETRY_TIMEOUT_MS:-120000}"
+      DB_MIGRATION_RETRY_DELAY_MS: "${DB_MIGRATION_RETRY_DELAY_MS:-2000}"
+      LOG_LEVEL: "${LOG_LEVEL:-info}"
+    restart: "no"
+    networks:
+      operator-internal:
+        aliases: [operator-db-migrator]
+      egress: {}
+
+  issuer-claims-grant:
+    <<: *node-runtime
+    image: ${OPERATOR_CONSOLE_IMAGE:?OPERATOR_CONSOLE_IMAGE must be set to a versioned tag or digest}
+    command:
+      [
+        "node",
+        "dist-server/apps/operator-console/server/grant-issuer-claims.js",
+      ]
+    environment:
+      ISSUER_MIGRATOR_DATABASE_URL: "${ISSUER_MIGRATOR_DATABASE_URL:?ISSUER_MIGRATOR_DATABASE_URL must be set}"
+      ISSUER_CLAIMS_DB_ROLE: "${ISSUER_CLAIMS_DB_ROLE:-issuer_claims_writer}"
+      DB_MIGRATION_RETRY_TIMEOUT_MS: "${DB_MIGRATION_RETRY_TIMEOUT_MS:-120000}"
+      DB_MIGRATION_RETRY_DELAY_MS: "${DB_MIGRATION_RETRY_DELAY_MS:-2000}"
+    depends_on:
+      issuerservice:
+        condition: service_healthy
+    restart: "no"
+    networks:
+      operator-internal:
+      egress: {}
+
+  operator-console:
+    <<: *node-runtime
+    image: ${OPERATOR_CONSOLE_IMAGE:?OPERATOR_CONSOLE_IMAGE must be set to a versioned tag or digest}
+    environment:
+      PORT: "3000"
+      OPERATOR_CONSOLE_DATABASE_URL: "${OPERATOR_CONSOLE_DATABASE_URL:?OPERATOR_CONSOLE_DATABASE_URL must be set}"
+      DATABASE_URL: "${OPERATOR_CONSOLE_DATABASE_URL:?OPERATOR_CONSOLE_DATABASE_URL must be set}"
+      OPERATOR_CONSOLE_AUTH_MODE: "${OPERATOR_CONSOLE_AUTH_MODE:?OPERATOR_CONSOLE_AUTH_MODE must be set}"
+      OPERATOR_CONSOLE_AUTH_HEADER: "${OPERATOR_CONSOLE_AUTH_HEADER:-x-forwarded-user}"
+      OPERATOR_CONSOLE_AUTH_ALLOWED_USERS: "${OPERATOR_CONSOLE_AUTH_ALLOWED_USERS:-}"
+      OPERATOR_CONSOLE_TITLE: "${OPERATOR_CONSOLE_TITLE:-}"
+      OPERATOR_CONSOLE_SUBTITLE: "${OPERATOR_CONSOLE_SUBTITLE:-}"
+      OPERATOR_CONSOLE_CONFIG_JSON: "${OPERATOR_CONSOLE_CONFIG_JSON:-}"
+      OPERATOR_CONSOLE_THEME_JSON: "${OPERATOR_CONSOLE_THEME_JSON:-}"
+      OPERATOR_CONSOLE_API_KEY: "${OPERATOR_CONSOLE_API_KEY:-}"
+      OPERATOR_CONSOLE_HTTPS_HEADERS: "${OPERATOR_CONSOLE_HTTPS_HEADERS:-true}"
+      BDRS_MANAGEMENT_URL: "http://bdrs-server:8081/api/management"
+      BDRS_API_KEY: "${BDRS_API_KEY:?BDRS_API_KEY must be set}"
+      ISSUER_DID: "did:web:${ISSUER_DID_HOST:?ISSUER_DID_HOST must be set}:${BPN_ISSUER:?BPN_ISSUER must be set}"
+      ISSUER_ADMIN_URL: "http://issuerservice:8086/api/admin"
+      ISSUER_IDENTITY_URL: "http://issuerservice:8087/api/identity"
+      ISSUER_ISSUANCE_URL: "http://issuerservice:8082/api/issuance"
+      ISSUER_CLAIMS_DATABASE_URL: "${ISSUER_CLAIMS_DATABASE_URL:?ISSUER_CLAIMS_DATABASE_URL must be set}"
+      ISSUER_CONTEXT: "${BPN_ISSUER:?BPN_ISSUER must be set}"
+      ISSUER_CONTEXT_PATH_ID: "${BPN_ISSUER_BASE64:?BPN_ISSUER_BASE64 must be set}"
+      ISSUER_API_KEY: "${ISSUER_API_KEY:-}"
+      ISSUER_API_KEY_ALIAS: "${BPN_ISSUER:?BPN_ISSUER must be set}-apikey"
+      ISSUER_API_KEY_VAULT_URL: "${VAULT_URL:?VAULT_URL must be set}"
+      ISSUER_API_KEY_VAULT_TOKEN: "${VAULT_TOKEN:?VAULT_TOKEN must be set}"
+      ISSUER_API_KEY_VAULT_PATH: "/v1/secret/data/data/${BPN_ISSUER:?BPN_ISSUER must be set}-apikey"
+      ISSUER_SUPERUSER_API_KEY_VAULT_PATH: "/v1/secret/data/data/super-user-apikey"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget --no-verbose --tries=1 --spider http://localhost:3000/api/health || exit 1",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    depends_on:
+      db-migrator:
+        condition: service_completed_successfully
+      bdrs-server:
+        condition: service_healthy
+      issuerservice:
+        condition: service_healthy
+      issuer-claims-grant:
+        condition: service_completed_successfully
+    networks:
+      operator-internal:
+        aliases: [operator-console]
+      admin-access: {}
+      egress: {}
+
+  operator-onboarding-service:
+    <<: *node-runtime
+    image: ${OPERATOR_ONBOARDING_SERVICE_IMAGE:?OPERATOR_ONBOARDING_SERVICE_IMAGE must be set to a versioned tag or digest}
+    environment:
+      PORT: "3000"
+      OPERATOR_ONBOARDING_SERVICE_DATABASE_URL: "${OPERATOR_ONBOARDING_SERVICE_DATABASE_URL:?OPERATOR_ONBOARDING_SERVICE_DATABASE_URL must be set}"
+      OPERATOR_ONBOARDING_SERVICE_ALLOWED_ORIGINS: "${OPERATOR_ONBOARDING_SERVICE_ALLOWED_ORIGINS:?OPERATOR_ONBOARDING_SERVICE_ALLOWED_ORIGINS must be set}"
+      OPERATOR_ONBOARDING_SERVICE_ENABLE_RATE_LIMIT: "${OPERATOR_ONBOARDING_SERVICE_ENABLE_RATE_LIMIT:-true}"
+      OPERATOR_ONBOARDING_SERVICE_RATE_LIMIT_MAX: "${OPERATOR_ONBOARDING_SERVICE_RATE_LIMIT_MAX:-60}"
+      OPERATOR_ONBOARDING_SERVICE_RATE_LIMIT_WINDOW: "${OPERATOR_ONBOARDING_SERVICE_RATE_LIMIT_WINDOW:-1 minute}"
+      OPERATOR_ONBOARDING_SERVICE_TITLE: "${OPERATOR_ONBOARDING_SERVICE_TITLE:-Operator Onboarding Service}"
+      OPERATOR_ONBOARDING_SERVICE_CONFIG_JSON: "${OPERATOR_ONBOARDING_SERVICE_CONFIG_JSON:-}"
+      OPERATOR_ONBOARDING_SERVICE_THEME_JSON: "${OPERATOR_ONBOARDING_SERVICE_THEME_JSON:-}"
+      ISSUER_DID: "did:web:${ISSUER_DID_HOST:?ISSUER_DID_HOST must be set}:${BPN_ISSUER:?BPN_ISSUER must be set}"
+      LOG_LEVEL: "${LOG_LEVEL:-info}"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget --no-verbose --tries=1 --spider http://localhost:3000/api/health || exit 1",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    depends_on:
+      db-migrator:
+        condition: service_completed_successfully
+    networks:
+      edge:
+        aliases: [operator-onboarding-service]
+      operator-internal:
+        aliases: [operator-onboarding-service]
+      egress: {}
+
+configs:
+  ih-logging:
+    content: |
+      .level=INFO
+      org.eclipse.edc.level=INFO
+  nginx-issuer-did:
+    content: |
+      server {
+          listen 80;
+          server_name _;
+
+          location /statuslist/ {
+              proxy_pass http://issuerservice:8088/statuslist/;
+              proxy_set_header Host $$host;
+              proxy_set_header Accept application/json;
+              proxy_set_header X-Real-IP $$remote_addr;
+          }
+
+          location /.well-known/api/ {
+              proxy_pass http://issuerservice:8084/.well-known/api/;
+              proxy_set_header Host $$host;
+              proxy_set_header X-Real-IP $$remote_addr;
+          }
+
+          location /api/directory/ {
+              proxy_pass http://bdrs-server:8082/api/directory/;
+              proxy_set_header Host $$host;
+              proxy_set_header X-Real-IP $$remote_addr;
+          }
+
+          location / {
+              proxy_pass http://issuerservice:8083;
+              proxy_set_header Host $$host;
+              proxy_set_header X-Real-IP $$remote_addr;
+          }
+      }
+
+networks:
+  operator-internal:
+    name: ${COMPOSE_PROJECT_PREFIX:-tx-bootstrap}-operator-internal
+    internal: true
+  egress:
+    name: ${OPERATOR_EGRESS_NETWORK:-${COMPOSE_PROJECT_PREFIX:-tx-bootstrap}-operator-egress}
+  admin-access:
+    name: ${OPERATOR_ADMIN_ACCESS_NETWORK:-${COMPOSE_PROJECT_PREFIX:-tx-bootstrap}-admin-access}
+  edge:
+    name: ${OPERATOR_EDGE_NETWORK:-tx-bootstrap-operator-edge}
+    external: ${OPERATOR_EDGE_NETWORK_EXTERNAL:-false}

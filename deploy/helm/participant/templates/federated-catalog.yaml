@@ -1,0 +1,122 @@
+{{- $name := include "tx-bootstrap-participant.componentName" (dict "root" . "component" "federated-catalog") -}}
+{{- $podContext := mergeOverwrite (deepCopy .Values.podSecurityContext) (dict "fsGroup" .Values.federatedCatalog.securityContext.runAsGroup) -}}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "tx-bootstrap-participant.labels" . | nindent 4 }}
+    app.kubernetes.io/component: federated-catalog
+spec:
+  serviceName: {{ $name }}
+  replicas: {{ .Values.federatedCatalog.replicaCount }}
+  revisionHistoryLimit: {{ .Values.revisionHistoryLimit }}
+  selector:
+    matchLabels:
+      {{- include "tx-bootstrap-participant.selectorLabels" (dict "root" . "component" "federated-catalog") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "tx-bootstrap-participant.selectorLabels" (dict "root" . "component" "federated-catalog") | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      serviceAccountName: {{ include "tx-bootstrap-participant.serviceAccountName" . }}
+      automountServiceAccountToken: {{ .Values.serviceAccount.automountServiceAccountToken }}
+      securityContext:
+        {{- toYaml $podContext | nindent 8 }}
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: federated-catalog
+          image: {{ include "tx-bootstrap-participant.image" .Values.federatedCatalog.image | quote }}
+          imagePullPolicy: {{ .Values.federatedCatalog.image.pullPolicy }}
+          securityContext:
+            {{- include "tx-bootstrap-participant.containerSecurityContext" (dict "root" . "component" .Values.federatedCatalog.securityContext) | nindent 12 }}
+          ports:
+            - { name: http, containerPort: 8000 }
+          env:
+            - { name: FEDERATED_CATALOG_STORE_PATH, value: /data/oxigraph }
+            - name: FEDERATED_CATALOG_API_KEY
+              {{- include "tx-bootstrap-participant.secretValue" (dict "root" . "key" "federatedCatalogApiKey") | nindent 14 }}
+            - name: PARTICIPANT_BPN
+              value: {{ .Values.identity.participantBpn | quote }}
+            - name: PARTICIPANT_DIRECTORY_URL
+              value: {{ .Values.portal.onboarding.dataspaceAdminApiUrl | quote }}
+            - name: EDC_MANAGEMENT_API_URL
+              value: "http://{{ include "tx-bootstrap-participant.componentName" (dict "root" . "component" "controlplane") }}:8081/management"
+            - name: EDC_API_KEY
+              {{- include "tx-bootstrap-participant.secretValue" (dict "root" . "key" "edcApiKey") | nindent 14 }}
+            - name: DIRECTORY_REFRESH_INTERVAL_SECONDS
+              value: {{ .Values.federatedCatalog.directoryRefreshIntervalSeconds | quote }}
+            - name: CATALOG_REFRESH_INTERVAL_SECONDS
+              value: {{ .Values.federatedCatalog.catalogRefreshIntervalSeconds | quote }}
+            - name: CATALOG_CRAWL_CONCURRENCY
+              value: {{ .Values.federatedCatalog.crawlConcurrency | quote }}
+          volumeMounts:
+            - { name: data, mountPath: /data }
+          startupProbe:
+            httpGet: { path: /health/live, port: http }
+            periodSeconds: 5
+            timeoutSeconds: 5
+            failureThreshold: 30
+          readinessProbe:
+            httpGet: { path: /health/ready, port: http }
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet: { path: /health/live, port: http }
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.federatedCatalog.resources | nindent 12 }}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes:
+          {{- toYaml .Values.federatedCatalog.persistence.accessModes | nindent 10 }}
+        {{- with .Values.federatedCatalog.persistence.storageClass }}
+        storageClassName: {{ . | quote }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.federatedCatalog.persistence.size | quote }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "tx-bootstrap-participant.labels" . | nindent 4 }}
+    app.kubernetes.io/component: federated-catalog
+spec:
+  type: {{ .Values.federatedCatalog.service.type }}
+  selector:
+    {{- include "tx-bootstrap-participant.selectorLabels" (dict "root" . "component" "federated-catalog") | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ .Values.federatedCatalog.service.port }}
+      targetPort: http

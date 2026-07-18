@@ -1,0 +1,80 @@
+identity:
+  participantRole: consumer
+  participantBpn: __BPN_CONSUMER__
+  participantBpnBase64: __BPN_CONSUMER_BASE64__
+  participantContextId: __CONSUMER_CONTEXT_ID__
+  identityHubParticipantContextId: __BPN_CONSUMER__
+  participantDidHost: consumer.__INGRESS_IP__.nip.io
+  participantPublicHost: consumer.__INGRESS_IP__.nip.io
+  issuerBpn: __BPN_ISSUER__
+  issuerDidHost: issuer.__INGRESS_IP__.nip.io
+  useHttpsDidWeb: false
+
+publicEndpoints:
+  dspCallbackAddress: http://consumer.__INGRESS_IP__.nip.io/api/v1/dsp
+  credentialServiceEndpoint: http://consumer.__INGRESS_IP__.nip.io/api/credentials
+  dataPlaneBaseUrl: http://consumer.__INGRESS_IP__.nip.io/api/public/
+  dataPlaneTokenRefreshEndpoint: http://consumer.__INGRESS_IP__.nip.io/api/public
+  bdrsServerUrl: http://issuer.__INGRESS_IP__.nip.io/api/directory
+
+vault:
+  url: http://vault.tx-infra.svc.cluster.local:8200
+  apiSecretPath: /v1/consumer
+  healthCheckPath: /v1/sys/health
+
+existingSecret:
+  name: tx-bootstrap-consumer-secrets
+
+jobs:
+  portalMigrator:
+    ownerRole: consumer_portal_owner
+    runtimeRole: consumer_portal
+
+identityHub:
+  encryptionKeyAlias: consumer-identityhub-encryption-key
+
+participantInit:
+  image:
+    repository: tx-bootstrap-participant-init
+    tag: local
+    pullPolicy: Never
+
+federatedCatalog:
+  image:
+    repository: tx-bootstrap-federated-catalog
+    tag: local
+    pullPolicy: Never
+
+portal:
+  image:
+    repository: tx-bootstrap-participant-portal-backend
+    tag: local
+    pullPolicy: Never
+  title: Portal - Consumer
+  name: Local Consumer
+  publicEdcEndpoint: http://provider.__INGRESS_IP__.nip.io/api/v1/dsp
+  httpsHeaders: false
+  auth:
+    mode: none
+    allowInsecure: true
+  onboarding:
+    dataspaceAdminApiUrl: http://onboarding.__INGRESS_IP__.nip.io/api
+    organizationName: Local Consumer
+    requestedBpn: __BPN_CONSUMER__
+    contactEmail: consumer@local.test
+    requestedRole: participant
+    did: did:web:consumer.__INGRESS_IP__.nip.io:__BPN_CONSUMER__
+    dspEndpoint: http://consumer.__INGRESS_IP__.nip.io/api/v1/dsp
+    credentialServiceEndpoint: http://consumer.__INGRESS_IP__.nip.io/api/credentials
+
+ingress:
+  public:
+    enabled: true
+    className: traefik
+    hosts:
+      - consumer.__INGRESS_IP__.nip.io
+  internal:
+    enabled: true
+    className: traefik
+    hosts:
+      - consumer-portal.__INGRESS_IP__.nip.io

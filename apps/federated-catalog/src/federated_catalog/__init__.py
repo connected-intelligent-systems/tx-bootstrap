@@ -1,0 +1,1 @@
+"""Participant-local federated catalog."""

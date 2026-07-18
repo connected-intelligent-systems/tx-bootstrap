@@ -1,0 +1,15 @@
+# Local development port overrides
+# This file is loaded by deploy/local_compose/scripts/up.sh alongside compose.yaml.
+
+services:
+  public-gateway:
+    ports:
+      - "${PUBLIC_HTTP_BIND:-127.0.0.1}:${PROVIDER_PUBLIC_HTTP_HOST_PORT:-29284}:80"
+
+  participant-api-gateway:
+    ports:
+      - "${INTERNAL_HTTP_BIND:-127.0.0.1}:${PROVIDER_API_HTTP_HOST_PORT:-29282}:80"
+
+  portal-gateway:
+    ports:
+      - "${INTERNAL_HTTP_BIND:-127.0.0.1}:${PROVIDER_INTERNAL_HTTP_HOST_PORT:-29283}:80"

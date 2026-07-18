@@ -1,0 +1,109 @@
+{{- if .Values.jobs.portalMigrator.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "tx-bootstrap-participant.componentName" (dict "root" . "component" (printf "portal-db-migrator-r%d" .Release.Revision)) }}
+  labels:
+    {{- include "tx-bootstrap-participant.labels" . | nindent 4 }}
+    app.kubernetes.io/component: portal-db-migrator
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: "-10"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: {{ .Values.jobs.portalMigrator.backoffLimit }}
+  activeDeadlineSeconds: {{ .Values.jobs.portalMigrator.activeDeadlineSeconds }}
+  template:
+    metadata:
+      labels:
+        {{- include "tx-bootstrap-participant.selectorLabels" (dict "root" . "component" "portal-db-migrator") | nindent 8 }}
+    spec:
+      {{- include "tx-bootstrap-participant.preInstallPodDefaults" (dict "root" . "serviceAccountName" .Values.jobs.portalMigrator.serviceAccountName) | nindent 6 }}
+      restartPolicy: Never
+      containers:
+        - name: portal-db-migrator
+          image: {{ include "tx-bootstrap-participant.image" .Values.portal.image | quote }}
+          imagePullPolicy: {{ .Values.portal.image.pullPolicy }}
+          command: [node, dist-server/server/migrate.js]
+          securityContext:
+            {{- include "tx-bootstrap-participant.containerSecurityContext" (dict "root" . "component" .Values.portal.securityContext) | nindent 12 }}
+          env:
+            - name: PARTICIPANT_PORTAL_MIGRATIONS_DIR
+              value: {{ .Values.jobs.portalMigrator.migrationDirectory | quote }}
+            - name: PARTICIPANT_PORTAL_MIGRATOR_DATABASE_URL
+              {{- include "tx-bootstrap-participant.secretValue" (dict "root" . "key" "portalMigratorDatabaseUrl") | nindent 14 }}
+            - name: PARTICIPANT_PORTAL_OWNER_ROLE
+              value: {{ .Values.jobs.portalMigrator.ownerRole | quote }}
+            - name: PARTICIPANT_PORTAL_DB_ROLE
+              value: {{ .Values.jobs.portalMigrator.runtimeRole | quote }}
+            - name: DB_MIGRATION_RETRY_TIMEOUT_MS
+              value: {{ .Values.jobs.retryTimeoutMs | quote }}
+            - name: DB_MIGRATION_RETRY_DELAY_MS
+              value: {{ .Values.jobs.retryDelayMs | quote }}
+          resources:
+            {{- toYaml .Values.jobs.resources | nindent 12 }}
+{{- end }}
+{{- if and .Values.jobs.portalMigrator.enabled .Values.jobs.participantInit.enabled }}
+---
+{{- end }}
+{{- if .Values.jobs.participantInit.enabled }}
+{{ $initHash := include "tx-bootstrap-participant.participantInitHash" . -}}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "tx-bootstrap-participant.componentName" (dict "root" . "component" (printf "participant-init-%s" $initHash)) }}
+  labels:
+    {{- include "tx-bootstrap-participant.labels" . | nindent 4 }}
+    app.kubernetes.io/component: participant-init
+spec:
+  backoffLimit: {{ .Values.jobs.participantInit.backoffLimit }}
+  activeDeadlineSeconds: {{ .Values.jobs.participantInit.activeDeadlineSeconds }}
+  template:
+    metadata:
+      labels:
+        {{- include "tx-bootstrap-participant.selectorLabels" (dict "root" . "component" "participant-init") | nindent 8 }}
+    spec:
+      {{- include "tx-bootstrap-participant.podDefaults" . | nindent 6 }}
+      restartPolicy: Never
+      containers:
+        - name: participant-init
+          image: {{ include "tx-bootstrap-participant.image" .Values.participantInit.image | quote }}
+          imagePullPolicy: {{ .Values.participantInit.image.pullPolicy }}
+          securityContext:
+            {{- include "tx-bootstrap-participant.containerSecurityContext" (dict "root" . "component" .Values.participantInit.securityContext) | nindent 12 }}
+          env:
+            - name: PARTICIPANT_ROLE
+              value: {{ .Values.identity.participantRole | quote }}
+            - name: PARTICIPANT_BPN
+              value: {{ .Values.identity.participantBpn | quote }}
+            - name: PARTICIPANT_BPN_BASE64
+              value: {{ .Values.identity.participantBpnBase64 | quote }}
+            - name: IDENTITYHUB_PARTICIPANT_CONTEXT_ID
+              value: {{ .Values.identity.identityHubParticipantContextId | quote }}
+            - name: PARTICIPANT_DID_HOST
+              value: {{ .Values.identity.participantDidHost | quote }}
+            - name: PARTICIPANT_PUBLIC_HOST
+              value: {{ .Values.identity.participantPublicHost | quote }}
+            - name: PUBLIC_DSP_CALLBACK_ADDRESS
+              value: {{ include "tx-bootstrap-participant.dspCallbackAddress" . | quote }}
+            - name: PUBLIC_CREDENTIAL_SERVICE_ENDPOINT
+              value: {{ include "tx-bootstrap-participant.credentialServiceEndpoint" . | quote }}
+            - name: IDENTITYHUB_API_KEY
+              {{- include "tx-bootstrap-participant.secretValue" (dict "root" . "key" "identityHubSuperuserApiKey") | nindent 14 }}
+            - name: IDENTITYHUB_SUPERUSER_API_KEY_ALIAS
+              value: {{ .Values.participantInit.superuserApiKeyAlias | quote }}
+            - name: VAULT_TOKEN
+              {{- include "tx-bootstrap-participant.secretValue" (dict "root" . "key" "vaultToken") | nindent 14 }}
+            - name: IDENTITYHUB_IDENTITY_URL
+              value: "http://{{ include "tx-bootstrap-participant.componentName" (dict "root" . "component" "identityhub") }}:8082/api/identity"
+            - name: IDENTITYHUB_HEALTH_URL
+              value: "http://{{ include "tx-bootstrap-participant.componentName" (dict "root" . "component" "identityhub") }}:8081/api/check/readiness"
+            - name: VAULT_ADDR
+              value: {{ .Values.vault.url | quote }}
+            - name: VAULT_SECRET_PATH
+              value: {{ .Values.vault.apiSecretPath | quote }}
+            - name: PARTICIPANT_INIT_MARKER_ALIAS
+              value: {{ include "tx-bootstrap-participant.participantInitMarkerAlias" . | quote }}
+          resources:
+            {{- toYaml .Values.jobs.resources | nindent 12 }}
+{{- end }}

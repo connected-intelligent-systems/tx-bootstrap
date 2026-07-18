@@ -1,0 +1,123 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "tx-bootstrap-participant.componentName" (dict "root" . "component" "identityhub-logging") }}
+  labels:
+    {{- include "tx-bootstrap-participant.labels" . | nindent 4 }}
+    app.kubernetes.io/component: identityhub
+data:
+  logging.properties: |
+    .level=INFO
+    org.eclipse.edc.level=INFO
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "tx-bootstrap-participant.componentName" (dict "root" . "component" "edc-logging") }}
+  labels:
+    {{- include "tx-bootstrap-participant.labels" . | nindent 4 }}
+    app.kubernetes.io/component: controlplane
+data:
+  logging.properties: |
+    .level=INFO
+    org.eclipse.edc.level=INFO
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "tx-bootstrap-participant.componentName" (dict "root" . "component" "opentelemetry") }}
+  labels:
+    {{- include "tx-bootstrap-participant.labels" . | nindent 4 }}
+    app.kubernetes.io/component: edc
+data:
+  opentelemetry.properties: |
+    otel.sdk.disabled=true
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "tx-bootstrap-participant.componentName" (dict "root" . "component" "public-nginx") }}
+  labels:
+    {{- include "tx-bootstrap-participant.labels" . | nindent 4 }}
+    app.kubernetes.io/component: public-gateway
+data:
+  default.conf: |
+    server {
+        listen 8080;
+        server_name {{ .Values.identity.participantPublicHost }} {{ .Values.identity.participantDidHost }} _;
+
+        location /api/v1/dsp/ {
+            proxy_pass http://{{ include "tx-bootstrap-participant.componentName" (dict "root" . "component" "controlplane") }}:8084/api/v1/dsp/;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+        }
+
+        location /api/public/ {
+            proxy_pass http://{{ include "tx-bootstrap-participant.componentName" (dict "root" . "component" "dataplane") }}:8081/api/public/;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+        }
+
+        location /api/credentials/ {
+            proxy_pass http://{{ include "tx-bootstrap-participant.componentName" (dict "root" . "component" "identityhub") }}:8083/api/credentials/;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+        }
+
+        location /.well-known/api/ {
+            proxy_pass http://{{ include "tx-bootstrap-participant.componentName" (dict "root" . "component" "controlplane") }}:8085/.well-known/api/;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+        }
+
+        location / {
+            proxy_pass http://{{ include "tx-bootstrap-participant.componentName" (dict "root" . "component" "identityhub") }}:8084;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+        }
+    }
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "tx-bootstrap-participant.componentName" (dict "root" . "component" "internal-nginx") }}
+  labels:
+    {{- include "tx-bootstrap-participant.labels" . | nindent 4 }}
+    app.kubernetes.io/component: internal-gateway
+data:
+  default.conf: |
+    server {
+        listen 8080;
+        server_name _;
+
+        location ~ ^/(management|catalog)(/|$) {
+            return 404;
+        }
+
+        location /api/identity/ {
+            proxy_pass http://{{ include "tx-bootstrap-participant.componentName" (dict "root" . "component" "identityhub") }}:8082/api/identity/;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+        }
+
+        location /identity/ {
+            proxy_pass http://{{ include "tx-bootstrap-participant.componentName" (dict "root" . "component" "identityhub") }}:8082/api/identity/;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+        }
+
+        location /.well-known/api/ {
+            proxy_pass http://{{ include "tx-bootstrap-participant.componentName" (dict "root" . "component" "controlplane") }}:8085/.well-known/api/;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+        }
+
+        location / {
+            proxy_pass http://{{ include "tx-bootstrap-participant.componentName" (dict "root" . "component" "portal") }}:3000;
+            proxy_http_version 1.1;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+    }
