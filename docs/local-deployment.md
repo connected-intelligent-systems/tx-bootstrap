@@ -31,8 +31,8 @@ development, `deploy/local_compose/local.env.example` points
 
 On pushes to `main`, the reusable applications are published to GHCR as:
 
-- `oci://ghcr.io/salberternst/tx-bootstrap-operator:latest`
-- `oci://ghcr.io/salberternst/tx-bootstrap-participant:latest`
+- `oci://ghcr.io/connected-intelligent-systems/tx-bootstrap-operator:latest`
+- `oci://ghcr.io/connected-intelligent-systems/tx-bootstrap-participant:latest`
 
 Version tags such as `v1.2.3` also publish `1.2.3` and `1.2` artifact
 tags. Every commit also publishes a `sha-<commit>` tag; production consumers

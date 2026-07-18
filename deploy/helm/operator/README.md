@@ -132,7 +132,7 @@ helm upgrade --install operator deploy/helm/operator \
 ```
 
 To install the published chart instead, replace `deploy/helm/operator` with
-`oci://ghcr.io/salberternst/tx-bootstrap-charts/tx-bootstrap-operator` and add
+`oci://ghcr.io/connected-intelligent-systems/tx-bootstrap-charts/tx-bootstrap-operator` and add
 `--version 0.1.0`.
 
 The command above targets Helm 4. The legacy wait strategy avoids its watcher

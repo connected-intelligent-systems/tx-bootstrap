@@ -2,7 +2,7 @@ name: ${COMPOSE_PROJECT_PREFIX:-tx-bootstrap}-consumer
 
 include:
   - path:
-      - ${PARTICIPANT_COMPOSE_REF:-oci://ghcr.io/salberternst/tx-bootstrap-participant:latest}
+      - ${PARTICIPANT_COMPOSE_REF:-oci://ghcr.io/connected-intelligent-systems/tx-bootstrap-participant:latest}
       - ../vault-bootstrap.compose.yml
       - ../participant-vault.override.yml
       - ../participant-database.override.yml

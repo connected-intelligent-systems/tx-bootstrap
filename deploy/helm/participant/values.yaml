@@ -127,7 +127,7 @@ participantInit:
     runAsUser: 100
     runAsGroup: 101
   image:
-    repository: ghcr.io/salberternst/tx-bootstrap-participant-init
+    repository: ghcr.io/connected-intelligent-systems/tx-bootstrap-participant-init
     tag: 0.1.0
     digest: ""
     pullPolicy: IfNotPresent
@@ -186,7 +186,7 @@ federatedCatalog:
     runAsUser: 10001
     runAsGroup: 10001
   image:
-    repository: ghcr.io/salberternst/tx-bootstrap-federated-catalog
+    repository: ghcr.io/connected-intelligent-systems/tx-bootstrap-federated-catalog
     tag: 0.1.0
     digest: ""
     pullPolicy: IfNotPresent
@@ -215,7 +215,7 @@ portal:
     runAsUser: 1000
     runAsGroup: 1000
   image:
-    repository: ghcr.io/salberternst/tx-bootstrap-participant-portal-backend
+    repository: ghcr.io/connected-intelligent-systems/tx-bootstrap-participant-portal-backend
     tag: 0.1.0
     digest: ""
     pullPolicy: IfNotPresent

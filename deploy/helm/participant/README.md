@@ -191,7 +191,7 @@ helm upgrade --install participant deploy/helm/participant \
 ```
 
 To install the published chart instead, replace `deploy/helm/participant` with
-`oci://ghcr.io/salberternst/tx-bootstrap-charts/tx-bootstrap-participant` and
+`oci://ghcr.io/connected-intelligent-systems/tx-bootstrap-charts/tx-bootstrap-participant` and
 add `--version 0.1.0`.
 
 The command above targets Helm 4. The legacy wait strategy avoids its watcher

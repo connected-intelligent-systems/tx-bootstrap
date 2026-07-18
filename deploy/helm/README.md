@@ -14,14 +14,14 @@ Available charts:
 
 Published OCI references:
 
-- `oci://ghcr.io/salberternst/tx-bootstrap-charts/tx-bootstrap-operator`
-- `oci://ghcr.io/salberternst/tx-bootstrap-charts/tx-bootstrap-participant`
+- `oci://ghcr.io/connected-intelligent-systems/tx-bootstrap-charts/tx-bootstrap-operator`
+- `oci://ghcr.io/connected-intelligent-systems/tx-bootstrap-charts/tx-bootstrap-participant`
 
 Select an explicit chart version when pulling or installing. For example:
 
 ```sh
 helm show chart \
-  oci://ghcr.io/salberternst/tx-bootstrap-charts/tx-bootstrap-operator \
+  oci://ghcr.io/connected-intelligent-systems/tx-bootstrap-charts/tx-bootstrap-operator \
   --version 0.1.0
 ```
 

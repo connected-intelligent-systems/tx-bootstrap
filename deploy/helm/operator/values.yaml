@@ -184,7 +184,7 @@ operatorConsole:
     runAsUser: 1000
     runAsGroup: 1000
   image:
-    repository: ghcr.io/salberternst/tx-bootstrap-operator-console
+    repository: ghcr.io/connected-intelligent-systems/tx-bootstrap-operator-console
     tag: 0.1.0
     digest: ""
     pullPolicy: IfNotPresent
@@ -214,7 +214,7 @@ operatorOnboarding:
     runAsUser: 1000
     runAsGroup: 1000
   image:
-    repository: ghcr.io/salberternst/tx-bootstrap-operator-onboarding-service
+    repository: ghcr.io/connected-intelligent-systems/tx-bootstrap-operator-onboarding-service
     tag: 0.1.0
     digest: ""
     pullPolicy: IfNotPresent
