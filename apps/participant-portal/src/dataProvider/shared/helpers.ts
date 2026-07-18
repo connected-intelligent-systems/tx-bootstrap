@@ -1,6 +1,5 @@
 import * as jsonld from 'jsonld'
-
-type JsonLdDocumentLoader = (url: string) => Promise<any>
+import { createBundledJsonLdDocumentLoader, JsonLdDocumentLoader } from './jsonLdDocumentLoader'
 
 export function createCachedDocumentLoader(loadDocument: JsonLdDocumentLoader): JsonLdDocumentLoader {
   const cache = new Map<string, Promise<any>>()
@@ -18,8 +17,7 @@ export function createCachedDocumentLoader(loadDocument: JsonLdDocumentLoader): 
   }
 }
 
-const defaultDocumentLoader = (jsonld as typeof jsonld & { documentLoader: JsonLdDocumentLoader }).documentLoader
-const cachedDocumentLoader = createCachedDocumentLoader(defaultDocumentLoader)
+const cachedDocumentLoader = createCachedDocumentLoader(createBundledJsonLdDocumentLoader())
 
 export async function compactJsonLd(jsonLd: any, frame: any) {
   return jsonld.compact(jsonLd, frame, {
