@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import {
   ArrayInput,
   FormDataConsumer,
@@ -13,7 +13,7 @@ import {
   useTranslate,
 } from 'react-admin'
 import { Box, Button, Typography } from '@mui/material'
-import GroupsIcon from '@mui/icons-material/Groups'
+import { Link as RouterLink } from 'react-router-dom'
 import {
   getTractusXActionChoices,
   getTractusXConstraint,
@@ -21,7 +21,6 @@ import {
   type TractusXAction,
   type TractusXRuleType,
 } from './tractusxPolicyMetadata'
-import { BusinessPartnerGroupsDialog } from './BusinessPartnerGroupsDialog'
 
 const listOperators = ['isAnyOf', 'isAllOf', 'isNoneOf', 'isPartOf']
 
@@ -48,7 +47,6 @@ const RightOperandInput = ({ scopedFormData }: any) => {
   const leftOperand = scopedFormData?.leftOperand
   const operator = scopedFormData?.operator
   const constraint = getTractusXConstraint(leftOperand)
-  const [groupsDialogOpen, setGroupsDialogOpen] = useState(false)
 
   if (usesListValue(operator)) {
     return (
@@ -63,12 +61,9 @@ const RightOperandInput = ({ scopedFormData }: any) => {
           </SimpleFormIterator>
         </ArrayInput>
         {leftOperand === 'BusinessPartnerGroup' && (
-          <>
-            <Button size="small" startIcon={<GroupsIcon />} onClick={() => setGroupsDialogOpen(true)}>
-              {translate('resources.policies.groupsDialog.manageButton')}
-            </Button>
-            <BusinessPartnerGroupsDialog open={groupsDialogOpen} onClose={() => setGroupsDialogOpen(false)} />
-          </>
+          <Button size="small" component={RouterLink} to="/settings/partner-groups" target="_blank" rel="noreferrer">
+            {translate('resources.policies.groupsDialog.manageButton')}
+          </Button>
         )}
       </Box>
     )

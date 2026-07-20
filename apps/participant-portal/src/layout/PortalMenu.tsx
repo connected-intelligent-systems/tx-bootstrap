@@ -17,11 +17,7 @@ export const PortalMenu = () => {
       />
       <MenuItemLink to="/discover" primaryText={translate('portalUx.nav.discover')} leftIcon={<SearchIcon />} />
       <MenuItemLink to="/data-access" primaryText={translate('portalUx.nav.myData')} leftIcon={<InventoryIcon />} />
-      <MenuItemLink
-        to="/settings/api-clients"
-        primaryText={translate('portalUx.nav.apiClients')}
-        leftIcon={<SettingsIcon />}
-      />
+      <MenuItemLink to="/settings" primaryText={translate('portalUx.nav.settings')} leftIcon={<SettingsIcon />} />
     </Menu>
   )
 }

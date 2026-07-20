@@ -19,7 +19,7 @@ import {
 import { OnboardingFlow } from './pages/onboarding'
 import { api } from './utils/onboarding-api'
 import type { GatewayState } from './types/onboarding'
-import { ApiClientsPage } from './pages/settings'
+import { ApiClientsPage, PartnerGroupsPage, SettingsLayout } from './pages/settings'
 
 const CustomAppBar = (props: ComponentProps<typeof AppBar>) => {
   const currentTheme = useTheme()
@@ -84,10 +84,15 @@ const PortalApp = () => (
       <Route path="/my-requests" element={<Navigate to="/data-access?status=pending" replace />} />
       <Route path="/my-data-access" element={<Navigate to="/data-access?status=active" replace />} />
       <Route path="/activity" element={<Navigate to="/data-access" replace />} />
-      <Route path="/settings/api-clients" element={<ApiClientsPage />} />
+      <Route path="/settings" element={<SettingsLayout />}>
+        <Route index element={<Navigate to="api-clients" replace />} />
+        <Route path="partner-groups" element={<PartnerGroupsPage />} />
+        <Route path="api-clients" element={<ApiClientsPage />} />
+      </Route>
     </CustomRoutes>
     <Resource name="assets" />
     <Resource name="policies" />
+    <Resource name="businesspartnergroups" />
     <Resource name="contractdefinitions" />
     <Resource name="contractnegotiations" />
     <Resource name="contractagreements" />
