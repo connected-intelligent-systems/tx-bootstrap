@@ -28,7 +28,7 @@ spec:
       {{- include "tx-bootstrap-participant.podDefaults" $ | nindent 6 }}
       containers:
         - name: {{ $component }}
-          image: {{ include "tx-bootstrap-participant.image" $settings.image | quote }}
+          image: {{ include "tx-bootstrap-participant.image" (dict "root" $ "image" $settings.image) | quote }}
           imagePullPolicy: {{ $settings.image.pullPolicy }}
           securityContext:
             {{- include "tx-bootstrap-participant.containerSecurityContext" (dict "root" $ "component" $settings.securityContext) | nindent 12 }}

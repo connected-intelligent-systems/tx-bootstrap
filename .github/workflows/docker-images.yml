@@ -1,11 +1,7 @@
 name: Docker images
 
 on:
-  push:
-    branches:
-      - main
-    tags:
-      - "v*"
+  workflow_call:
   pull_request:
   workflow_dispatch:
 
@@ -45,6 +41,14 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
+      - name: Determine stack version
+        id: stack-version
+        shell: bash
+        run: |
+          npm run version:check
+          development_version="$(node scripts/version.mjs print --dev-sha "$GITHUB_SHA")"
+          printf 'development=%s\n' "$development_version" >> "$GITHUB_OUTPUT"
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -67,6 +71,7 @@ jobs:
             type=sha,format=long
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=${{ steps.stack-version.outputs.development }},priority=900,enable=${{ github.ref == 'refs/heads/main' }}
             type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Build image for security scan

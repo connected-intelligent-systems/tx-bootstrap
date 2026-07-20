@@ -1,0 +1,41 @@
+name: Development stack
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: development-stack-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  preflight:
+    name: Validate stack version
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Check stack version
+        run: npm run version:check
+
+  images:
+    name: Publish images and Compose artifacts
+    needs: preflight
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/docker-images.yml
+
+  charts:
+    name: Publish Helm charts
+    needs: images
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/helm-charts.yml

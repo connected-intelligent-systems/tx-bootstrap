@@ -49,7 +49,7 @@ spec:
       {{- end }}
       containers:
         - name: federated-catalog
-          image: {{ include "tx-bootstrap-participant.image" .Values.federatedCatalog.image | quote }}
+          image: {{ include "tx-bootstrap-participant.image" (dict "root" . "image" .Values.federatedCatalog.image) | quote }}
           imagePullPolicy: {{ .Values.federatedCatalog.image.pullPolicy }}
           securityContext:
             {{- include "tx-bootstrap-participant.containerSecurityContext" (dict "root" . "component" .Values.federatedCatalog.securityContext) | nindent 12 }}

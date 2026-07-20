@@ -35,9 +35,10 @@ On pushes to `main`, the reusable applications are published to GHCR as:
 - `oci://ghcr.io/connected-intelligent-systems/tx-bootstrap-participant:latest`
 
 Version tags such as `v1.2.3` also publish `1.2.3` and `1.2` artifact
-tags. Every commit also publishes a `sha-<commit>` tag; production consumers
-should use a version or commit tag instead of `latest`. Pull requests validate
-both applications without publishing them.
+tags. Every `main` commit publishes the canonical development stack version
+`<version>-dev.sha.<commit>` as well as a `sha-<commit>` alias. Production
+consumers should use a stable version or immutable commit-derived tag instead
+of `latest`. Pull requests validate both applications without publishing them.
 
 Provider, consumer, and operator data remain isolated in uniquely named
 databases and roles. Only the local PostgreSQL server process is shared; there

@@ -27,7 +27,7 @@ spec:
       {{- include "tx-bootstrap-participant.podDefaults" . | nindent 6 }}
       containers:
         - name: identityhub
-          image: {{ include "tx-bootstrap-participant.image" .Values.identityHub.image | quote }}
+          image: {{ include "tx-bootstrap-participant.image" (dict "root" . "image" .Values.identityHub.image) | quote }}
           imagePullPolicy: {{ .Values.identityHub.image.pullPolicy }}
           securityContext:
             {{- include "tx-bootstrap-participant.containerSecurityContext" (dict "root" . "component" .Values.identityHub.securityContext) | nindent 12 }}

@@ -81,10 +81,10 @@ app.kubernetes.io/component: {{ .component }}
 {{- end }}
 
 {{- define "tx-bootstrap-participant.image" -}}
-{{- if .digest -}}
-{{- printf "%s@%s" .repository .digest -}}
+{{- if .image.digest -}}
+{{- printf "%s@%s" .image.repository .image.digest -}}
 {{- else -}}
-{{- printf "%s:%s" .repository .tag -}}
+{{- printf "%s:%s" .image.repository (default .root.Chart.AppVersion .image.tag) -}}
 {{- end -}}
 {{- end }}
 

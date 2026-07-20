@@ -27,7 +27,7 @@ spec:
       {{- include "tx-bootstrap-operator.podDefaults" . | nindent 6 }}
       containers:
         - name: issuer-did
-          image: {{ include "tx-bootstrap-operator.image" .Values.issuerDid.image | quote }}
+          image: {{ include "tx-bootstrap-operator.image" (dict "root" . "image" .Values.issuerDid.image) | quote }}
           imagePullPolicy: {{ .Values.issuerDid.image.pullPolicy }}
           securityContext:
             {{- include "tx-bootstrap-operator.containerSecurityContext" (dict "root" . "component" .Values.issuerDid.securityContext) | nindent 12 }}

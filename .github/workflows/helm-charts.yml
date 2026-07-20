@@ -6,14 +6,6 @@ on:
     paths:
       - "deploy/helm/**"
       - ".github/workflows/helm-charts.yml"
-  push:
-    branches:
-      - main
-    tags:
-      - "v*"
-    paths:
-      - "deploy/helm/**"
-      - ".github/workflows/helm-charts.yml"
   workflow_dispatch:
 
 permissions:
@@ -38,6 +30,9 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
+      - name: Check stack version
+        run: npm run version:check
+
       - name: Set up Helm
         uses: azure/setup-helm@v4
         with:
@@ -51,6 +46,22 @@ jobs:
           helm template "${{ matrix.chart }}" "deploy/helm/${{ matrix.chart }}" \
             --namespace "tx-${{ matrix.chart }}" \
             > "/tmp/${{ matrix.chart }}-default.yaml"
+
+      - name: Check first-party image versions
+        shell: bash
+        run: |
+          app_version="$(helm show chart "deploy/helm/${{ matrix.chart }}" | awk '$1 == "appVersion:" { gsub(/\"/, "", $2); print $2; exit }')"
+          case "${{ matrix.chart }}" in
+            operator)
+              grep -q "tx-bootstrap-operator-console:${app_version}" /tmp/operator-default.yaml
+              grep -q "tx-bootstrap-operator-onboarding-service:${app_version}" /tmp/operator-default.yaml
+              ;;
+            participant)
+              grep -q "tx-bootstrap-participant-init:${app_version}" /tmp/participant-default.yaml
+              grep -q "tx-bootstrap-federated-catalog:${app_version}" /tmp/participant-default.yaml
+              grep -q "tx-bootstrap-participant-portal-backend:${app_version}" /tmp/participant-default.yaml
+              ;;
+          esac
 
       - name: Check operator variants
         if: matrix.chart == 'operator'
@@ -213,8 +224,8 @@ jobs:
             publish_version="$release_version"
             app_version="$release_version"
           else
-            publish_version="${source_version}-dev.sha${GITHUB_SHA}"
-            app_version="sha-${GITHUB_SHA}"
+            publish_version="${source_version}-dev.sha.${GITHUB_SHA}"
+            app_version="$publish_version"
           fi
 
           mkdir -p /tmp/charts

@@ -28,7 +28,7 @@ spec:
       {{- if .Values.jobs.participantInit.enabled }}
       initContainers:
         - name: wait-for-participant-init
-          image: {{ include "tx-bootstrap-participant.image" .Values.participantInit.image | quote }}
+          image: {{ include "tx-bootstrap-participant.image" (dict "root" . "image" .Values.participantInit.image) | quote }}
           imagePullPolicy: {{ .Values.participantInit.image.pullPolicy }}
           command:
             - /bin/sh
@@ -61,7 +61,7 @@ spec:
       {{- end }}
       containers:
         - name: controlplane
-          image: {{ include "tx-bootstrap-participant.image" .Values.controlPlane.image | quote }}
+          image: {{ include "tx-bootstrap-participant.image" (dict "root" . "image" .Values.controlPlane.image) | quote }}
           imagePullPolicy: {{ .Values.controlPlane.image.pullPolicy }}
           securityContext:
             {{- include "tx-bootstrap-participant.containerSecurityContext" (dict "root" . "component" .Values.controlPlane.securityContext) | nindent 12 }}

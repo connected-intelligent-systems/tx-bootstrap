@@ -27,7 +27,7 @@ spec:
       {{- include "tx-bootstrap-operator.podDefaults" . | nindent 6 }}
       containers:
         - name: issuer-identityhub
-          image: {{ include "tx-bootstrap-operator.image" .Values.issuerIdentityHub.image | quote }}
+          image: {{ include "tx-bootstrap-operator.image" (dict "root" . "image" .Values.issuerIdentityHub.image) | quote }}
           imagePullPolicy: {{ .Values.issuerIdentityHub.image.pullPolicy }}
           securityContext:
             {{- include "tx-bootstrap-operator.containerSecurityContext" (dict "root" . "component" .Values.issuerIdentityHub.securityContext) | nindent 12 }}

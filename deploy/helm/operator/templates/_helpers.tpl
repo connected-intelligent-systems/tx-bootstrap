@@ -58,10 +58,10 @@ app.kubernetes.io/component: {{ .component }}
 
 {{/* Render an image by immutable digest when supplied, otherwise by tag. */}}
 {{- define "tx-bootstrap-operator.image" -}}
-{{- if .digest -}}
-{{- printf "%s@%s" .repository .digest -}}
+{{- if .image.digest -}}
+{{- printf "%s@%s" .image.repository .image.digest -}}
 {{- else -}}
-{{- printf "%s:%s" .repository .tag -}}
+{{- printf "%s:%s" .image.repository (default .root.Chart.AppVersion .image.tag) -}}
 {{- end -}}
 {{- end }}
 

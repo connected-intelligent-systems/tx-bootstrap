@@ -22,7 +22,7 @@ spec:
       restartPolicy: Never
       containers:
         - name: db-migrator
-          image: {{ include "tx-bootstrap-operator.image" .Values.operatorConsole.image | quote }}
+          image: {{ include "tx-bootstrap-operator.image" (dict "root" . "image" .Values.operatorConsole.image) | quote }}
           imagePullPolicy: {{ .Values.operatorConsole.image.pullPolicy }}
           command: [node, dist-server/apps/operator-console/server/migrate.js]
           securityContext:
@@ -71,7 +71,7 @@ spec:
       restartPolicy: Never
       containers:
         - name: issuer-claims-grant
-          image: {{ include "tx-bootstrap-operator.image" .Values.operatorConsole.image | quote }}
+          image: {{ include "tx-bootstrap-operator.image" (dict "root" . "image" .Values.operatorConsole.image) | quote }}
           imagePullPolicy: {{ .Values.operatorConsole.image.pullPolicy }}
           command: [node, dist-server/apps/operator-console/server/grant-issuer-claims.js]
           securityContext:

@@ -11,6 +11,7 @@ for command in npm uv docker helm git; do
   fi
 done
 
+npm run version:check
 npm run lint
 npm run build
 npm test

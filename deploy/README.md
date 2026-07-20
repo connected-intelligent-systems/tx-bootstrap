@@ -27,9 +27,9 @@ owned by the deployment platform, as the local deployments do.
 ## Compose template contract
 
 OCI-backed Compose applications require Docker Compose 2.34.0 or newer. Pin a
-versioned or `sha-<commit>` OCI reference in production rather than consuming
-`latest`. Published artifacts resolve every referenced image to a digest, so an
-artifact version continues to deploy the same image set.
+stable version or immutable `<version>-dev.sha.<commit>` OCI reference rather
+than consuming `latest`. Published artifacts resolve every referenced image to
+a digest, so an artifact version continues to deploy the same image set.
 
 The files under `compose/` are reusable base applications. They provide
 healthchecks, restart behavior, PID limits, resource ceilings, bounded JSON log

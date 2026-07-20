@@ -193,7 +193,7 @@
     "issuerDid": { "$ref": "#/definitions/httpComponent" },
     "operatorConsole": {
       "allOf": [
-        { "$ref": "#/definitions/httpComponent" },
+        { "$ref": "#/definitions/firstPartyHttpComponent" },
         {
           "type": "object",
           "required": [
@@ -229,7 +229,7 @@
     },
     "operatorOnboarding": {
       "allOf": [
-        { "$ref": "#/definitions/httpComponent" },
+        { "$ref": "#/definitions/firstPartyHttpComponent" },
         {
           "type": "object",
           "required": [
@@ -297,12 +297,12 @@
   ],
   "definitions": {
     "secretKey": { "type": "string", "minLength": 1 },
-    "image": {
+    "imageShape": {
       "type": "object",
       "required": ["repository", "tag", "digest", "pullPolicy"],
       "properties": {
         "repository": { "type": "string", "minLength": 1 },
-        "tag": { "type": "string", "minLength": 1 },
+        "tag": { "type": "string" },
         "digest": {
           "type": "string",
           "pattern": "^(|sha256:[a-fA-F0-9]{64})$"
@@ -313,9 +313,15 @@
         }
       }
     },
+    "image": {
+      "allOf": [
+        { "$ref": "#/definitions/imageShape" },
+        { "properties": { "tag": { "minLength": 1 } } }
+      ]
+    },
     "firstPartyImage": {
       "allOf": [
-        { "$ref": "#/definitions/image" },
+        { "$ref": "#/definitions/imageShape" },
         {
           "anyOf": [
             {
@@ -425,6 +431,28 @@
           }
         }
       ]
+    },
+    "firstPartyHttpComponent": {
+      "type": "object",
+      "required": [
+        "replicaCount",
+        "securityContext",
+        "image",
+        "service",
+        "resources"
+      ],
+      "properties": {
+        "replicaCount": { "type": "integer", "minimum": 1 },
+        "securityContext": { "$ref": "#/definitions/runtimeIdentity" },
+        "image": { "$ref": "#/definitions/firstPartyImage" },
+        "service": {
+          "allOf": [
+            { "$ref": "#/definitions/service" },
+            { "type": "object", "required": ["port"] }
+          ]
+        },
+        "resources": { "$ref": "#/definitions/resources" }
+      }
     },
     "job": {
       "type": "object",

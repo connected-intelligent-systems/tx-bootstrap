@@ -128,7 +128,7 @@ participantInit:
     runAsGroup: 101
   image:
     repository: ghcr.io/connected-intelligent-systems/tx-bootstrap-participant-init
-    tag: 0.1.0
+    tag: ""
     digest: ""
     pullPolicy: IfNotPresent
   superuserApiKeyAlias: super-user-apikey
@@ -187,7 +187,7 @@ federatedCatalog:
     runAsGroup: 10001
   image:
     repository: ghcr.io/connected-intelligent-systems/tx-bootstrap-federated-catalog
-    tag: 0.1.0
+    tag: ""
     digest: ""
     pullPolicy: IfNotPresent
   directoryRefreshIntervalSeconds: 300
@@ -216,7 +216,7 @@ portal:
     runAsGroup: 1000
   image:
     repository: ghcr.io/connected-intelligent-systems/tx-bootstrap-participant-portal-backend
-    tag: 0.1.0
+    tag: ""
     digest: ""
     pullPolicy: IfNotPresent
   title: Participant Portal

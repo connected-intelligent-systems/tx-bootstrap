@@ -26,7 +26,7 @@ spec:
       {{- include "tx-bootstrap-operator.podDefaults" . | nindent 6 }}
       containers:
         - name: bdrs
-          image: {{ include "tx-bootstrap-operator.image" .Values.bdrs.image | quote }}
+          image: {{ include "tx-bootstrap-operator.image" (dict "root" . "image" .Values.bdrs.image) | quote }}
           imagePullPolicy: {{ .Values.bdrs.image.pullPolicy }}
           securityContext:
             {{- include "tx-bootstrap-operator.containerSecurityContext" (dict "root" . "component" .Values.bdrs.securityContext) | nindent 12 }}

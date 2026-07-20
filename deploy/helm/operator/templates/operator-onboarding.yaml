@@ -26,7 +26,7 @@ spec:
       {{- include "tx-bootstrap-operator.podDefaults" . | nindent 6 }}
       containers:
         - name: onboarding
-          image: {{ include "tx-bootstrap-operator.image" .Values.operatorOnboarding.image | quote }}
+          image: {{ include "tx-bootstrap-operator.image" (dict "root" . "image" .Values.operatorOnboarding.image) | quote }}
           imagePullPolicy: {{ .Values.operatorOnboarding.image.pullPolicy }}
           securityContext:
             {{- include "tx-bootstrap-operator.containerSecurityContext" (dict "root" . "component" .Values.operatorOnboarding.securityContext) | nindent 12 }}

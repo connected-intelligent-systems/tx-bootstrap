@@ -112,6 +112,9 @@ applications, validates every tracked shell script, renders the local Compose
 environments, and lints and renders both Helm charts. Individual applications
 also expose workspace-specific commands through their `package.json` files.
 
+All repository-owned components follow one lockstep stack version. See
+[Versioning and releases](docs/versioning.md) before preparing a release.
+
 ## Documentation
 
 - [Deployment artifacts and lifecycle](deploy/README.md)
@@ -121,6 +124,7 @@ also expose workspace-specific commands through their `package.json` files.
 - [Local Compose deployment](docs/local-deployment.md)
 - [Local Kubernetes deployment](deploy/local_k8s/README.md)
 - [PostgreSQL provisioning](deploy/database/README.md)
+- [Versioning and releases](docs/versioning.md)
 
 ## License
 

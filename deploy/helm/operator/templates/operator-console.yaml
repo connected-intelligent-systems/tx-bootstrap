@@ -26,7 +26,7 @@ spec:
       {{- include "tx-bootstrap-operator.podDefaults" . | nindent 6 }}
       containers:
         - name: console
-          image: {{ include "tx-bootstrap-operator.image" .Values.operatorConsole.image | quote }}
+          image: {{ include "tx-bootstrap-operator.image" (dict "root" . "image" .Values.operatorConsole.image) | quote }}
           imagePullPolicy: {{ .Values.operatorConsole.image.pullPolicy }}
           securityContext:
             {{- include "tx-bootstrap-operator.containerSecurityContext" (dict "root" . "component" .Values.operatorConsole.securityContext) | nindent 12 }}

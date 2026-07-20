@@ -247,7 +247,7 @@
     "dataPlane": { "$ref": "#/definitions/component" },
     "federatedCatalog": {
       "allOf": [
-        { "$ref": "#/definitions/httpComponent" },
+        { "$ref": "#/definitions/firstPartyHttpComponent" },
         {
           "type": "object",
           "required": [
@@ -286,7 +286,7 @@
     },
     "portal": {
       "allOf": [
-        { "$ref": "#/definitions/httpComponent" },
+        { "$ref": "#/definitions/firstPartyHttpComponent" },
         {
           "type": "object",
           "required": [
@@ -415,12 +415,12 @@
     "url": { "type": "string", "pattern": "^https?://" },
     "optionalUrl": { "type": "string", "pattern": "^$|^https?://.+$" },
     "secretKey": { "type": "string", "minLength": 1 },
-    "image": {
+    "imageShape": {
       "type": "object",
       "required": ["repository", "tag", "digest", "pullPolicy"],
       "properties": {
         "repository": { "type": "string", "minLength": 1 },
-        "tag": { "type": "string", "minLength": 1 },
+        "tag": { "type": "string" },
         "digest": { "type": "string", "pattern": "^(|sha256:[a-f0-9]{64})$" },
         "pullPolicy": {
           "type": "string",
@@ -428,9 +428,15 @@
         }
       }
     },
+    "image": {
+      "allOf": [
+        { "$ref": "#/definitions/imageShape" },
+        { "properties": { "tag": { "minLength": 1 } } }
+      ]
+    },
     "firstPartyImage": {
       "allOf": [
-        { "$ref": "#/definitions/image" },
+        { "$ref": "#/definitions/imageShape" },
         {
           "anyOf": [
             {
@@ -522,6 +528,28 @@
           }
         }
       ]
+    },
+    "firstPartyHttpComponent": {
+      "type": "object",
+      "required": [
+        "replicaCount",
+        "securityContext",
+        "image",
+        "service",
+        "resources"
+      ],
+      "properties": {
+        "replicaCount": { "type": "integer", "minimum": 1 },
+        "securityContext": { "$ref": "#/definitions/runtimeIdentity" },
+        "image": { "$ref": "#/definitions/firstPartyImage" },
+        "service": {
+          "allOf": [
+            { "$ref": "#/definitions/service" },
+            { "type": "object", "required": ["port"] }
+          ]
+        },
+        "resources": { "$ref": "#/definitions/resources" }
+      }
     },
     "job": {
       "type": "object",

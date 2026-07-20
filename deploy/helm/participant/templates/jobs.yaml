@@ -22,7 +22,7 @@ spec:
       restartPolicy: Never
       containers:
         - name: portal-db-migrator
-          image: {{ include "tx-bootstrap-participant.image" .Values.portal.image | quote }}
+          image: {{ include "tx-bootstrap-participant.image" (dict "root" . "image" .Values.portal.image) | quote }}
           imagePullPolicy: {{ .Values.portal.image.pullPolicy }}
           command: [node, dist-server/server/migrate.js]
           securityContext:
@@ -67,7 +67,7 @@ spec:
       restartPolicy: Never
       containers:
         - name: participant-init
-          image: {{ include "tx-bootstrap-participant.image" .Values.participantInit.image | quote }}
+          image: {{ include "tx-bootstrap-participant.image" (dict "root" . "image" .Values.participantInit.image) | quote }}
           imagePullPolicy: {{ .Values.participantInit.image.pullPolicy }}
           securityContext:
             {{- include "tx-bootstrap-participant.containerSecurityContext" (dict "root" . "component" .Values.participantInit.securityContext) | nindent 12 }}

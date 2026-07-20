@@ -28,6 +28,9 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
+      - name: Check stack version
+        run: npm run version:check
+
       - name: Validate local Compose applications
         run: |
           docker compose --env-file deploy/local_compose/local.env.example -f deploy/local_compose/compose.yaml config --quiet
@@ -107,6 +110,14 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
+      - name: Determine stack version
+        id: stack-version
+        shell: bash
+        run: |
+          npm run version:check
+          development_version="$(node scripts/version.mjs print --dev-sha "$GITHUB_SHA")"
+          printf 'development=%s\n' "$development_version" >> "$GITHUB_OUTPUT"
+
       - name: Check Docker Compose version
         run: |
           docker compose version
@@ -143,6 +154,7 @@ jobs:
             type=sha,format=long
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=${{ steps.stack-version.outputs.development }},priority=900,enable=${{ github.ref == 'refs/heads/main' }}
             type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Publish Compose application

@@ -27,7 +27,7 @@ spec:
       {{- include "tx-bootstrap-participant.podDefaults" . | nindent 6 }}
       initContainers:
         - name: wait-for-controlplane
-          image: {{ include "tx-bootstrap-participant.image" .Values.participantInit.image | quote }}
+          image: {{ include "tx-bootstrap-participant.image" (dict "root" . "image" .Values.participantInit.image) | quote }}
           imagePullPolicy: {{ .Values.participantInit.image.pullPolicy }}
           command:
             - /bin/sh
@@ -45,7 +45,7 @@ spec:
             {{- toYaml .Values.jobs.resources | nindent 12 }}
       containers:
         - name: dataplane
-          image: {{ include "tx-bootstrap-participant.image" .Values.dataPlane.image | quote }}
+          image: {{ include "tx-bootstrap-participant.image" (dict "root" . "image" .Values.dataPlane.image) | quote }}
           imagePullPolicy: {{ .Values.dataPlane.image.pullPolicy }}
           securityContext:
             {{- include "tx-bootstrap-participant.containerSecurityContext" (dict "root" . "component" .Values.dataPlane.securityContext) | nindent 12 }}

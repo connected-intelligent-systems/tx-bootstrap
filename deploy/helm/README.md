@@ -22,14 +22,15 @@ Select an explicit chart version when pulling or installing. For example:
 ```sh
 helm show chart \
   oci://ghcr.io/connected-intelligent-systems/tx-bootstrap-charts/tx-bootstrap-operator \
-  --version 0.1.0
+  --version 0.1.2
 ```
 
 The chart workflow publishes validated packages from `main` with an immutable
-development version such as `0.1.0-dev.sha<commit>` and the matching
-`sha-<commit>` application-image tag. A Git tag such as `v0.1.0` publishes the
-stable `0.1.0` chart only when it matches `Chart.yaml`; its default images use
-the matching `0.1.0` release tag. Rerunning an unchanged version is safe, while
+development version such as `0.1.2-dev.sha.<commit>`. The exact same version is
+used for the chart `appVersion` and all repository-owned image tags. A Git tag
+such as `v0.1.2` publishes the stable `0.1.2` chart only when it matches the
+repository [`VERSION`](../../VERSION); its default images use the matching
+`0.1.2` release tag. Rerunning an unchanged version is safe, while
 attempting to replace an existing version with different contents fails.
 
 GitHub Container Registry creates new packages as private by default. After the
