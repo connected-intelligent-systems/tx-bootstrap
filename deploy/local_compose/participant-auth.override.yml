@@ -45,6 +45,11 @@ services:
       internal:
         aliases:
           - "${PARTICIPANT_ROLE:?PARTICIPANT_ROLE must be set}-portal"
+      # Docker cannot publish a host port for a container attached only to an
+      # internal network. The role-scoped egress network provides the required
+      # bridge endpoint without exposing this gateway to the shared public
+      # participant network.
+      egress: {}
 
   participant-api-gateway:
     <<: *local-auth-runtime
@@ -67,6 +72,8 @@ services:
       internal:
         aliases:
           - "${PARTICIPANT_ROLE:?PARTICIPANT_ROLE must be set}-api"
+      # Keep the local API reachable through its loopback-only published port.
+      egress: {}
 
 configs:
   nginx-participant-local-portal:
