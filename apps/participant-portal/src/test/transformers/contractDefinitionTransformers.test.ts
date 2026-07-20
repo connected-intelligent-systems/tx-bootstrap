@@ -71,12 +71,12 @@ describe("contractDefinitionTransformers", () => {
     expect(result.privateProperties?.name).toBe("New Contract Definition");
     expect(result.accessPolicyId).toBe("access-policy-789");
     expect(result.contractPolicyId).toBe("contract-policy-012");
-    expect(result.assetsSelector).toHaveLength(2);
+    expect(result.assetsSelector).toHaveLength(1);
     expect(result.assetsSelector?.[0]).toEqual({
       "@type": "Criterion",
       operandLeft: "https://w3id.org/edc/v0.0.1/ns/id",
       operator: "in",
-      operandRight: "asset-789",
+      operandRight: ["asset-789", "asset-012"],
     });
   });
 
@@ -140,6 +140,14 @@ describe("contractDefinitionTransformers", () => {
       "A description from a flat form structure"
     );
     expect(result.accessPolicyId).toBe("form-access-policy");
+    expect(result.assetsSelector).toEqual([
+      {
+        "@type": "Criterion",
+        operandLeft: "https://w3id.org/edc/v0.0.1/ns/id",
+        operator: "=",
+        operandRight: "form-asset-1",
+      },
+    ]);
   });
 
   test("should handle missing createdAt field", async () => {

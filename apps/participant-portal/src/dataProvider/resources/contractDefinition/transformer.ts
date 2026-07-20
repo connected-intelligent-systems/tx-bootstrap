@@ -43,12 +43,17 @@ export async function serializeContractDefinitionToJsonLd(
       ? [contractDefinition.assetsSelector]
       : []
 
-  const assetsSelector = selectedAssets.map((assetId) => ({
-    '@type': 'Criterion',
-    operandLeft: 'https://w3id.org/edc/v0.0.1/ns/id',
-    operator: 'in',
-    operandRight: assetId,
-  }))
+  const assetsSelector =
+    selectedAssets.length === 0
+      ? []
+      : [
+          {
+            '@type': 'Criterion',
+            operandLeft: 'https://w3id.org/edc/v0.0.1/ns/id',
+            operator: selectedAssets.length === 1 ? '=' : 'in',
+            operandRight: selectedAssets.length === 1 ? selectedAssets[0] : selectedAssets,
+          },
+        ]
 
   const privateProperties = contractDefinition.privateProperties
     ? contractDefinition.privateProperties

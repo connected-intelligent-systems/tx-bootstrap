@@ -136,7 +136,28 @@ describe('contractNegotiationTransformers', () => {
 
     expect(result.policy).toMatchObject(rawOffer)
     expect(result.policy['odrl:permission']['odrl:constraint']).toEqual(rawOffer['odrl:permission']['odrl:constraint'])
-    expect(result.policy.assigner).toBe('BPNL00000003AYRE')
-    expect(result.policy.target).toBe('test-asset-1')
+    expect(result.policy.assigner).toBeUndefined()
+    expect(result.policy.target).toBeUndefined()
+    expect(result.policy['odrl:assigner']).toEqual({ '@id': 'BPNL00000003AYRE' })
+    expect(result.policy['odrl:target']).toEqual({ '@id': 'test-asset-1' })
+  })
+
+  it('does not overwrite an assigner already present in the catalog offer', async () => {
+    const result = await serializeContractNegotiationToJsonLd({
+      counterPartyAddress: 'http://provider-controlplane:8084/api/v1/dsp',
+      counterPartyId: 'did:web:provider-did:BPNL00000003AYRE',
+      policy: {
+        raw: {
+          '@id': 'offer-id',
+          '@type': 'odrl:Offer',
+          'odrl:assigner': { '@id': 'BPNL00000003AYRE' },
+        },
+        assigner: 'did:web:wrong-override:BPNL00000003AYRE',
+        target: 'test-asset-1',
+      },
+    })
+
+    expect(result.policy['odrl:assigner']).toEqual({ '@id': 'BPNL00000003AYRE' })
+    expect(result.policy.assigner).toBeUndefined()
   })
 })

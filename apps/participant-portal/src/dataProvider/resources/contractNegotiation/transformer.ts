@@ -94,27 +94,33 @@ export async function parseContractNegotiationFromJsonLdArray(jsonLdArray: any[]
 
 export async function serializeContractNegotiationToJsonLd(data: any): Promise<any> {
   const rawPolicy = data.policy?.raw
-  const policy: any =
-    rawPolicy && typeof rawPolicy === 'object' && !Array.isArray(rawPolicy)
-      ? {
-          '@context': 'http://www.w3.org/ns/odrl.jsonld',
-          ...rawPolicy,
-          assigner: data.policy?.assigner,
-          target: data.policy?.target,
-        }
-      : {
-          '@context': 'http://www.w3.org/ns/odrl.jsonld',
-          '@type': data.policy?.type,
-          '@id': data.policy?.id,
-          assigner: data.policy?.assigner,
-          target: data.policy?.target,
-        }
+  const hasRawPolicy = rawPolicy && typeof rawPolicy === 'object' && !Array.isArray(rawPolicy)
+  const policy: any = hasRawPolicy
+    ? {
+        '@context': 'http://www.w3.org/ns/odrl.jsonld',
+        ...rawPolicy,
+      }
+    : {
+        '@context': 'http://www.w3.org/ns/odrl.jsonld',
+        '@type': data.policy?.type,
+        '@id': data.policy?.id,
+        assigner: data.policy?.assigner,
+        target: data.policy?.target,
+      }
 
-  if (!rawPolicy && data.policy?.obligations) {
+  if (hasRawPolicy && policy.assigner === undefined && policy['odrl:assigner'] === undefined && data.policy?.assigner) {
+    policy['odrl:assigner'] = { '@id': data.policy.assigner }
+  }
+
+  if (hasRawPolicy && policy.target === undefined && policy['odrl:target'] === undefined && data.policy?.target) {
+    policy['odrl:target'] = { '@id': data.policy.target }
+  }
+
+  if (!hasRawPolicy && data.policy?.obligations) {
     policy.obligation = data.policy.obligations
   }
 
-  if (!rawPolicy && data.policy?.permissions) {
+  if (!hasRawPolicy && data.policy?.permissions) {
     policy.permission = data.policy.permissions.map((permission: any) => {
       return {
         action: {
@@ -134,7 +140,7 @@ export async function serializeContractNegotiationToJsonLd(data: any): Promise<a
     })
   }
 
-  if (!rawPolicy && data.policy?.prohibitions) {
+  if (!hasRawPolicy && data.policy?.prohibitions) {
     policy.prohibition = data.policy.prohibitions
   }
 

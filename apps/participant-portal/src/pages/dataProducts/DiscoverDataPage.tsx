@@ -228,6 +228,7 @@ export const DiscoverDataPage = () => {
           dataset={selected.dataset}
           counterPartyAddress={selected.dataset.catalogUrl}
           counterPartyId={selected.providerId}
+          assignerId={selected.participantBpn}
           open
           onClose={() => setSelected(undefined)}
         />
