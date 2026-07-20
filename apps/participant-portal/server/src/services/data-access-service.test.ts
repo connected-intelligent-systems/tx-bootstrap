@@ -109,4 +109,51 @@ describe('consumer data access lifecycles', () => {
       await app.close()
     }
   })
+
+  it('resolves a DID-based lifecycle URL to its canonical BPN lifecycle', async () => {
+    config.edc.managementApiUrl = 'http://controlplane.test/management/'
+    config.edc.apiKey = 'test-key'
+    const bodies: Record<string, unknown>[] = []
+    const fetchMock = vi.fn(async (input: URL | RequestInfo, init?: RequestInit) => {
+      const path = new URL(String(input)).pathname
+      bodies.push(JSON.parse(String(init?.body)))
+      const upstream = path.endsWith('/contractnegotiations/request')
+        ? [
+            {
+              '@id': 'negotiation-1',
+              type: 'CONSUMER',
+              assetId: 'asset-a',
+              counterPartyId: 'BPNL00000003AYRE',
+              state: 'REQUESTED',
+              updatedAt: '2026-07-20T10:03:35.000Z',
+            },
+          ]
+        : []
+      return new Response(JSON.stringify(upstream), { status: 200 })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const app = createApp()
+
+    try {
+      const response = await app.inject({
+        method: 'GET',
+        url: '/api/portal/data-access/did%3Aweb%3Aprovider-did%3ABPNL00000003AYRE%7Casset-a',
+      })
+
+      expect(response.statusCode).toBe(200)
+      expect(response.json()).toEqual({
+        data: expect.objectContaining({
+          id: 'BPNL00000003AYRE|asset-a',
+          providerId: 'BPNL00000003AYRE',
+          assetId: 'asset-a',
+          status: 'pending',
+        }),
+      })
+      expect(bodies[0]).toMatchObject({
+        filterExpression: [{ operandLeft: 'type', operator: '=', operandRight: 'CONSUMER' }],
+      })
+    } finally {
+      await app.close()
+    }
+  })
 })

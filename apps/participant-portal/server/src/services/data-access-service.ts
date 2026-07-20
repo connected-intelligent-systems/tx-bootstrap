@@ -106,14 +106,14 @@ async function loadLifecycleData(
   include = { agreements: true, transfers: true, retirements: true },
 ): Promise<LifecycleData> {
   const negotiationFilters = [filter('type', '=', 'CONSUMER')]
-  if (scope) {
-    negotiationFilters.push(filter('counterPartyId', '=', scope.providerId))
-  }
+  // EDC can expose the counter-party first as a DID and later as its BPN. The
+  // negotiation API cannot filter by asset ID, so aliases are matched locally.
   const negotiations = (await queryAll('v3/contractnegotiations/request', negotiationFilters)).filter(
     (entry) =>
       readString(entry, 'type') === 'CONSUMER' &&
       (!scope ||
-        (readString(entry, 'counterPartyId') === scope.providerId && readString(entry, 'assetId') === scope.assetId)),
+        (normalizeProviderId(readString(entry, 'counterPartyId')) === scope.providerId &&
+          readString(entry, 'assetId') === scope.assetId)),
   )
   const agreementIds = uniqueStrings(negotiations.map((entry) => readString(entry, 'contractAgreementId')))
   const agreements =
@@ -138,7 +138,7 @@ function buildLifecycles({ negotiations, agreements, transfers, retiredIds }: Li
   const groups = new Map<string, JsonRecord[]>()
   for (const negotiation of negotiations) {
     const assetId = readString(negotiation, 'assetId')
-    const providerId = readString(negotiation, 'counterPartyId')
+    const providerId = normalizeProviderId(readString(negotiation, 'counterPartyId'))
     if (!assetId || !providerId) continue
     const key = lifecycleId(providerId, assetId)
     groups.set(key, [...(groups.get(key) || []), negotiation])
@@ -148,7 +148,7 @@ function buildLifecycles({ negotiations, agreements, transfers, retiredIds }: Li
     const sortedRequests = [...requests].sort((left, right) => timestamp(right).localeCompare(timestamp(left)))
     const latestRequest = sortedRequests[0]
     const assetId = readString(latestRequest, 'assetId') || ''
-    const providerId = readString(latestRequest, 'counterPartyId') || ''
+    const providerId = normalizeProviderId(readString(latestRequest, 'counterPartyId')) || ''
     const requestAgreementIds = new Set(
       sortedRequests.map((item) => readString(item, 'contractAgreementId')).filter((value): value is string => !!value),
     )
@@ -294,7 +294,15 @@ const lifecycleId = (providerId: string, assetId: string) => `${providerId}|${as
 function parseLifecycleId(value: string): LifecycleScope | undefined {
   const separator = value.indexOf('|')
   if (separator < 1 || separator === value.length - 1) return undefined
-  return { providerId: value.slice(0, separator), assetId: value.slice(separator + 1) }
+  const providerId = normalizeProviderId(value.slice(0, separator))
+  if (!providerId) return undefined
+  return { providerId, assetId: value.slice(separator + 1) }
+}
+
+function normalizeProviderId(value: string | undefined): string | undefined {
+  if (!value?.startsWith('did:web:')) return value
+  const lastSegment = value.split(':').at(-1)
+  return lastSegment && /^BPN[A-Z0-9]+$/i.test(lastSegment) ? lastSegment : value
 }
 
 const filter = (operandLeft: string, operator: string, operandRight: unknown): FilterExpression => ({

@@ -65,10 +65,7 @@ describe('data access detail relations', () => {
         ],
         total: 1,
       })
-      expect(bodies[0].filterExpression).toEqual([
-        { operandLeft: 'type', operator: '=', operandRight: 'CONSUMER' },
-        { operandLeft: 'counterPartyId', operator: '=', operandRight: 'provider-a' },
-      ])
+      expect(bodies[0].filterExpression).toEqual([{ operandLeft: 'type', operator: '=', operandRight: 'CONSUMER' }])
       expect(bodies[1].filterExpression).toEqual([{ operandLeft: 'id', operator: 'in', operandRight: ['agreement-1'] }])
       expect(bodies[2].filterExpression).toEqual([
         { operandLeft: 'contractId', operator: 'in', operandRight: ['agreement-1'] },
