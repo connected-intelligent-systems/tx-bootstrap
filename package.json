@@ -1,7 +1,7 @@
 {
   "name": "tx-bootstrap",
   "private": true,
-  "version": "0.1.3",
+  "version": "0.1.4",
   "license": "MIT",
   "type": "module",
   "packageManager": "npm@12.0.0",
@@ -32,6 +32,7 @@
     "format:staged": "lint-staged"
   },
   "overrides": {
+    "fast-uri": "3.1.4",
     "react": "19.2.7",
     "react-dom": "19.2.7",
     "react-router": "6.30.1",
