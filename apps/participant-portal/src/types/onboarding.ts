@@ -40,6 +40,7 @@ export type GatewayState = {
   caseId?: string
   case?: OnboardingCase
   credentials: OnboardingCredential[]
+  credentialRequestStatus?: Record<string, unknown>
   lastError?: string
   updatedAt?: string
 }

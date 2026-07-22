@@ -71,7 +71,7 @@ spec:
             - name: ISSUER_IDENTITY_URL
               value: "http://{{ include "tx-bootstrap-operator.componentName" (dict "root" . "component" "issuer-service") }}:8087/api/identity"
             - name: ISSUER_ISSUANCE_URL
-              value: "http://{{ include "tx-bootstrap-operator.componentName" (dict "root" . "component" "issuer-service") }}:8082/api/issuance"
+              value: "{{ include "tx-bootstrap-operator.issuerPublicUrl" . }}/api/issuance"
             - name: ISSUER_CLAIMS_DATABASE_URL
               {{- include "tx-bootstrap-operator.secretValue" (dict "root" . "key" "issuerClaimsDatabaseUrl") | nindent 14 }}
             - name: ISSUER_CONTEXT
@@ -91,9 +91,9 @@ spec:
             - name: ISSUER_API_KEY_VAULT_TOKEN
               {{- include "tx-bootstrap-operator.secretValue" (dict "root" . "key" "vaultToken") | nindent 14 }}
             - name: ISSUER_API_KEY_VAULT_PATH
-              value: {{ printf "%s/data/data/%s-apikey" .Values.vault.apiSecretPath .Values.identity.issuerBpn | quote }}
+              value: {{ printf "%s/data/%s-apikey" .Values.vault.apiSecretPath .Values.identity.issuerBpn | quote }}
             - name: ISSUER_SUPERUSER_API_KEY_VAULT_PATH
-              value: {{ printf "%s/data/data/super-user-apikey" .Values.vault.apiSecretPath | quote }}
+              value: {{ printf "%s/data/super-user-apikey" .Values.vault.apiSecretPath | quote }}
           startupProbe:
             httpGet: { path: /api/health, port: http }
             periodSeconds: 10

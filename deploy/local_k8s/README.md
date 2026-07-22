@@ -62,9 +62,11 @@ and persistent volumes. This permanently deletes the local Kubernetes state.
 
 The default hostnames use the Rancher Desktop load-balancer IP through
 `nip.io`. Override `LOCAL_K8S_INGRESS_IP` before running the scripts when that
-address changes. `up.sh` renders environment-owned values from the templates
-under `values/`; generated values and credentials are written only below the
-ignored `.generated/` directory.
+address changes. Host-side verification connects through
+`LOCAL_K8S_INGRESS_CONNECT_IP`, which defaults to Rancher Desktop's loopback
+port forward so a VPN route cannot capture the VM subnet. `up.sh` renders
+environment-owned values from the templates under `values/`; generated values
+and credentials are written only below the ignored `.generated/` directory.
 
 TLS is deliberately disabled for this local cluster. The reusable charts keep
 HTTPS defaults, and a non-local environment must configure real DNS names and

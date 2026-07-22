@@ -11,16 +11,20 @@ export const createApiRoutes: FastifyPluginAsync<{
   app,
   { healthService, publicOnboardingService, networkParticipantService },
 ) => {
-  app.get("/health", async (request, reply) => {
-    const health = await healthService.getHealth();
+  app.get(
+    "/health",
+    { config: { rateLimit: false } },
+    async (request, reply) => {
+      const health = await healthService.getHealth();
 
-    if (health.status === "unhealthy") {
-      request.log.error({ checks: health.checks }, "Health check failed");
-      return reply.status(503).send(health);
-    }
+      if (health.status === "unhealthy") {
+        request.log.error({ checks: health.checks }, "Health check failed");
+        return reply.status(503).send(health);
+      }
 
-    return health;
-  });
+      return health;
+    },
+  );
 
   app.get("/network/participants", async (_request, reply) => {
     const participants = await networkParticipantService.list();

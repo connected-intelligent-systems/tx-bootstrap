@@ -354,8 +354,8 @@ services:
       ISSUER_API_KEY_ALIAS: "${BPN_ISSUER:?BPN_ISSUER must be set}-apikey"
       ISSUER_API_KEY_VAULT_URL: "${VAULT_URL:?VAULT_URL must be set}"
       ISSUER_API_KEY_VAULT_TOKEN: "${VAULT_TOKEN:?VAULT_TOKEN must be set}"
-      ISSUER_API_KEY_VAULT_PATH: "/v1/secret/data/data/${BPN_ISSUER:?BPN_ISSUER must be set}-apikey"
-      ISSUER_SUPERUSER_API_KEY_VAULT_PATH: "/v1/secret/data/data/super-user-apikey"
+      ISSUER_API_KEY_VAULT_PATH: "/v1/secret/data/${BPN_ISSUER:?BPN_ISSUER must be set}-apikey"
+      ISSUER_SUPERUSER_API_KEY_VAULT_PATH: "/v1/secret/data/super-user-apikey"
     healthcheck:
       test:
         [

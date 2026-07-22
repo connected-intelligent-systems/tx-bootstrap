@@ -1,4 +1,5 @@
 import fastify from "fastify";
+import rateLimit from "@fastify/rate-limit";
 import { describe, expect, it, vi } from "vitest";
 import type { Auth } from "../http/auth.js";
 import type { OperatorController } from "../controllers/operator-controller.js";
@@ -80,6 +81,28 @@ describe("operator console routes", () => {
 
     expect(response.statusCode).toBe(503);
     expect(response.json().status).toBe("unhealthy");
+  });
+
+  it("keeps health probes outside the global rate limit", async () => {
+    const app = fastify({ logger: false });
+    await app.register(rateLimit, {
+      global: true,
+      max: 1,
+      timeWindow: "1 minute",
+    });
+    await app.register(createApiRoutes, {
+      prefix: "/api",
+      auth: fakeAuth(),
+      controller: {} as OperatorController,
+      healthService: fakeHealthService(),
+    });
+
+    const first = await app.inject({ method: "GET", url: "/api/health" });
+    const second = await app.inject({ method: "GET", url: "/api/health" });
+    await app.close();
+
+    expect(first.statusCode).toBe(200);
+    expect(second.statusCode).toBe(200);
   });
 });
 

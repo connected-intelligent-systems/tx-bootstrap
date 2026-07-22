@@ -122,6 +122,7 @@ ensure_aes_key() {
 }
 
 seed_value operator password password
+seed_value operator super-user-apikey "$IDENTITYHUB_SUPERUSER_API_KEY"
 seed_value operator mgmt-api-key "$BDRS_API_KEY"
 seed_value operator edc.datasource.didentry.user bdrs
 seed_value operator edc.datasource.didentry.password "$BDRS_DB_PASSWORD"

@@ -160,7 +160,13 @@ export function OnboardingFlow({ initialState, onComplete }: OnboardingFlowProps
           </Container>
         ) : (
           <GatewayContent
-            canRetryCredentials={Boolean(state.caseId && isApproved(state) && !state.onboarded && state.lastError)}
+            canRetryCredentials={Boolean(
+              state.caseId &&
+              isApproved(state) &&
+              !state.onboarded &&
+              state.lastError &&
+              String(state.credentialRequestStatus?.status ?? '').toUpperCase() !== 'ERROR',
+            )}
             isBusy={isBusy}
             language={language}
             message={message}

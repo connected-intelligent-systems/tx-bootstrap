@@ -12,7 +12,7 @@ identity:
 
 publicEndpoints:
   dspCallbackAddress: http://consumer.__INGRESS_IP__.nip.io/api/v1/dsp
-  credentialServiceEndpoint: http://consumer.__INGRESS_IP__.nip.io/api/credentials
+  credentialServiceEndpoint: http://consumer.__INGRESS_IP__.nip.io/api/credentials/v1/participants/__BPN_CONSUMER_BASE64__
   dataPlaneBaseUrl: http://consumer.__INGRESS_IP__.nip.io/api/public/
   dataPlaneTokenRefreshEndpoint: http://consumer.__INGRESS_IP__.nip.io/api/public
   bdrsServerUrl: http://issuer.__INGRESS_IP__.nip.io/api/directory

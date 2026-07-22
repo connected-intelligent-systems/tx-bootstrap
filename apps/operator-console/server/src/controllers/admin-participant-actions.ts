@@ -301,7 +301,7 @@ function assertCanRejectParticipant(partner, latestCase) {
   }
   if (latestCase.state === "CREDENTIALS_REQUESTED") {
     throw new ConflictError(
-      "Participants with issued credentials cannot be rejected through onboarding",
+      "Participants with requested or issued credentials cannot be rejected through onboarding",
     );
   }
 }

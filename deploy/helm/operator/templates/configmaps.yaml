@@ -30,6 +30,12 @@ data:
             proxy_set_header X-Real-IP $remote_addr;
         }
 
+        location /api/issuance/ {
+            proxy_pass http://{{ include "tx-bootstrap-operator.componentName" (dict "root" . "component" "issuer-service") }}:8082/api/issuance/;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+        }
+
         location /.well-known/api/ {
             proxy_pass http://{{ include "tx-bootstrap-operator.componentName" (dict "root" . "component" "issuer-service") }}:8084/.well-known/api/;
             proxy_set_header Host $host;

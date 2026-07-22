@@ -75,9 +75,7 @@ export function derivePageState(state: GatewayState): PageState {
 
 export function isApproved(state: GatewayState) {
   const caseState = state.case?.state || state.state || ''
-  return (
-    ['READY_FOR_PARTICIPANT', 'CREDENTIALS_REQUESTED', 'ACTIVE', 'ONBOARDED'].includes(caseState) || state.onboarded
-  )
+  return ['READY_FOR_PARTICIPANT', 'CREDENTIALS_REQUESTED', 'ONBOARDED'].includes(caseState) || state.onboarded
 }
 
 export function heroTitle(pageState: PageState, t: UiCopy) {
@@ -153,6 +151,7 @@ export function buildDiagnostics(state: GatewayState) {
       credentialService:
         state.case?.identityHubCredentialServiceEndpoint || state.defaults.identityHubCredentialServiceEndpoint,
       credentialCount: state.credentials.length,
+      credentialRequestStatus: state.credentialRequestStatus,
       lastError: state.lastError,
       updatedAt: state.updatedAt,
       setupChecks: state.case?.setupChecks,

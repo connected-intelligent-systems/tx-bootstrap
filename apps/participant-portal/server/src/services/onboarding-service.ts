@@ -10,10 +10,11 @@ import { httpError } from '@tx-bootstrap/core/server/http/errors.js'
 import { decodeRegistrationToken } from '@tx-bootstrap/core/api/registration-token.js'
 import { isRecord } from '../lib/objects.js'
 import { extractCredentials, normalizeCaseData, normalizeOnboardingInput } from '../lib/onboarding-normalizers.js'
+import { preserveCredentialRequestState } from '../lib/onboarding-state.js'
 import { errorMessage } from '../types.js'
 import type { CredentialSummary, ExpectedCredential, JsonRecord, OnboardingInput, StateRow } from '../types.js'
 
-const participantReadyStates = ['READY_FOR_PARTICIPANT', 'CREDENTIALS_REQUESTED', 'ACTIVE']
+const participantReadyStates = ['READY_FOR_PARTICIPANT', 'CREDENTIALS_REQUESTED']
 let autoProgressPromise: Promise<void> | null = null
 
 type ParticipantStateRow = StateRow & { case_id: string; participant_token: string }
@@ -113,7 +114,7 @@ async function runAutoProgress(): Promise<void> {
     row = await loadStateRow()
   }
 
-  if (!row || !row.case_id || row.state === 'ONBOARDED') return
+  if (!row || !row.case_id || row.state === 'ONBOARDED' || row.state === 'FAILED') return
 
   const refreshed = await refreshOnboardingForRow(row)
   row = await loadStateRow()
@@ -124,16 +125,18 @@ async function runAutoProgress(): Promise<void> {
   if (!participantReadyStates.includes(caseState)) return
 
   const credentialRequestKnown = hasCredentialRequest(row.credential_request)
-  if (caseState !== 'ACTIVE' && (!credentialRequestKnown || row.state !== 'CREDENTIALS_REQUESTED')) {
+  let requestedCredentials = false
+  if (!credentialRequestKnown || row.state !== 'CREDENTIALS_REQUESTED') {
     try {
       await requestCredentialsForRow(row, { returnRaw: true })
+      requestedCredentials = true
     } catch {
       return
     }
     row = await loadStateRow()
   }
 
-  if (row && row.state !== 'ONBOARDED') {
+  if (requestedCredentials && row && row.state !== 'ONBOARDED') {
     await refreshOnboardingForRow(row)
   }
 }
@@ -171,7 +174,7 @@ async function requestCredentialsForRow(row: StateRow, options: RequestCredentia
     credentialRequest = credentialRequestFromCase(caseData, credentialRequest)
 
     await patchState({
-      state: String(caseData.state ?? '') === 'ACTIVE' ? 'ACTIVE' : 'CREDENTIALS_REQUESTED',
+      state: 'CREDENTIALS_REQUESTED',
       caseData,
       credentialRequest,
       lastError: receipt.warning,
@@ -205,8 +208,10 @@ async function refreshOnboardingForRow(row: StateRow): Promise<JsonRecord> {
   let caseData = normalizeCaseData(row.case_data)
   let credentialRequest: unknown = row.credential_request ?? {}
   let credentials: CredentialSummary[] = extractCredentials(row.credentials)
+  let credentialRequestStatus = identityHubRequestStatusFromCase(caseData)
   let lastError = ''
   let issued = false
+  let requestFailed = false
   let receiptWarning = ''
 
   try {
@@ -226,11 +231,32 @@ async function refreshOnboardingForRow(row: StateRow): Promise<JsonRecord> {
   if (participantReadyStates.includes(caseState)) {
     try {
       await assertIdentityHubConfigured()
-      if (!hasCredentialRequest(credentialRequest) && caseState !== 'ACTIVE') {
+      if (!hasCredentialRequest(credentialRequest)) {
         credentialRequest = await fetchCredentialRequest(row)
       }
 
       if (hasCredentialRequest(credentialRequest)) {
+        const holderPid = credentialRequestHolderPid(credentialRequest)
+        if (holderPid && (row.state === 'CREDENTIALS_REQUESTED' || caseState === 'CREDENTIALS_REQUESTED')) {
+          try {
+            credentialRequestStatus = await identityHubFetch<JsonRecord>(
+              '/v1alpha/participants/' +
+                encodeURIComponent(getIdentityHubParticipantContextPathId()) +
+                '/credentials/request/' +
+                encodeURIComponent(holderPid),
+            )
+            if (String(credentialRequestStatus.status ?? '').toUpperCase() === 'ERROR') {
+              requestFailed = true
+              lastError =
+                'IdentityHub credential request is ERROR for holder ' +
+                holderPid +
+                '. Inspect the participant IdentityHub warning log for the failed Holder Credential Request.'
+            }
+          } catch (error) {
+            lastError = errorMessage(error, 'Could not read IdentityHub credential request status')
+          }
+        }
+
         const identityHubResponse = await identityHubFetch(
           '/v1alpha/participants/' + encodeURIComponent(getIdentityHubParticipantContextPathId()) + '/credentials',
         )
@@ -242,10 +268,12 @@ async function refreshOnboardingForRow(row: StateRow): Promise<JsonRecord> {
             credentials.some((credential) => credential.type === item.type || credential.id === item.id),
           )
 
-        if (caseState !== 'ACTIVE') {
+        if (issued || requestFailed) {
           const receipt = await reportReceipt(row.case_id, row.participant_token, {
-            status: issued ? 'issued' : 'requested',
-            message: issued ? 'Expected credentials found in IdentityHub.' : 'IdentityHub credentials were polled.',
+            status: issued ? 'issued' : 'failed',
+            message: issued
+              ? 'Expected credentials found in IdentityHub.'
+              : 'Participant IdentityHub reports credential request status ERROR.',
             credentials,
           })
           receiptWarning = receipt.warning
@@ -260,8 +288,17 @@ async function refreshOnboardingForRow(row: StateRow): Promise<JsonRecord> {
     }
   }
 
+  caseData = {
+    ...caseData,
+    identityHubCredentialRequest: credentialRequestStatus,
+  }
+
   const nextState =
-    issued && (caseState === 'ACTIVE' || !receiptWarning) ? 'ONBOARDED' : caseState || row.state || 'REQUESTED'
+    issued && !receiptWarning
+      ? 'ONBOARDED'
+      : requestFailed
+        ? 'FAILED'
+        : preserveCredentialRequestState(row.state, caseState)
   await patchState({
     state: nextState,
     caseData,
@@ -300,6 +337,7 @@ async function buildRawStateResponse(): Promise<JsonRecord> {
     case: normalizeCaseData(row.case_data),
     credentials: extractCredentials(row.credentials),
     credentialRequest: row.credential_request ?? {},
+    credentialRequestStatus: identityHubRequestStatusFromCase(row.case_data),
     lastError: row.last_error || undefined,
     updatedAt: row.updated_at,
   }
@@ -472,6 +510,15 @@ function expectedCredentials(value: unknown): ExpectedCredential[] {
 
 function hasCredentialRequest(value: unknown): boolean {
   return expectedCredentials(value).length > 0
+}
+
+function credentialRequestHolderPid(value: unknown): string {
+  return isRecord(value) ? String(value.holderPid ?? '').trim() : ''
+}
+
+function identityHubRequestStatusFromCase(value: unknown): JsonRecord {
+  if (!isRecord(value) || !isRecord(value.identityHubCredentialRequest)) return {}
+  return value.identityHubCredentialRequest
 }
 
 function isConflict(error: unknown): boolean {

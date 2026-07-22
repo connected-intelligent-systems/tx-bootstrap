@@ -44,7 +44,7 @@ describe('onboarding view state', () => {
     [gatewayState({ caseId: 'case-1', state: 'REQUESTED' }), 'waitingForOperator'],
     [gatewayState({ caseId: 'case-1', state: 'READY_FOR_PARTICIPANT' }), 'settingUpCredentials'],
     [gatewayState({ caseId: 'case-1', state: 'FAILED' }), 'failed'],
-    [gatewayState({ caseId: 'case-1', state: 'ACTIVE', onboarded: true }), 'ready'],
+    [gatewayState({ caseId: 'case-1', state: 'ONBOARDED', onboarded: true }), 'ready'],
   ] as const)('maps gateway state to %s', (state, expected) => {
     expect(derivePageState(state)).toBe(expected)
   })
@@ -94,6 +94,7 @@ describe('participant details and diagnostics', () => {
           caseId: 'case-1',
           state: 'FAILED',
           lastError: 'IdentityHub unavailable',
+          credentialRequestStatus: { status: 'ERROR', holderPid: 'BPNL000000000123' },
           case: { state: 'REQUESTED', assignedBpn: 'BPNL000000000123' },
           credentials: [
             { id: 'credential-1', type: 'MembershipCredential', issuer: 'did:web:issuer', state: 'ISSUED' },
@@ -108,6 +109,7 @@ describe('participant details and diagnostics', () => {
       caseState: 'REQUESTED',
       assignedBpn: 'BPNL000000000123',
       credentialCount: 1,
+      credentialRequestStatus: { status: 'ERROR', holderPid: 'BPNL000000000123' },
       lastError: 'IdentityHub unavailable',
     })
   })

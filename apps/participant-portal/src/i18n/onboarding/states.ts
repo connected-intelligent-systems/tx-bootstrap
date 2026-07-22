@@ -2,7 +2,6 @@ import type { Language } from '../../types/onboarding'
 
 export const localizedStates: Record<Language, Record<string, string>> = {
   en: {
-    ACTIVE: 'Active',
     CREDENTIALS_REQUESTED: 'Credentials requested',
     CONFIGURATION_REQUIRED: 'Configuration required',
     FAILED: 'Failed',
@@ -12,7 +11,6 @@ export const localizedStates: Record<Language, Record<string, string>> = {
     REQUESTED: 'Requested',
   },
   de: {
-    ACTIVE: 'Aktiv',
     CREDENTIALS_REQUESTED: 'Credentials angefragt',
     CONFIGURATION_REQUIRED: 'Konfiguration erforderlich',
     FAILED: 'Fehlgeschlagen',

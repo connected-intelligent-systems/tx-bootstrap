@@ -265,6 +265,7 @@ AS $$
   WITH updated AS (
     UPDATE onboarding_cases
        SET credential_receipts = COALESCE(credential_receipts, '[]'::jsonb) || jsonb_build_array(p_receipt),
+           state = 'CREDENTIALS_REQUESTED',
            updated_at = now()
      WHERE id = p_case_id
        AND participant_token_hash = p_participant_token_hash

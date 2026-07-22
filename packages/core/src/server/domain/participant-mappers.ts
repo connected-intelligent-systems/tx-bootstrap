@@ -385,13 +385,15 @@ export function deriveCredentialState(
   receipts: Array<{ status?: string }>,
 ): CredentialStateType {
   if (!latestCase) return CredentialState.NOT_REQUESTED;
-  if (receipts.some((receipt) => receipt.status === "failed"))
-    return CredentialState.FAILED;
+  const latestReceipt = receipts.at(-1);
+  if (latestReceipt?.status === "issued") return CredentialState.ISSUED;
+  if (latestReceipt?.status === "failed") return CredentialState.FAILED;
   if (
     latestCase.state === OnboardingCaseState.CREDENTIALS_REQUESTED ||
-    receipts.length
+    latestReceipt?.status === "requested" ||
+    latestReceipt?.status === "reported"
   )
-    return CredentialState.ISSUED;
+    return CredentialState.REQUESTED;
   if (latestCase.state === OnboardingCaseState.READY_FOR_PARTICIPANT)
     return CredentialState.READY;
   return CredentialState.NOT_REQUESTED;

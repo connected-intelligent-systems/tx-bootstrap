@@ -75,6 +75,26 @@ describe("operator onboarding service routes", () => {
     expect(response.json().status).toBe("unhealthy");
   });
 
+  it("keeps health probes outside the global rate limit", async () => {
+    const app = createApp({
+      config: {
+        ...config,
+        enableRateLimit: true,
+        rateLimit: { max: 1, timeWindow: "1 minute" },
+      },
+      healthService: fakeHealthService(),
+      publicOnboardingService: fakePublicOnboardingService(),
+      networkParticipantService: fakeNetworkParticipantService(),
+    });
+
+    const first = await app.inject({ method: "GET", url: "/api/health" });
+    const second = await app.inject({ method: "GET", url: "/api/health" });
+    await app.close();
+
+    expect(first.statusCode).toBe(200);
+    expect(second.statusCode).toBe(200);
+  });
+
   it("exposes the cacheable public participant directory", async () => {
     const app = createApp({
       config,

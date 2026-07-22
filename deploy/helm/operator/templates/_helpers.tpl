@@ -56,6 +56,10 @@ app.kubernetes.io/component: {{ .component }}
 {{- printf "did:web:%s:%s" .Values.identity.issuerDidHost .Values.identity.issuerBpn }}
 {{- end }}
 
+{{- define "tx-bootstrap-operator.issuerPublicUrl" -}}
+{{- ternary "https" "http" .Values.identity.useHttpsDidWeb }}://{{ .Values.identity.issuerDidHost }}
+{{- end }}
+
 {{/* Render an image by immutable digest when supplied, otherwise by tag. */}}
 {{- define "tx-bootstrap-operator.image" -}}
 {{- if .image.digest -}}
