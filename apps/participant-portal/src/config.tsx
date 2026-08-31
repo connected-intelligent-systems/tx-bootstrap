@@ -41,7 +41,6 @@ export type AppConfig = {
   participantPortalName?: string
   deploymentLinks?: Array<{ label: string; href: string }>
   theme?: ThemeConfig
-  publicEdcEndpoint?: string
   showQuery?: boolean
   identityHubIdentityApiUrl?: string
   identityHubParticipantContextId?: string

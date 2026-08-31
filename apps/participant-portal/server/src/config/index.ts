@@ -55,7 +55,6 @@ export const config = {
   publicConfig: {
     title: process.env.PORTAL_TITLE ?? 'Participant Portal',
     participantPortalName: process.env.PARTICIPANT_PORTAL_NAME ?? process.env.PORTAL_TITLE ?? 'Participant Portal',
-    publicEdcEndpoint: process.env.PORTAL_PUBLIC_EDC_ENDPOINT ?? '',
   },
   stateId: 'default',
   onboardingRegistrationToken: process.env.ONBOARDING_REGISTRATION_TOKEN ?? '',

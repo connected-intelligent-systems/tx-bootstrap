@@ -3,23 +3,25 @@ import { useRecordContext, useTranslate } from 'react-admin'
 import { Typography, Box, CircularProgress, useTheme } from '@mui/material'
 import SwaggerUI from 'swagger-ui-react'
 import 'swagger-ui-react/swagger-ui.css'
+import { isRequestWithinEndpoint } from '../../utils/apiDescriptionUtils'
 
 interface OpenAPIViewerProps {
   authToken?: string
+  endpoint?: string
 }
 
-export const OpenAPIViewer = ({ authToken }: OpenAPIViewerProps) => {
+export const OpenAPIViewer = ({ authToken, endpoint }: OpenAPIViewerProps) => {
   const record = useRecordContext()
   const translate = useTranslate()
   const theme = useTheme()
-  const thingDescription = record?.thingDescription
+  const apiDescription = record?.apiDescription
   const [openApiSpec, setOpenApiSpec] = useState<unknown>()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string>()
   const isDarkMode = theme.palette.mode === 'dark'
 
   useEffect(() => {
-    if (!thingDescription) {
+    if (!apiDescription || !endpoint) {
       setOpenApiSpec(undefined)
       setError(undefined)
       return
@@ -28,10 +30,10 @@ export const OpenAPIViewer = ({ authToken }: OpenAPIViewerProps) => {
     const controller = new AbortController()
     setLoading(true)
     setError(undefined)
-    fetch('/api/portal/thing-description/convert', {
+    fetch('/api/portal/api-description/openapi', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ thingDescription }),
+      body: JSON.stringify({ apiDescription, endpoint }),
       signal: controller.signal,
     })
       .then(async (response) => {
@@ -48,12 +50,12 @@ export const OpenAPIViewer = ({ authToken }: OpenAPIViewerProps) => {
       })
 
     return () => controller.abort()
-  }, [thingDescription])
+  }, [apiDescription, endpoint])
 
-  if (!thingDescription) {
+  if (!apiDescription || !endpoint) {
     return (
       <Typography variant="body2" color="text.secondary">
-        {translate('resources.assets.tabs.thingDescriptionTab.noDescription')}
+        {translate('resources.assets.tabs.apiDescriptionTab.noDescription')}
       </Typography>
     )
   }
@@ -96,7 +98,18 @@ export const OpenAPIViewer = ({ authToken }: OpenAPIViewerProps) => {
         <SwaggerUI
           spec={openApiSpec}
           requestInterceptor={(request) => {
-            if (authToken) request.headers.Authorization = authToken
+            if (!isRequestWithinEndpoint(request.url, endpoint)) {
+              throw new Error('OpenAPI request outside the negotiated endpoint was blocked')
+            }
+
+            request.credentials = 'omit'
+            request.redirect = 'error'
+            if (authToken) {
+              request.headers.Authorization = authToken
+            } else {
+              delete request.headers.Authorization
+              delete request.headers.authorization
+            }
             return request
           }}
         />

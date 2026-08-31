@@ -20,6 +20,7 @@ COPY packages/core ./packages/core
 COPY packages/ui-runtime ./packages/ui-runtime
 COPY apps/participant-portal/index.html apps/participant-portal/tsconfig.json apps/participant-portal/tsconfig.server.json apps/participant-portal/vite.config.ts apps/participant-portal/vitest.config.ts ./apps/participant-portal/
 COPY apps/participant-portal/public ./apps/participant-portal/public
+COPY apps/participant-portal/shared ./apps/participant-portal/shared
 COPY apps/participant-portal/src ./apps/participant-portal/src
 COPY apps/participant-portal/server ./apps/participant-portal/server
 RUN npm run build --workspace @tx-bootstrap/participant-portal

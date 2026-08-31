@@ -1,4 +1,7 @@
 import { MultiLanguageValue } from '../dataProvider/shared/transformerHelpers'
+import type { OpenApiDocument } from '../../shared/api-description'
+
+export type { OpenApiDocument } from '../../shared/api-description'
 
 export interface AssetDataAddress {
   type: string
@@ -62,8 +65,8 @@ export interface Asset {
     [key: string]: any
   }
 
-  // W3C Thing Description
-  thingDescription?: string
+  // Endpoint-neutral API contract. Runtime endpoints belong to the transfer data address.
+  apiDescription?: OpenApiDocument
 
   // Raw JSON-LD representation
   raw?: any

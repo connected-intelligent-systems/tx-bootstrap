@@ -83,8 +83,6 @@ spec:
               value: {{ .Values.portal.title | quote }}
             - name: PARTICIPANT_PORTAL_NAME
               value: {{ .Values.portal.name | quote }}
-            - name: PORTAL_PUBLIC_EDC_ENDPOINT
-              value: {{ .Values.portal.publicEdcEndpoint | quote }}
             - name: DATABASE_URL
               {{- include "tx-bootstrap-participant.secretValue" (dict "root" . "key" "portalDatabaseUrl") | nindent 14 }}
             - name: ONBOARDING_DATASPACE_ADMIN_API_URL

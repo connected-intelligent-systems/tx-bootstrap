@@ -39,9 +39,9 @@ export function buildDatasetAccessSections(
   translate: ReturnType<typeof useTranslate>,
 ): AssetSection[] {
   const assetSections = getAssetSections(dataset, translate)
-  const thingDescription = assetSections.find((section) => section.id === 'thing-description')
+  const apiDescription = assetSections.find((section) => section.id === 'api-description')
   const sections = assetSections.filter(
-    (section) => !['basic-info', 'description', 'thing-description', 'raw'].includes(section.id),
+    (section) => !['basic-info', 'description', 'api-description', 'raw'].includes(section.id),
   )
 
   if (dataset.distributions?.length) {
@@ -53,6 +53,6 @@ export function buildDatasetAccessSections(
       component: <ServiceInformation dataset={dataset} />,
     })
   }
-  if (thingDescription) sections.push(thingDescription)
+  if (apiDescription) sections.push(apiDescription)
   return sections
 }

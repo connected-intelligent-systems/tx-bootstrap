@@ -16,7 +16,7 @@ import {
   DataPrivacy,
   DataQuality,
   Versioning,
-  ThingDescription,
+  ApiDescription,
 } from '../../../components/assets'
 import { ServiceInformation } from '../../../components/datasets'
 import { MarkdownField } from '../../../components/markdown'
@@ -104,12 +104,12 @@ const DATASET_TABS: DatasetTabDefinition[] = [
     render: (dataset) => withRecordContext(dataset, <DataQuality />),
   },
   {
-    id: 'thing-description',
+    id: 'api-description',
     icon: <DevicesIcon />,
-    labelTranslationKey: 'resources.assets.tabs.thingDescription',
-    ariaControls: 'dataset-thing-description-tab',
-    isVisible: (dataset) => !!dataset?.thingDescription,
-    render: (dataset) => withRecordContext(dataset, <ThingDescription />),
+    labelTranslationKey: 'resources.assets.tabs.apiDescription',
+    ariaControls: 'dataset-api-description-tab',
+    isVisible: (dataset) => !!dataset?.apiDescription,
+    render: (dataset) => withRecordContext(dataset, <ApiDescription />),
   },
   {
     id: 'service-info',
@@ -128,9 +128,9 @@ export const DatasetDetailsView = ({ dataset, isMobile }: DatasetDetailsViewProp
   const selectedTab = visibleTabs[activeTab]
 
   return (
-    <>
+    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: 0, height: '100%' }}>
       {visibleTabs.length > 0 && (
-        <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+        <Box sx={{ borderBottom: 1, borderColor: 'divider', flexShrink: 0 }}>
           <Tabs
             value={activeTab}
             onChange={(_, newValue: number) => setActiveTab(newValue)}
@@ -151,7 +151,7 @@ export const DatasetDetailsView = ({ dataset, isMobile }: DatasetDetailsViewProp
         </Box>
       )}
 
-      <Box sx={{ p: 3 }}>
+      <Box sx={{ p: 3, flex: 1, minHeight: 0, overflowY: 'auto' }}>
         {selectedTab ? (
           selectedTab.render(dataset)
         ) : (
@@ -160,6 +160,6 @@ export const DatasetDetailsView = ({ dataset, isMobile }: DatasetDetailsViewProp
           </Typography>
         )}
       </Box>
-    </>
+    </Box>
   )
 }

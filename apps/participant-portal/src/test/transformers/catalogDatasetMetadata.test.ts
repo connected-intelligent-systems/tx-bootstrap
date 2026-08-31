@@ -13,4 +13,19 @@ describe('catalog dataset metadata compatibility', () => {
     expect(dataset.title).toBe('Native dataset name')
     expect(dataset.description).toBe('Native detailed description')
   })
+
+  it('reads endpoint-neutral API descriptions from catalog metadata', async () => {
+    const apiDescription = {
+      openapi: '3.1.0',
+      info: { title: 'Orders', version: '1.0.0' },
+      paths: { '/orders': { get: { responses: { 200: { description: 'ok' } } } } },
+    }
+    const dataset = await parseDatasetFromJsonLd({
+      '@id': 'orders-api',
+      'dct:title': 'Orders',
+      'txb:apiDescription': JSON.stringify(apiDescription),
+    })
+
+    expect(dataset.apiDescription).toEqual(apiDescription)
+  })
 })

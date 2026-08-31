@@ -97,7 +97,8 @@ export const TransferAccessDetailsAction = ({
 
   if (!supportsPullAccess(transfer)) return null
 
-  const supportsOpenApi = /httpdata.*-pull$/i.test(transfer.transferType || '') && Boolean(dataset?.thingDescription)
+  const supportsOpenApi =
+    /httpdata.*-pull$/i.test(transfer.transferType || '') && Boolean(dataset?.apiDescription && data?.endpoint)
   const supportsHttpPreview = /httpdata.*-pull$/i.test(transfer.transferType || '') && Boolean(data?.endpoint)
   const curlCommand = buildCurlCommand(data)
 
@@ -289,7 +290,7 @@ export const TransferAccessDetailsAction = ({
                   </Box>
                 }
               >
-                <OpenAPIViewer authToken={data?.authorization} />
+                <OpenAPIViewer authToken={data?.authorization} endpoint={data?.endpoint} />
               </Suspense>
             </RecordContextProvider>
           )}

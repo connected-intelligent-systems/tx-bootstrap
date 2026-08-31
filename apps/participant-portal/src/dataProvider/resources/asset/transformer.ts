@@ -9,11 +9,15 @@ import {
   extractString,
   normalizeStringArray,
   serializePrivacySettings,
-  extractThingDescription,
+  extractApiDescription,
   extractMultiLanguageString,
   type MultiLanguageValue,
 } from '../../shared/transformerHelpers'
-import { expandThingDescription } from '../../../utils/thingDescriptionUtils'
+import {
+  API_DESCRIPTION_COMPACT_PROPERTY,
+  API_DESCRIPTION_PROPERTY,
+  serializeApiDescription,
+} from '../../../utils/apiDescriptionUtils'
 import { CoreAssetSchema, type CoreAsset } from './schema'
 
 const HEADER_PREFIX = 'header:'
@@ -66,7 +70,7 @@ function serializeMultiLanguageString(value: string | MultiLanguageValue[] | und
   return undefined
 }
 
-export async function parseAssetFromJsonLd(jsonLdAsset: any): Promise<Asset> {
+export function parseAssetFromJsonLd(jsonLdAsset: any): Asset {
   try {
     const coreAsset: CoreAsset = CoreAssetSchema.parse(jsonLdAsset)
 
@@ -112,7 +116,9 @@ export async function parseAssetFromJsonLd(jsonLdAsset: any): Promise<Asset> {
       provenance: extractProvenance(coreAsset),
       qualityMeasurements: extractQualityMeasurements(coreAsset),
       privacySettings: extractPrivacySettings(coreAsset),
-      thingDescription: await extractThingDescription(coreAsset.properties?.['td:hasThingDescription']),
+      apiDescription: extractApiDescription(
+        coreAsset.properties?.[API_DESCRIPTION_COMPACT_PROPERTY] ?? coreAsset.properties?.[API_DESCRIPTION_PROPERTY],
+      ),
     }
 
     return stripUndefinedValues(asset)
@@ -122,7 +128,7 @@ export async function parseAssetFromJsonLd(jsonLdAsset: any): Promise<Asset> {
   }
 }
 
-export async function serializeAssetToJsonLd(asset: AssetFormData): Promise<any> {
+export function serializeAssetToJsonLd(asset: AssetFormData): any {
   const properties: Record<string, any> = {
     'dct:title': asset.titles && asset.titles.length > 0 ? serializeMultiLanguageString(asset.titles) : asset.title,
     'dct:abstract':
@@ -234,7 +240,7 @@ export async function serializeAssetToJsonLd(asset: AssetFormData): Promise<any>
       prov: 'http://www.w3.org/ns/prov#',
       odrl: 'http://www.w3.org/ns/odrl/2/',
       dqv: 'http://www.w3.org/ns/dqv#',
-      td: 'https://www.w3.org/2019/wot/td#',
+      txb: 'https://github.com/connected-intelligent-systems/tx-bootstrap/ns/',
       dpv: 'https://w3id.org/dpv#',
       schema: 'http://schema.org/',
       owl: 'http://www.w3.org/2002/07/owl#',
@@ -252,10 +258,10 @@ export async function serializeAssetToJsonLd(asset: AssetFormData): Promise<any>
     jsonLd.properties = { ...jsonLd.properties, ...privacyProps }
   }
 
-  if (asset.thingDescription) {
+  if (asset.apiDescription) {
     jsonLd.properties = {
       ...jsonLd.properties,
-      'td:hasThingDescription': await expandThingDescription(asset.thingDescription),
+      [API_DESCRIPTION_COMPACT_PROPERTY]: serializeApiDescription(asset.apiDescription),
     }
   }
 

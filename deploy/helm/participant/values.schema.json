@@ -292,7 +292,6 @@
           "required": [
             "title",
             "name",
-            "publicEdcEndpoint",
             "upstreamTimeoutMs",
             "httpsHeaders",
             "rateLimit",
@@ -303,7 +302,6 @@
             "image": { "$ref": "#/definitions/firstPartyImage" },
             "title": { "type": "string", "minLength": 1 },
             "name": { "type": "string", "minLength": 1 },
-            "publicEdcEndpoint": { "$ref": "#/definitions/optionalUrl" },
             "upstreamTimeoutMs": {
               "type": "integer",
               "minimum": 1,

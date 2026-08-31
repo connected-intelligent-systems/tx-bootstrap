@@ -26,7 +26,6 @@ export async function loadPublicPortalConfig(): Promise<JsonRecord> {
     ...bundledConfig,
     title: config.publicConfig.title,
     participantPortalName: config.publicConfig.participantPortalName,
-    publicEdcEndpoint: config.publicConfig.publicEdcEndpoint || bundledConfig.publicEdcEndpoint,
   })
 }
 
@@ -53,8 +52,6 @@ function sanitizePublicConfig(runtimeConfig: JsonRecord): JsonRecord {
     title: typeof runtimeConfig.title === 'string' ? runtimeConfig.title : undefined,
     participantPortalName:
       typeof runtimeConfig.participantPortalName === 'string' ? runtimeConfig.participantPortalName : undefined,
-    publicEdcEndpoint:
-      typeof runtimeConfig.publicEdcEndpoint === 'string' ? runtimeConfig.publicEdcEndpoint : undefined,
     showQuery: typeof runtimeConfig.showQuery === 'boolean' ? runtimeConfig.showQuery : undefined,
     deploymentLinks: sanitizeDeploymentLinks(runtimeConfig.deploymentLinks),
     theme: sanitizeTheme(runtimeConfig.theme),

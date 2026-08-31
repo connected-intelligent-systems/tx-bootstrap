@@ -221,7 +221,6 @@ portal:
     pullPolicy: IfNotPresent
   title: Participant Portal
   name: Participant Portal
-  publicEdcEndpoint: ""
   upstreamTimeoutMs: 10000
   httpsHeaders: true
   rateLimit:

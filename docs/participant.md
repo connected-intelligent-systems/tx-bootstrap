@@ -131,7 +131,6 @@ Most settings have local defaults in `.env.example`. These are the important dep
 | `PARTICIPANT_PORTAL_UPSTREAM_TIMEOUT_MS` | `10000`                                              | Maximum duration in milliseconds for portal requests to EDC, IdentityHub, Vault, the operator, and transfer data endpoints.                     |
 | `PARTICIPANT_PORTAL_ALLOW_INSECURE_AUTH` | `false`                                              | Must be `true` to acknowledge `PARTICIPANT_PORTAL_AUTH_MODE=none` in a production runtime; never enable on a reachable deployment.              |
 | `PORTAL_TITLE`                           | `Participant Portal`                                 | Title written into the portal runtime config.                                                                                                   |
-| `PORTAL_PUBLIC_EDC_ENDPOINT`             | empty                                                | Optional remote DSP endpoint shown/used by the portal.                                                                                          |
 | `ONBOARDING_DATASPACE_ADMIN_API_URL`     | `http://operator-onboarding-service:3000/api`        | Operator onboarding service.                                                                                                                    |
 | `ONBOARDING_REGISTRATION_TOKEN`          | `eyJjYX...`                                          | Operator-created registration token for config-driven gateway automation. Keep it secret.                                                       |
 | `ONBOARDING_ORGANIZATION_NAME`           | `Example Participant`                                | Fallback organization name shown by the gateway when the operator case has not been fetched yet.                                                |
@@ -150,6 +149,10 @@ The internal gateway routes `/` to the participant portal runtime service (`part
 Without a configured or attached registration token, the backend cannot start onboarding. It shows a missing-invite status until the operator-created value is supplied.
 
 The participant portal runtime is internal-only by default. It is not connected to the public gateway and does not bind a separate portal host port.
+
+### API descriptions
+
+Asset metadata may contain one OpenAPI 3.x description uploaded as JSON or YAML. The portal stores the normalized OpenAPI document directly as metadata, not as an executable endpoint description. `servers`, operation-level server overrides, API security declarations, callbacks, webhooks, external references, and external documentation values are removed. After a consumer receives access, the backend binds the document to the negotiated data-plane endpoint. Swagger requests receive the transfer authorization header only when their final URL remains within that endpoint path.
 
 ## Production Onboarding Sequence
 

@@ -1,4 +1,5 @@
 import { MultiLanguageValue } from '../dataProvider/shared/transformerHelpers'
+import type { OpenApiDocument } from './asset'
 
 export interface PolicyConstraint {
   leftOperand: string
@@ -42,6 +43,7 @@ export interface Dataset {
   mediaType?: string
   theme?: DatasetTheme
   keywords?: string[]
+  apiDescription?: OpenApiDocument
 
   // Participant information - inherited from parent catalog
   participantId?: string

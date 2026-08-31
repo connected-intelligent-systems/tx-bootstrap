@@ -46,7 +46,6 @@ describe('portal gateway runtime', () => {
       `window.config = {
         title: 'Bundled Gateway',
         participantPortalName: 'Bundled Participant Portal',
-        publicEdcEndpoint: 'https://bundled.example/api/v1/dsp',
         identityHubApiKey: 'secret-value',
         deploymentLinks: [
           { label: 'Docs', href: 'https://docs.example' },
@@ -74,7 +73,6 @@ describe('portal gateway runtime', () => {
     Object.assign(config.publicConfig, {
       title: 'Env Portal',
       participantPortalName: 'Env Participant Portal',
-      publicEdcEndpoint: 'https://participant.example/api/v1/dsp',
     })
     Object.assign(config.rateLimit, originalConfig.rateLimit)
     isOnboardedMock.mockResolvedValue(false)
@@ -123,7 +121,6 @@ describe('portal gateway runtime', () => {
     expect(runtimeConfig).toMatchObject({
       title: 'Env Portal',
       participantPortalName: 'Env Participant Portal',
-      publicEdcEndpoint: 'https://participant.example/api/v1/dsp',
       deploymentLinks: [{ label: 'Docs', href: 'https://docs.example' }],
       theme: {
         light: {

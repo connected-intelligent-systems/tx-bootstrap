@@ -49,7 +49,7 @@ export const DiscoverDataPage = () => {
       })
       const mapped = await Promise.allSettled(
         result.items.map(async (entry) => {
-          const dataset = await parseDatasetFromJsonLd(entry.dataset)
+          const dataset = parseDatasetFromJsonLd(entry.dataset)
           dataset.id = entry.datasetId
           dataset.originalId = entry.datasetId
           dataset.catalogUrl = entry.counterPartyAddress
