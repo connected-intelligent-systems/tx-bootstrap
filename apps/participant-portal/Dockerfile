@@ -1,7 +1,8 @@
 # syntax=docker/dockerfile:1.7
 FROM node:26-alpine AS node-base
 RUN --mount=type=cache,target=/root/.npm,sharing=locked \
-    npm install --global npm@12.0.1 --no-audit --no-fund
+    apk upgrade --no-cache \
+    && npm install --global npm@12.0.2 --no-audit --no-fund
 
 FROM node-base AS deps
 WORKDIR /app
@@ -43,7 +44,9 @@ COPY apps/operator-onboarding-service/package.json ./apps/operator-onboarding-se
 COPY apps/participant-portal/package.json ./apps/participant-portal/package.json
 RUN --mount=type=cache,target=/root/.npm,sharing=locked \
     npm ci --omit=dev --workspace @tx-bootstrap/core --workspace @tx-bootstrap/participant-portal --include-workspace-root=false --ignore-scripts --no-audit --no-fund \
-    && npm cache clean --force
+    && npm cache clean --force \
+    && rm -rf /usr/local/lib/node_modules/npm \
+    && rm -f /usr/local/bin/npm /usr/local/bin/npx
 COPY --from=builder --chown=node:node /app/packages/core/dist ./packages/core/dist
 COPY --from=builder --chown=node:node /app/packages/ui-runtime/dist ./packages/ui-runtime/dist
 COPY --from=builder --chown=node:node /app/apps/participant-portal/dist ./apps/participant-portal/dist
