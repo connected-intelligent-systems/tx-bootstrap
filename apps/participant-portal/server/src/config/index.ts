@@ -1,5 +1,5 @@
 import { join } from 'node:path'
-import { parseBooleanEnv, parseLogLevelEnv } from '@tx-bootstrap/core/server/config/env.js'
+import { parseBooleanEnv, parseCsvEnv, parseLogLevelEnv } from '@tx-bootstrap/core/server/config/env.js'
 import type { OnboardingInput } from '../types.js'
 
 const allowInsecureAuth = process.env.PARTICIPANT_PORTAL_ALLOW_INSECURE_AUTH === 'true'
@@ -14,6 +14,9 @@ export const config = {
     timeWindow: process.env.PARTICIPANT_PORTAL_RATE_LIMIT_WINDOW ?? '1 minute',
   },
   upstreamRequestTimeoutMs: positiveIntegerEnv('PARTICIPANT_PORTAL_UPSTREAM_TIMEOUT_MS', 10_000),
+  transferPreview: {
+    allowedPrivateHosts: parseCsvEnv('PARTICIPANT_PORTAL_PREVIEW_ALLOWED_PRIVATE_HOSTS', []),
+  },
   databaseUrl: process.env.DATABASE_URL ?? buildDatabaseUrl(),
   dataspaceAdminApiUrl: trimTrailingSlash(
     process.env.ONBOARDING_DATASPACE_ADMIN_API_URL ??

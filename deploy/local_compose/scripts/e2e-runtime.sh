@@ -272,6 +272,12 @@ AUTHORIZATION="$(jq -r '.authorization // .["edc:authorization"] // .authKey // 
 [ "$AUTHORIZATION" != "null" ] && [ -n "$AUTHORIZATION" ] || { jq . "$TMPDIR/edr.json"; fail "missing EDR authorization"; }
 curl -sL "$ENDPOINT" -H "Authorization: $AUTHORIZATION" > "$TMPDIR/data.json"
 jq . "$TMPDIR/data.json" >/dev/null || { cat "$TMPDIR/data.json"; fail "data response is not JSON"; }
-ok "valid JSON data received"
+curl -fsS "${PORTAL_ADMIN_AUTH[@]}" "$CONSUMER_PORTAL/api/portal/transfers/$TRANSFER_ID/preview" > "$TMPDIR/data_preview.json"
+jq -e '.status == 200 and .truncated == false and (.body | fromjson | true)' \
+    "$TMPDIR/data_preview.json" >/dev/null || {
+    jq . "$TMPDIR/data_preview.json"
+    fail "participant portal data preview is invalid"
+}
+ok "valid JSON data received directly and through the participant portal preview"
 
 printf "\nE2E complete: asset=%s agreement=%s transfer=%s\n" "$ASSET_ID" "$CONTRACT_AGREEMENT_ID" "$TRANSFER_ID"

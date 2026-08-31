@@ -64,7 +64,7 @@ export async function fetchPublicHttpPreview(target: URL, authorization?: string
   const timeoutSignal = AbortSignal.timeout(config.upstreamRequestTimeoutMs)
 
   try {
-    const resolved = await resolvePublicAddress(hostname)
+    const resolved = await resolvePreviewAddress(hostname)
     const response = await requestPinnedAddress(target, hostname, resolved, authorization, timeoutSignal)
     const preview = await readPreview(response)
     const contentType = response.headers['content-type']
@@ -80,11 +80,21 @@ export async function fetchPublicHttpPreview(target: URL, authorization?: string
   }
 }
 
-export function selectPublicAddress(addresses: readonly LookupAddress[]): LookupAddress {
-  if (addresses.length === 0 || addresses.some(({ address }) => isForbiddenIpAddress(address))) {
+export function selectPreviewAddress(addresses: readonly LookupAddress[], allowPrivate = false): LookupAddress {
+  const hasInvalidAddress = addresses.some(({ address }) => !isIP(address) || address.includes('%'))
+  if (
+    addresses.length === 0 ||
+    hasInvalidAddress ||
+    (!allowPrivate && addresses.some(({ address }) => isForbiddenIpAddress(address)))
+  ) {
     throw httpError(422, 'Transfer endpoint must resolve only to public network addresses')
   }
   return addresses[0]
+}
+
+export function isAllowedPrivatePreviewHost(hostname: string, allowedHosts: readonly string[]): boolean {
+  const normalizedHostname = normalizeHostname(hostname)
+  return allowedHosts.some((allowedHost) => normalizeHostname(allowedHost) === normalizedHostname)
 }
 
 export function isForbiddenIpAddress(address: string): boolean {
@@ -98,12 +108,13 @@ export function isForbiddenIpAddress(address: string): boolean {
   return blockedIpv6.check(address, 'ipv6')
 }
 
-async function resolvePublicAddress(hostname: string): Promise<LookupAddress> {
+async function resolvePreviewAddress(hostname: string): Promise<LookupAddress> {
   const family = isIP(hostname)
   const addresses: LookupAddress[] = family
     ? [{ address: hostname, family }]
     : await lookup(hostname, { all: true, verbatim: true })
-  return selectPublicAddress(addresses)
+  const allowPrivate = isAllowedPrivatePreviewHost(hostname, config.transferPreview.allowedPrivateHosts)
+  return selectPreviewAddress(addresses, allowPrivate)
 }
 
 function requestPinnedAddress(
@@ -180,6 +191,10 @@ function mappedIpv4Address(address: string): string | null {
 
 function unbracket(hostname: string): string {
   return hostname.startsWith('[') && hostname.endsWith(']') ? hostname.slice(1, -1) : hostname
+}
+
+function normalizeHostname(hostname: string): string {
+  return unbracket(hostname.trim()).toLowerCase().replace(/\.$/, '')
 }
 
 function isHttpError(error: unknown): error is { status: number } {
