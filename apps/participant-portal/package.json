@@ -1,6 +1,6 @@
 {
   "name": "@tx-bootstrap/participant-portal",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "private": true,
   "license": "MIT",
   "type": "module",
@@ -25,7 +25,7 @@
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
-    "@tx-bootstrap/core": "0.1.4",
+    "@tx-bootstrap/core": "0.1.5",
     "fastify": "^5.8.5",
     "kysely": "^0.29.2",
     "pg": "8.22.0"
@@ -43,7 +43,7 @@
     "@testing-library/jest-dom": "6.9.1",
     "@testing-library/react": "16.3.2",
     "@triply/yasgui": "4.2.28",
-    "@tx-bootstrap/ui-runtime": "0.1.4",
+    "@tx-bootstrap/ui-runtime": "0.1.5",
     "@types/jsonld": "1.5.15",
     "@types/lodash": "4.17.24",
     "@types/node": "26.1.1",
