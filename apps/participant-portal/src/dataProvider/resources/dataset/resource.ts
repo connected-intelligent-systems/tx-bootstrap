@@ -12,7 +12,7 @@ const frame = {
     prov: 'http://www.w3.org/ns/prov#',
     odrl: 'http://www.w3.org/ns/odrl/2/',
     dqv: 'http://www.w3.org/ns/dqv#',
-    td: 'https://www.w3.org/2019/wot/td#',
+    txb: 'https://github.com/connected-intelligent-systems/tx-bootstrap/ns/',
     dpv: 'https://w3id.org/dpv#',
     schema: 'http://schema.org/',
     owl: 'http://www.w3.org/2002/07/owl#',
@@ -79,7 +79,7 @@ export async function getManyReference(params: GetManyReferenceParams) {
     }
 
     const framedCatalog = await compactJsonLd(catalogData, frame)
-    const cleanCatalog = await parseCatalogFromJsonLd(framedCatalog, catalogUrl as string)
+    const cleanCatalog = parseCatalogFromJsonLd(framedCatalog, catalogUrl as string)
 
     const datasets = (cleanCatalog.datasets || []).map((dataset: any) => ({
       ...dataset,
@@ -146,7 +146,7 @@ export async function getOne(params: any) {
 
     const datasetData = await response.json()
     const framedDataset = await compactJsonLd(datasetData, frame)
-    const cleanDataset = await parseDatasetFromJsonLd(framedDataset)
+    const cleanDataset = parseDatasetFromJsonLd(framedDataset)
 
     cleanDataset.catalogUrl = catalogUrl
     cleanDataset.originalId = cleanDataset.id
@@ -204,7 +204,7 @@ export async function getMany(params: any) {
 
         const datasetData = await response.json()
         const framedDataset = await compactJsonLd(datasetData, frame)
-        const cleanDataset = await parseDatasetFromJsonLd(framedDataset)
+        const cleanDataset = parseDatasetFromJsonLd(framedDataset)
 
         cleanDataset.catalogUrl = catalogUrl
         cleanDataset.originalId = cleanDataset.id

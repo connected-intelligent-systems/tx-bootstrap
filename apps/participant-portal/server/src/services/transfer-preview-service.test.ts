@@ -1,14 +1,23 @@
+import type { IncomingMessage } from 'node:http'
+import { Readable } from 'node:stream'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { config } from '../config/index.js'
-import { fetchPublicHttpPreview } from './public-http-preview.js'
-import { previewHttpPullTransfer } from './transfer-preview-service.js'
+import { fetchPublicHttpDownload, fetchPublicHttpPreview } from './public-http-preview.js'
+import { downloadHttpPullTransfer, previewHttpPullTransfer } from './transfer-preview-service.js'
 
-vi.mock('./public-http-preview.js', () => ({ fetchPublicHttpPreview: vi.fn() }))
+vi.mock('./public-http-preview.js', () => ({
+  fetchPublicHttpDownload: vi.fn(),
+  fetchPublicHttpPreview: vi.fn(),
+}))
 
 const fetchPublicHttpPreviewMock = vi.mocked(fetchPublicHttpPreview)
+const fetchPublicHttpDownloadMock = vi.mocked(fetchPublicHttpDownload)
 
 describe('transfer preview service', () => {
-  afterEach(() => vi.restoreAllMocks())
+  afterEach(() => {
+    vi.restoreAllMocks()
+    vi.clearAllMocks()
+  })
 
   it('resolves the EDR and previews the endpoint with its authorization', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
@@ -37,6 +46,50 @@ describe('transfer preview service', () => {
       body: '{"value":42}',
       truncated: false,
     })
+  })
+
+  it('streams a download with safe response headers and no caching', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify({ endpoint: 'https://data.test/public', authorization: 'Bearer token' })),
+    )
+    const download = Object.assign(Readable.from(['{"value":42}']), {
+      statusCode: 200,
+      headers: {
+        'content-type': 'application/json; charset=utf-8',
+        'content-length': '12',
+      },
+    }) as unknown as IncomingMessage
+    fetchPublicHttpDownloadMock.mockResolvedValue(download)
+    const reply = replyStub()
+
+    await downloadHttpPullTransfer({ params: { transferId: 'transfer-1' } } as never, reply as never)
+
+    expect(fetchPublicHttpDownloadMock).toHaveBeenCalledWith(new URL('https://data.test/public'), 'Bearer token')
+    expect(reply.status).toBe(200)
+    expect(reply.header).toHaveBeenCalledWith('Cache-Control', 'no-store')
+    expect(reply.header).toHaveBeenCalledWith('Content-Type', 'application/json; charset=utf-8')
+    expect(reply.header).toHaveBeenCalledWith('Content-Length', '12')
+    expect(reply.header).toHaveBeenCalledWith('Content-Disposition', 'attachment; filename="transfer-1.json"')
+    expect(reply.payload).toBe(download)
+  })
+
+  it('preserves an upstream attachment filename', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify({ endpoint: 'https://data.test/report' })),
+    )
+    const download = Object.assign(Readable.from(['report']), {
+      statusCode: 200,
+      headers: {
+        'content-type': 'text/csv',
+        'content-disposition': 'attachment; filename="report.csv"',
+      },
+    }) as unknown as IncomingMessage
+    fetchPublicHttpDownloadMock.mockResolvedValue(download)
+    const reply = replyStub()
+
+    await downloadHttpPullTransfer({ params: { transferId: 'transfer-1' } } as never, reply as never)
+
+    expect(reply.header).toHaveBeenCalledWith('Content-Disposition', 'attachment; filename="report.csv"')
   })
 })
 

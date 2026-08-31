@@ -1,5 +1,10 @@
 # syntax=docker/dockerfile:1.7
-FROM python:3.12-slim AS builder
+FROM python:3.12-slim AS python-base
+RUN apt-get update \
+    && apt-get upgrade --yes \
+    && rm -rf /var/lib/apt/lists/*
+
+FROM python-base AS builder
 WORKDIR /app
 COPY pyproject.toml uv.lock ./
 RUN --mount=type=cache,target=/root/.cache/pip \
@@ -8,7 +13,7 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 COPY src ./src
 RUN uv sync --frozen --no-dev
 
-FROM python:3.12-slim AS runtime
+FROM python-base AS runtime
 RUN groupadd --gid 10001 app && useradd --uid 10001 --gid app --create-home app
 WORKDIR /app
 ENV PATH=/app/.venv/bin:$PATH \

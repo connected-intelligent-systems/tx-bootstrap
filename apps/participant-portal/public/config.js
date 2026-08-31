@@ -1,12 +1,10 @@
 var config = {
   showDevices: false,
-  showThingDescriptions: false,
   showQuery: false,
   showCustomers: false,
   showThingsboard: false,
   showKeycloak: false,
   title: 'test',
-  publicEdcEndpoint: 'http://localhost:8080/api/v1/dsp',
   theme: {
     light: {
       palette: {

@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import type { CoreResource } from '../../shared/transformerHelpers'
+import { API_DESCRIPTION_COMPACT_PROPERTY, API_DESCRIPTION_PROPERTY } from '../../../utils/apiDescriptionUtils'
 
 type CatalogPolicyConstraint = {
   leftOperand: string
@@ -218,7 +219,7 @@ export const DatasetSchema = z
       keywords: d['dcat:keyword'] ? jsonLdStrings(d['dcat:keyword']) : undefined,
       policies: d['odrl:hasPolicy'],
       distributions: d['dcat:distribution'],
-      _rawThingDescription: d['td:hasThingDescription'],
+      _rawApiDescription: d[API_DESCRIPTION_COMPACT_PROPERTY] ?? d[API_DESCRIPTION_PROPERTY],
       _datasetResource: datasetResource,
     }
   })

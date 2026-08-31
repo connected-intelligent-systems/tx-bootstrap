@@ -63,9 +63,20 @@ const germanMessages: Partial<TranslationMessages> = {
         dataPrivacy: 'Datenschutz',
         dataQuality: 'Datenqualität',
         dataAddress: 'Datenadresse',
-        thingDescription: 'Thing Description',
-        thingDescriptionTab: {
-          noDescription: 'Keine Thing Description verfügbar',
+        apiDescription: 'API-Beschreibung',
+        apiDescriptionTab: {
+          noDescription: 'Keine API-Beschreibung verfügbar',
+          untitled: 'Unbenannte API',
+          version: 'Version',
+          endpointNeutralTitle: 'Endpunktneutraler Katalogvertrag',
+          endpointNeutralDescription:
+            'Diese Beschreibung enthält weder Laufzeit-Endpunkt noch Zugangsdaten. Sie werden durch den ausgehandelten Transfer bereitgestellt, sobald der Datenzugriff verfügbar ist.',
+          operations: 'Operationen',
+          noOperations: 'In dieser API-Beschreibung sind keine Operationen definiert.',
+          responseFormats: 'Antworten',
+          showAll: 'Alle anzeigen',
+          showLess: 'Weniger anzeigen',
+          downloadDocument: 'Spezifikation herunterladen',
         },
         serviceInformationTab: {
           description: 'Technische Serviceinformationen und Endpunkt-Details für den Zugriff auf diesen Datensatz.',
@@ -178,7 +189,7 @@ const germanMessages: Partial<TranslationMessages> = {
           provenance: 'Herkunft',
           dataPrivacy: 'Datenschutz',
           dataQuality: 'Datenqualität',
-          thingDescription: 'Thing Description',
+          apiDescription: 'API-Beschreibung',
         },
         buttons: {
           back: 'Zurück',
@@ -366,17 +377,15 @@ const germanMessages: Partial<TranslationMessages> = {
             descriptionHelper: 'Eine Beschreibung der Qualitätsmessung.',
           },
         },
-        thingDescription: {
-          title: 'W3C Thing Description',
+        apiDescription: {
+          title: 'API-Beschreibung',
           description:
-            'Laden Sie eine W3C Thing Description JSON-Datei hoch. Die Datei wird gegen das W3C TD-Schema validiert, und alle href-Werte werden automatisch durch den öffentlichen EDC-Endpunkt ersetzt, bevor sie gespeichert werden.',
-          uploadButton: 'JSON-Datei hochladen',
-          validating: 'Validierung läuft...',
-          viewDescription: 'Thing Description anzeigen',
+            'Laden Sie eine OpenAPI-3.x-Spezifikation als JSON oder YAML hoch. Serveradressen und API-Sicherheitseinstellungen werden entfernt; Endpunkt und Autorisierung der ausgehandelten Data Plane werden erst nach erteiltem Zugriff angewendet.',
+          uploadButton: 'OpenAPI-Spezifikation hochladen',
+          viewDescription: 'OpenAPI-Spezifikation anzeigen',
           errors: {
-            invalidJson: 'Ungültiges JSON-Format. Bitte überprüfen Sie Ihre Eingabe.',
-            validationFailed:
-              'Thing Description-Validierung fehlgeschlagen. Bitte beheben Sie die unten aufgeführten Fehler:',
+            invalidDocument: 'Ungültiges JSON- oder YAML-Dokument. Bitte überprüfen Sie Ihre Eingabe.',
+            validationFailed: 'OpenAPI-Validierung fehlgeschlagen. Bitte beheben Sie die unten aufgeführten Fehler:',
             details: 'Validierungsfehler:',
           },
         },
@@ -796,7 +805,7 @@ const germanMessages: Partial<TranslationMessages> = {
   datasets: {
     unnamedDataset: 'Unbenannter Datensatz',
     openapi: {
-      conversionError: 'Fehler beim Konvertieren der Thing Description in OpenAPI-Spezifikation',
+      conversionError: 'Fehler beim Vorbereiten der OpenAPI-Spezifikation',
     },
   },
 }

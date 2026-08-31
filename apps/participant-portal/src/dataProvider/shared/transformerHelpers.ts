@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { parseStoredApiDescription } from "../../utils/apiDescriptionUtils";
 
 export type CoreResource = {
   properties?: Record<string, unknown>;
@@ -292,13 +293,6 @@ export function serializePrivacySettings(
   return { "dpv:hasPersonalDataHandling": mapped };
 }
 
-export async function extractThingDescription(
-  thingDescription: any
-): Promise<any> {
-  if (!thingDescription) return undefined;
-
-  const { compactThingDescription } = await import(
-    "../../utils/thingDescriptionUtils"
-  );
-  return compactThingDescription(thingDescription);
+export function extractApiDescription(apiDescription: unknown) {
+  return parseStoredApiDescription(apiDescription);
 }

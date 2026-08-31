@@ -52,7 +52,6 @@ portal:
     pullPolicy: Never
   title: Portal - Consumer
   name: Local Consumer
-  publicEdcEndpoint: http://provider.__INGRESS_IP__.nip.io/api/v1/dsp
   httpsHeaders: false
   auth:
     mode: none

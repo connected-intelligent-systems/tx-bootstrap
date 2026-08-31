@@ -37,7 +37,7 @@ import {
   Provenance,
   DataPrivacy,
   DataQuality,
-  ThingDescription,
+  ApiDescription,
 } from "../../components/assets";
 import { ServiceInformation } from "../../components/datasets";
 
@@ -307,8 +307,8 @@ export const TransferProcessesShow = () => {
                 />
                 <Tab
                   icon={<DevicesIcon />}
-                  label={translate("resources.assets.tabs.thingDescription")}
-                  aria-controls="dataset-thing-description"
+                  label={translate("resources.assets.tabs.apiDescription")}
+                  aria-controls="dataset-api-description"
                 />
                 <Tab
                   icon={<CloudIcon />}
@@ -327,7 +327,7 @@ export const TransferProcessesShow = () => {
                   {activeTab === 1 && <Provenance />}
                   {activeTab === 2 && <DataPrivacy />}
                   {activeTab === 3 && <DataQuality />}
-                  {activeTab === 4 && <ThingDescription />}
+                  {activeTab === 4 && <ApiDescription />}
                   {activeTab === 5 && <ServiceInformation dataset={dataset} />}
                 </RecordContextProvider>
               </Suspense>

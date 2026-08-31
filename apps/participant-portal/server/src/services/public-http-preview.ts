@@ -59,13 +59,10 @@ export async function fetchPublicHttpPreview(target: URL, authorization?: string
   if (target.username || target.password) {
     throw httpError(422, 'Transfer endpoints with embedded credentials cannot be previewed')
   }
-
-  const hostname = unbracket(target.hostname)
   const timeoutSignal = AbortSignal.timeout(config.upstreamRequestTimeoutMs)
 
   try {
-    const resolved = await resolvePublicAddress(hostname)
-    const response = await requestPinnedAddress(target, hostname, resolved, authorization, timeoutSignal)
+    const response = await requestAllowedHttpResponse(target, authorization, timeoutSignal)
     const preview = await readPreview(response)
     const contentType = response.headers['content-type']
     return {
@@ -74,17 +71,38 @@ export async function fetchPublicHttpPreview(target: URL, authorization?: string
       ...preview,
     }
   } catch (error) {
-    if (timeoutSignal.aborted) throw httpError(504, 'Transfer data endpoint request timed out')
-    if (isHttpError(error)) throw error
-    throw httpError(502, 'Transfer data endpoint request failed')
+    throwTransferRequestError(error, timeoutSignal)
   }
 }
 
-export function selectPublicAddress(addresses: readonly LookupAddress[]): LookupAddress {
-  if (addresses.length === 0 || addresses.some(({ address }) => isForbiddenIpAddress(address))) {
+export async function fetchPublicHttpDownload(target: URL, authorization?: string): Promise<IncomingMessage> {
+  if (target.username || target.password) {
+    throw httpError(422, 'Transfer endpoints with embedded credentials cannot be downloaded')
+  }
+  const timeoutSignal = AbortSignal.timeout(config.transferPreview.downloadTimeoutMs)
+
+  try {
+    return await requestAllowedHttpResponse(target, authorization, timeoutSignal)
+  } catch (error) {
+    throwTransferRequestError(error, timeoutSignal)
+  }
+}
+
+export function selectPreviewAddress(addresses: readonly LookupAddress[], allowPrivate = false): LookupAddress {
+  const hasInvalidAddress = addresses.some(({ address }) => !isIP(address) || address.includes('%'))
+  if (
+    addresses.length === 0 ||
+    hasInvalidAddress ||
+    (!allowPrivate && addresses.some(({ address }) => isForbiddenIpAddress(address)))
+  ) {
     throw httpError(422, 'Transfer endpoint must resolve only to public network addresses')
   }
   return addresses[0]
+}
+
+export function isAllowedPrivatePreviewHost(hostname: string, allowedHosts: readonly string[]): boolean {
+  const normalizedHostname = normalizeHostname(hostname)
+  return allowedHosts.some((allowedHost) => normalizeHostname(allowedHost) === normalizedHostname)
 }
 
 export function isForbiddenIpAddress(address: string): boolean {
@@ -98,12 +116,23 @@ export function isForbiddenIpAddress(address: string): boolean {
   return blockedIpv6.check(address, 'ipv6')
 }
 
-async function resolvePublicAddress(hostname: string): Promise<LookupAddress> {
+async function resolvePreviewAddress(hostname: string): Promise<LookupAddress> {
   const family = isIP(hostname)
   const addresses: LookupAddress[] = family
     ? [{ address: hostname, family }]
     : await lookup(hostname, { all: true, verbatim: true })
-  return selectPublicAddress(addresses)
+  const allowPrivate = isAllowedPrivatePreviewHost(hostname, config.transferPreview.allowedPrivateHosts)
+  return selectPreviewAddress(addresses, allowPrivate)
+}
+
+async function requestAllowedHttpResponse(
+  target: URL,
+  authorization: string | undefined,
+  signal: AbortSignal,
+): Promise<IncomingMessage> {
+  const hostname = unbracket(target.hostname)
+  const resolved = await resolvePreviewAddress(hostname)
+  return requestPinnedAddress(target, hostname, resolved, authorization, signal)
 }
 
 function requestPinnedAddress(
@@ -182,6 +211,16 @@ function unbracket(hostname: string): string {
   return hostname.startsWith('[') && hostname.endsWith(']') ? hostname.slice(1, -1) : hostname
 }
 
+function normalizeHostname(hostname: string): string {
+  return unbracket(hostname.trim()).toLowerCase().replace(/\.$/, '')
+}
+
 function isHttpError(error: unknown): error is { status: number } {
   return typeof error === 'object' && error !== null && 'status' in error && typeof error.status === 'number'
+}
+
+function throwTransferRequestError(error: unknown, timeoutSignal: AbortSignal): never {
+  if (timeoutSignal.aborted) throw httpError(504, 'Transfer data endpoint request timed out')
+  if (isHttpError(error)) throw error
+  throw httpError(502, 'Transfer data endpoint request failed')
 }

@@ -1,6 +1,6 @@
 import type { LookupAddress } from 'node:dns'
 import { describe, expect, it } from 'vitest'
-import { isForbiddenIpAddress, selectPublicAddress } from './public-http-preview.js'
+import { isAllowedPrivatePreviewHost, isForbiddenIpAddress, selectPreviewAddress } from './public-http-preview.js'
 
 describe('public HTTP preview address policy', () => {
   it.each([
@@ -35,11 +35,23 @@ describe('public HTTP preview address policy', () => {
       { address: '127.0.0.1', family: 4 },
     ]
 
-    expect(() => selectPublicAddress(addresses)).toThrow('public network addresses')
+    expect(() => selectPreviewAddress(addresses)).toThrow('public network addresses')
   })
 
   it('selects a resolved public address for a pinned connection', () => {
     const address = { address: '2606:4700:4700::1111', family: 6 } satisfies LookupAddress
-    expect(selectPublicAddress([address])).toEqual(address)
+    expect(selectPreviewAddress([address])).toEqual(address)
+  })
+
+  it('selects a private address only when its hostname was explicitly allowed', () => {
+    const address = { address: '172.20.0.12', family: 4 } satisfies LookupAddress
+
+    expect(() => selectPreviewAddress([address])).toThrow('public network addresses')
+    expect(selectPreviewAddress([address], true)).toEqual(address)
+  })
+
+  it('matches allowed private hosts exactly after hostname normalization', () => {
+    expect(isAllowedPrivatePreviewHost('Provider-DID.', ['provider-did'])).toBe(true)
+    expect(isAllowedPrivatePreviewHost('provider-did.attacker.test', ['provider-did'])).toBe(false)
   })
 })

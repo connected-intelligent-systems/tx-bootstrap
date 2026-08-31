@@ -81,6 +81,12 @@ operator administration services. The shared public network simulates
 production DNS/TLS reachability between organizations and carries public DID,
 DSP, BDRS, credential, and data-plane gateway traffic.
 
+Because Docker resolves those simulated public gateway names to private bridge
+addresses, the local environment explicitly allows `provider-did` and
+`consumer-did` as transfer-preview and download targets. Other private,
+loopback, and link-local destinations remain blocked by the portal's SSRF
+protection.
+
 The bootstrap and E2E helpers are local-only exceptions: they temporarily attach
 to the networks needed to provision and verify demo state.
 

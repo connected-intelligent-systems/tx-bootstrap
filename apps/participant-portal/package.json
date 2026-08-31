@@ -1,6 +1,6 @@
 {
   "name": "@tx-bootstrap/participant-portal",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "private": true,
   "license": "MIT",
   "type": "module",
@@ -25,8 +25,7 @@
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
-    "@thingweb/open-api-converter": "1.0.0",
-    "@tx-bootstrap/core": "0.1.4",
+    "@tx-bootstrap/core": "0.1.5",
     "fastify": "^5.8.5",
     "kysely": "^0.29.2",
     "pg": "8.22.0"
@@ -44,7 +43,7 @@
     "@testing-library/jest-dom": "6.9.1",
     "@testing-library/react": "16.3.2",
     "@triply/yasgui": "4.2.28",
-    "@tx-bootstrap/ui-runtime": "0.1.4",
+    "@tx-bootstrap/ui-runtime": "0.1.5",
     "@types/jsonld": "1.5.15",
     "@types/lodash": "4.17.24",
     "@types/node": "26.1.1",
@@ -57,7 +56,6 @@
     "@uiw/react-md-editor": "4.1.1",
     "@vitejs/plugin-react": "6.0.3",
     "@vitest/coverage-v8": "4.1.10",
-    "ajv-formats-draft2019": "1.6.1",
     "countries-list": "3.4.0",
     "eslint": "^10.6.0",
     "eslint-plugin-react-hooks": "^7.1.1",
@@ -72,7 +70,6 @@
     "loupe": "3.2.1",
     "lz-string": "1.5.0",
     "node-stdlib-browser": "^1.2.1",
-    "npm": "12.0.0",
     "prettier": "^3.8.4",
     "process": "0.11.10",
     "ra-core": "5.15.0",

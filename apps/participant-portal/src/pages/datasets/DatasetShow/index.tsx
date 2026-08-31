@@ -23,7 +23,7 @@ import {
   Provenance,
   DataPrivacy,
   DataQuality,
-  ThingDescription,
+  ApiDescription,
 } from "../../../components/assets";
 import { ServiceInformation } from "../../../components/datasets";
 import { getTitleValue } from "../../../utils/multiLanguageUtils";
@@ -73,8 +73,8 @@ const hasServiceInformation = (dataset: any) => {
   );
 };
 
-const hasThingDescription = (dataset: any) => {
-  return !!dataset?.thingDescription;
+const hasApiDescription = (dataset: any) => {
+  return !!dataset?.apiDescription;
 };
 
 const hasRaw = (dataset: any) => {
@@ -168,13 +168,13 @@ export const DatasetShow = () => {
       });
     }
 
-    if (hasThingDescription(dataset)) {
+    if (hasApiDescription(dataset)) {
       allTabs.push({
-        id: "thing-description",
+        id: "api-description",
         icon: <DevicesIcon />,
-        label: translate("resources.assets.tabs.thingDescription"),
-        ariaControls: "dataset-thing-description",
-        component: <ThingDescription />,
+        label: translate("resources.assets.tabs.apiDescription"),
+        ariaControls: "dataset-api-description",
+        component: <ApiDescription />,
       });
     }
 

@@ -272,6 +272,24 @@ AUTHORIZATION="$(jq -r '.authorization // .["edc:authorization"] // .authKey // 
 [ "$AUTHORIZATION" != "null" ] && [ -n "$AUTHORIZATION" ] || { jq . "$TMPDIR/edr.json"; fail "missing EDR authorization"; }
 curl -sL "$ENDPOINT" -H "Authorization: $AUTHORIZATION" > "$TMPDIR/data.json"
 jq . "$TMPDIR/data.json" >/dev/null || { cat "$TMPDIR/data.json"; fail "data response is not JSON"; }
-ok "valid JSON data received"
+curl -fsS "${PORTAL_ADMIN_AUTH[@]}" "$CONSUMER_PORTAL/api/portal/transfers/$TRANSFER_ID/preview" > "$TMPDIR/data_preview.json"
+jq -e '.status == 200 and .truncated == false and (.body | fromjson | true)' \
+    "$TMPDIR/data_preview.json" >/dev/null || {
+    jq . "$TMPDIR/data_preview.json"
+    fail "participant portal data preview is invalid"
+}
+curl -fsS "${PORTAL_ADMIN_AUTH[@]}" \
+    -D "$TMPDIR/data_download.headers" \
+    -o "$TMPDIR/data_download.json" \
+    "$CONSUMER_PORTAL/api/portal/transfers/$TRANSFER_ID/download"
+jq . "$TMPDIR/data_download.json" >/dev/null || {
+    cat "$TMPDIR/data_download.json"
+    fail "participant portal data download is not JSON"
+}
+grep -qi '^content-disposition: attachment' "$TMPDIR/data_download.headers" || {
+    cat "$TMPDIR/data_download.headers"
+    fail "participant portal data download is missing an attachment disposition"
+}
+ok "valid JSON data received directly and through the participant portal preview and download"
 
 printf "\nE2E complete: asset=%s agreement=%s transfer=%s\n" "$ASSET_ID" "$CONTRACT_AGREEMENT_ID" "$TRANSFER_ID"

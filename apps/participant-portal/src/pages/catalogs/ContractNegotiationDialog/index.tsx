@@ -155,7 +155,7 @@ export const ContractNegotiationDialog: React.FC<ContractNegotiationDialogProps>
       maxWidth="md"
       fullWidth
       fullScreen={isMobile}
-      sx={isMobile ? {} : { '& .MuiDialog-paper': { minHeight: '70vh' } }}
+      sx={isMobile ? {} : { '& .MuiDialog-paper': { height: '70vh', maxHeight: '70vh' } }}
       aria-labelledby="dataset-dialog-title"
       aria-describedby="dataset-dialog-description"
     >
@@ -171,11 +171,14 @@ export const ContractNegotiationDialog: React.FC<ContractNegotiationDialogProps>
         </Box>
       </DialogTitle>
 
-      <DialogContent sx={{ p: 0 }} id="dataset-dialog-description">
+      <DialogContent
+        sx={{ p: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}
+        id="dataset-dialog-description"
+      >
         {step === 'view' ? (
           <DatasetDetailsView dataset={dataset} isMobile={isMobile} />
         ) : (
-          <Box sx={{ p: 3 }}>
+          <Box sx={{ p: 3, flex: 1, minHeight: 0, overflowY: 'auto' }}>
             <PolicySelectionView
               policies={policies}
               selectedPolicy={selectedPolicy}

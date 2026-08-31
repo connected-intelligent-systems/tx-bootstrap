@@ -16,7 +16,7 @@ import { Provenance } from './Provenance'
 import { DataPrivacy } from './DataPrivacy'
 import { DataQuality } from './DataQuality'
 import { DataAddress } from './DataAddress'
-import { ThingDescription } from './ThingDescription'
+import { ApiDescription } from './ApiDescription'
 
 export interface AssetSection {
   id: string
@@ -61,7 +61,7 @@ const hasDataQuality = (record: any) =>
 
 const hasDataAddress = (record: any) => !!record?.dataAddress?.type
 
-const hasThingDescription = (record: any) => !!record?.thingDescription
+const hasApiDescription = (record: any) => !!record?.apiDescription
 
 export const getAssetSections = (record: any, translate: ReturnType<typeof useTranslate>): AssetSection[] => {
   const sections: AssetSection[] = []
@@ -140,13 +140,13 @@ export const getAssetSections = (record: any, translate: ReturnType<typeof useTr
     })
   }
 
-  if (hasThingDescription(record)) {
+  if (hasApiDescription(record)) {
     sections.push({
-      id: 'thing-description',
+      id: 'api-description',
       icon: <DevicesIcon />,
-      label: translate('resources.assets.tabs.thingDescription'),
-      ariaControls: 'asset-thing-description',
-      component: <ThingDescription />,
+      label: translate('resources.assets.tabs.apiDescription'),
+      ariaControls: 'asset-api-description',
+      component: <ApiDescription />,
     })
   }
 

@@ -26,9 +26,6 @@ window.config = {
   //   },
   // },
 
-  // Optional: Public EDC endpoint for Thing Descriptions
-  // publicEdcEndpoint: "https://your-edc-endpoint.com",
-
   // Optional: Participant-side onboarding backend.
 
   // Optional: Configure custom categories with translations

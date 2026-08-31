@@ -51,9 +51,20 @@ const englishMessages: Partial<TranslationMessages> = {
         dataPrivacy: 'Data Privacy',
         dataQuality: 'Data Quality',
         dataAddress: 'Data Address',
-        thingDescription: 'Thing Description',
-        thingDescriptionTab: {
-          noDescription: 'No Thing Description available',
+        apiDescription: 'API Description',
+        apiDescriptionTab: {
+          noDescription: 'No API description available',
+          untitled: 'Untitled API',
+          version: 'Version',
+          endpointNeutralTitle: 'Endpoint-neutral catalog contract',
+          endpointNeutralDescription:
+            'This description contains no runtime endpoint or credentials. The negotiated transfer supplies them when data access is available.',
+          operations: 'Operations',
+          noOperations: 'No operations are declared in this API description.',
+          responseFormats: 'Responses',
+          showAll: 'Show all',
+          showLess: 'Show less',
+          downloadDocument: 'Download specification',
         },
         serviceInformationTab: {
           description: 'Technical service information and endpoint details for accessing this dataset.',
@@ -180,7 +191,7 @@ const englishMessages: Partial<TranslationMessages> = {
           provenance: 'Provenance',
           dataPrivacy: 'Data Privacy',
           dataQuality: 'Data Quality',
-          thingDescription: 'Thing Description',
+          apiDescription: 'API Description',
         },
         buttons: {
           back: 'Back',
@@ -367,16 +378,15 @@ const englishMessages: Partial<TranslationMessages> = {
             descriptionHelper: 'A description of the quality measurement.',
           },
         },
-        thingDescription: {
-          title: 'W3C Thing Description',
+        apiDescription: {
+          title: 'API Description',
           description:
-            'Upload a W3C Thing Description JSON file. The file will be validated against the W3C TD schema, and all href values will be automatically replaced with the public EDC endpoint before saving.',
-          uploadButton: 'Upload JSON File',
-          validating: 'Validating...',
-          viewDescription: 'View Thing Description',
+            'Upload an OpenAPI 3.x specification in JSON or YAML. Server addresses and API security settings are removed; the negotiated data-plane endpoint and authorization are applied only when access is granted.',
+          uploadButton: 'Upload OpenAPI Specification',
+          viewDescription: 'View OpenAPI Specification',
           errors: {
-            invalidJson: 'Invalid JSON format. Please check your input.',
-            validationFailed: 'Thing Description validation failed. Please fix the errors below:',
+            invalidDocument: 'Invalid JSON or YAML document. Please check your input.',
+            validationFailed: 'OpenAPI validation failed. Please fix the errors below:',
             details: 'Validation Errors:',
           },
         },
@@ -821,7 +831,7 @@ const englishMessages: Partial<TranslationMessages> = {
   datasets: {
     unnamedDataset: 'Unnamed Dataset',
     openapi: {
-      conversionError: 'Failed to convert Thing Description to OpenAPI specification',
+      conversionError: 'Failed to prepare the OpenAPI specification',
     },
   },
 }

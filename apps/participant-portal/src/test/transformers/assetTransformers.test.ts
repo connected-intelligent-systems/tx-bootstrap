@@ -42,6 +42,34 @@ describe('Asset Transformers', () => {
     expect(result.properties['dcat:mediaType']).toBe('application/json')
   })
 
+  it('should persist an endpoint-neutral API description as a JSON-LD literal', async () => {
+    const result = await serializeAssetToJsonLd({
+      id: 'weather-api',
+      title: 'Weather API',
+      abstract: 'Forecast data',
+      apiDescription: {
+        openapi: '3.1.0',
+        info: { title: 'Weather', version: '1.0.0' },
+        servers: [{ url: 'https://evil.example' }],
+        paths: { '/forecast': { get: { responses: { 200: { description: 'ok' } } } } },
+      },
+    })
+
+    const stored = JSON.parse(result.properties['txb:apiDescription'])
+    expect(stored).toMatchObject({ openapi: '3.1.0' })
+    expect(stored).not.toHaveProperty('servers')
+
+    const parsed = await parseAssetFromJsonLd({
+      '@id': 'weather-api',
+      properties: {
+        'dct:title': 'Weather API',
+        'dct:abstract': 'Forecast data',
+        'txb:apiDescription': result.properties['txb:apiDescription'],
+      },
+    })
+    expect(parsed.apiDescription).toEqual(stored)
+  })
+
   it('should expose EDC custom headers as editable form rows', async () => {
     const result = await parseAssetFromJsonLd({
       ...sampleJsonLdAsset,
@@ -103,8 +131,8 @@ describe('Asset Transformers', () => {
         type: 'ProxyHttpData',
         baseUrl: 'https://example.com/orders',
         proxyPath: 'true',
-        proxyQueryParams: 'true',
-        proxyMethod: 'true',
+        proxyQueryParams: 'false',
+        proxyMethod: 'false',
         proxyBody: 'true',
         'header:Accept': 'application/json',
         'header:X-Tenant': 'tenant-1',
@@ -114,6 +142,10 @@ describe('Asset Transformers', () => {
     expect(parsed.dataAddress).toMatchObject({
       type: 'ProxyHttpData',
       baseUrl: 'https://example.com/orders',
+      proxyPath: true,
+      proxyQueryParams: false,
+      proxyMethod: false,
+      proxyBody: true,
       'header:Accept': 'application/json',
       headers: [{ name: 'X-Tenant', value: 'tenant-1' }],
     })
@@ -124,8 +156,8 @@ describe('Asset Transformers', () => {
       type: 'ProxyHttpData',
       baseUrl: 'https://example.com/orders',
       proxyPath: 'true',
-      proxyQueryParams: 'true',
-      proxyMethod: 'true',
+      proxyQueryParams: 'false',
+      proxyMethod: 'false',
       proxyBody: 'true',
       'header:Accept': 'application/json',
       'header:X-Tenant': 'tenant-1',

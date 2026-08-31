@@ -14,9 +14,9 @@ import {
 import { getDataProductNegotiations } from './services/data-product-service.js'
 import { proxyToFederatedCatalog, proxyToManagementApi } from './services/portal-proxy-service.js'
 import { serveStaticApp } from './services/static-app-service.js'
-import { convertThingDescription } from './services/thing-description-service.js'
+import { prepareApiDescriptionOpenApi } from './services/api-description-service.js'
 import { getNetworkParticipants } from './services/network-participant-service.js'
-import { previewHttpPullTransfer } from './services/transfer-preview-service.js'
+import { downloadHttpPullTransfer, previewHttpPullTransfer } from './services/transfer-preview-service.js'
 import { resolvePrincipal, requireAdmin } from './services/auth-service.js'
 import { apiClientRouter } from './routes/api-client-routes.js'
 import participantApiOpenApi from './openapi/participant-api.openapi.json' with { type: 'json' }
@@ -64,12 +64,13 @@ function registerRoutes(app: StandardFastifyApp): void {
     async (portal) => {
       portal.addHook('preHandler', adminOnly)
       portal.get('/network-participants', getNetworkParticipants)
-      portal.post('/thing-description/convert', convertThingDescription)
+      portal.post('/api-description/openapi', prepareApiDescriptionOpenApi)
       portal.get('/data-access', getDataAccessLifecycles)
       portal.get('/data-access/:lifecycleId/:relation', getDataAccessRelatedRecords)
       portal.get('/data-access/:lifecycleId', getDataAccessLifecycle)
       portal.get('/data-products/:assetId/negotiations', getDataProductNegotiations)
       portal.get('/transfers/:transferId/preview', previewHttpPullTransfer)
+      portal.get('/transfers/:transferId/download', downloadHttpPullTransfer)
     },
     { prefix: '/api/portal' },
   )
