@@ -22,13 +22,28 @@ import { CoreAssetSchema, type CoreAsset } from './schema'
 
 const HEADER_PREFIX = 'header:'
 const ACCEPT_HEADER = 'header:Accept'
+const HTTP_PROXY_BOOLEAN_FIELDS = ['proxyPath', 'proxyQueryParams', 'proxyBody', 'proxyMethod'] as const
 
 const isHttpDataAddressType = (type: string) => type === 'HttpData' || type === 'ProxyHttpData' || type === 'http'
+
+const booleanForForm = (value: unknown): unknown => {
+  if (typeof value !== 'string') return value
+  const normalized = value.trim().toLowerCase()
+  if (normalized === 'true') return true
+  if (normalized === 'false') return false
+  return value
+}
 
 function dataAddressForForm(dataAddress: unknown): AssetDataAddress | undefined {
   if (!dataAddress || typeof dataAddress !== 'object') return undefined
 
   const address = dataAddress as AssetDataAddress
+  const formAddress = { ...address }
+  if (isHttpDataAddressType(address.type)) {
+    for (const field of HTTP_PROXY_BOOLEAN_FIELDS) {
+      if (Object.hasOwn(address, field)) formAddress[field] = booleanForForm(address[field])
+    }
+  }
   const headers = Object.entries(address)
     .filter(([key]) => key.startsWith(HEADER_PREFIX) && key.toLowerCase() !== ACCEPT_HEADER.toLowerCase())
     .map(([key, value]) => ({
@@ -36,7 +51,7 @@ function dataAddressForForm(dataAddress: unknown): AssetDataAddress | undefined 
       value: String(value),
     }))
 
-  return headers.length > 0 ? { ...address, headers } : address
+  return headers.length > 0 ? { ...formAddress, headers } : formAddress
 }
 
 function addCustomHeaders(processedAddress: AssetDataAddress, headers: AssetDataAddress['headers']): void {
