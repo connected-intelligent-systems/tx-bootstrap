@@ -16,6 +16,7 @@ export const config = {
   upstreamRequestTimeoutMs: positiveIntegerEnv('PARTICIPANT_PORTAL_UPSTREAM_TIMEOUT_MS', 10_000),
   transferPreview: {
     allowedPrivateHosts: parseCsvEnv('PARTICIPANT_PORTAL_PREVIEW_ALLOWED_PRIVATE_HOSTS', []),
+    downloadTimeoutMs: positiveIntegerEnv('PARTICIPANT_PORTAL_DOWNLOAD_TIMEOUT_MS', 300_000),
   },
   databaseUrl: process.env.DATABASE_URL ?? buildDatabaseUrl(),
   dataspaceAdminApiUrl: trimTrailingSlash(

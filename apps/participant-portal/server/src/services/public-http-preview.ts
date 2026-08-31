@@ -59,13 +59,10 @@ export async function fetchPublicHttpPreview(target: URL, authorization?: string
   if (target.username || target.password) {
     throw httpError(422, 'Transfer endpoints with embedded credentials cannot be previewed')
   }
-
-  const hostname = unbracket(target.hostname)
   const timeoutSignal = AbortSignal.timeout(config.upstreamRequestTimeoutMs)
 
   try {
-    const resolved = await resolvePreviewAddress(hostname)
-    const response = await requestPinnedAddress(target, hostname, resolved, authorization, timeoutSignal)
+    const response = await requestAllowedHttpResponse(target, authorization, timeoutSignal)
     const preview = await readPreview(response)
     const contentType = response.headers['content-type']
     return {
@@ -74,9 +71,20 @@ export async function fetchPublicHttpPreview(target: URL, authorization?: string
       ...preview,
     }
   } catch (error) {
-    if (timeoutSignal.aborted) throw httpError(504, 'Transfer data endpoint request timed out')
-    if (isHttpError(error)) throw error
-    throw httpError(502, 'Transfer data endpoint request failed')
+    throwTransferRequestError(error, timeoutSignal)
+  }
+}
+
+export async function fetchPublicHttpDownload(target: URL, authorization?: string): Promise<IncomingMessage> {
+  if (target.username || target.password) {
+    throw httpError(422, 'Transfer endpoints with embedded credentials cannot be downloaded')
+  }
+  const timeoutSignal = AbortSignal.timeout(config.transferPreview.downloadTimeoutMs)
+
+  try {
+    return await requestAllowedHttpResponse(target, authorization, timeoutSignal)
+  } catch (error) {
+    throwTransferRequestError(error, timeoutSignal)
   }
 }
 
@@ -115,6 +123,16 @@ async function resolvePreviewAddress(hostname: string): Promise<LookupAddress> {
     : await lookup(hostname, { all: true, verbatim: true })
   const allowPrivate = isAllowedPrivatePreviewHost(hostname, config.transferPreview.allowedPrivateHosts)
   return selectPreviewAddress(addresses, allowPrivate)
+}
+
+async function requestAllowedHttpResponse(
+  target: URL,
+  authorization: string | undefined,
+  signal: AbortSignal,
+): Promise<IncomingMessage> {
+  const hostname = unbracket(target.hostname)
+  const resolved = await resolvePreviewAddress(hostname)
+  return requestPinnedAddress(target, hostname, resolved, authorization, signal)
 }
 
 function requestPinnedAddress(
@@ -199,4 +217,10 @@ function normalizeHostname(hostname: string): string {
 
 function isHttpError(error: unknown): error is { status: number } {
   return typeof error === 'object' && error !== null && 'status' in error && typeof error.status === 'number'
+}
+
+function throwTransferRequestError(error: unknown, timeoutSignal: AbortSignal): never {
+  if (timeoutSignal.aborted) throw httpError(504, 'Transfer data endpoint request timed out')
+  if (isHttpError(error)) throw error
+  throw httpError(502, 'Transfer data endpoint request failed')
 }

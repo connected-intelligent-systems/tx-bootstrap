@@ -16,7 +16,7 @@ import { proxyToFederatedCatalog, proxyToManagementApi } from './services/portal
 import { serveStaticApp } from './services/static-app-service.js'
 import { prepareApiDescriptionOpenApi } from './services/api-description-service.js'
 import { getNetworkParticipants } from './services/network-participant-service.js'
-import { previewHttpPullTransfer } from './services/transfer-preview-service.js'
+import { downloadHttpPullTransfer, previewHttpPullTransfer } from './services/transfer-preview-service.js'
 import { resolvePrincipal, requireAdmin } from './services/auth-service.js'
 import { apiClientRouter } from './routes/api-client-routes.js'
 import participantApiOpenApi from './openapi/participant-api.openapi.json' with { type: 'json' }
@@ -70,6 +70,7 @@ function registerRoutes(app: StandardFastifyApp): void {
       portal.get('/data-access/:lifecycleId', getDataAccessLifecycle)
       portal.get('/data-products/:assetId/negotiations', getDataProductNegotiations)
       portal.get('/transfers/:transferId/preview', previewHttpPullTransfer)
+      portal.get('/transfers/:transferId/download', downloadHttpPullTransfer)
     },
     { prefix: '/api/portal' },
   )

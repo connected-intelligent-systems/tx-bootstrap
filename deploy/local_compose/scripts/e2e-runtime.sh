@@ -278,6 +278,18 @@ jq -e '.status == 200 and .truncated == false and (.body | fromjson | true)' \
     jq . "$TMPDIR/data_preview.json"
     fail "participant portal data preview is invalid"
 }
-ok "valid JSON data received directly and through the participant portal preview"
+curl -fsS "${PORTAL_ADMIN_AUTH[@]}" \
+    -D "$TMPDIR/data_download.headers" \
+    -o "$TMPDIR/data_download.json" \
+    "$CONSUMER_PORTAL/api/portal/transfers/$TRANSFER_ID/download"
+jq . "$TMPDIR/data_download.json" >/dev/null || {
+    cat "$TMPDIR/data_download.json"
+    fail "participant portal data download is not JSON"
+}
+grep -qi '^content-disposition: attachment' "$TMPDIR/data_download.headers" || {
+    cat "$TMPDIR/data_download.headers"
+    fail "participant portal data download is missing an attachment disposition"
+}
+ok "valid JSON data received directly and through the participant portal preview and download"
 
 printf "\nE2E complete: asset=%s agreement=%s transfer=%s\n" "$ASSET_ID" "$CONTRACT_AGREEMENT_ID" "$TRANSFER_ID"

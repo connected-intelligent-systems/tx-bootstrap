@@ -4,6 +4,7 @@ import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined'
 import VisibilityIcon from '@mui/icons-material/Visibility'
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff'
 import PlayArrowIcon from '@mui/icons-material/PlayArrow'
+import DownloadIcon from '@mui/icons-material/Download'
 import {
   Alert,
   Box,
@@ -75,6 +76,11 @@ const CopyButton = ({ value, label }: { value?: string; label: string }) => {
 export const supportsPullAccess = (transfer: TransferProcess) =>
   transfer.transferDirection.toUpperCase() === 'CONSUMER' && /-pull$/i.test(transfer.transferType || '')
 
+export const supportsHttpDownload = (transfer: TransferProcess, dataset?: Dataset, endpoint?: string) =>
+  /httpdata.*-pull$/i.test(transfer.transferType || '') &&
+  transfer.transferDirection.toUpperCase() === 'CONSUMER' &&
+  Boolean(dataset && !dataset.apiDescription && endpoint)
+
 export const TransferAccessDetailsAction = ({
   transfer,
   dataset,
@@ -100,7 +106,9 @@ export const TransferAccessDetailsAction = ({
   const supportsOpenApi =
     /httpdata.*-pull$/i.test(transfer.transferType || '') && Boolean(dataset?.apiDescription && data?.endpoint)
   const supportsHttpPreview = /httpdata.*-pull$/i.test(transfer.transferType || '') && Boolean(data?.endpoint)
+  const supportsDownload = supportsHttpDownload(transfer, dataset, data?.endpoint)
   const curlCommand = buildCurlCommand(data)
+  const downloadUrl = `/api/portal/transfers/${encodeURIComponent(transfer.id)}/download`
 
   const loadPreview = async () => {
     setPreviewing(true)
@@ -200,7 +208,7 @@ export const TransferAccessDetailsAction = ({
                           },
                         }}
                       />
-                      <Box>
+                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
                         <Button
                           variant="contained"
                           startIcon={previewing ? <CircularProgress size={18} color="inherit" /> : <PlayArrowIcon />}
@@ -209,6 +217,17 @@ export const TransferAccessDetailsAction = ({
                         >
                           {translate('portalUx.myData.previewData')}
                         </Button>
+                        {supportsDownload && (
+                          <Button
+                            component="a"
+                            href={downloadUrl}
+                            download
+                            variant="outlined"
+                            startIcon={<DownloadIcon />}
+                          >
+                            {translate('portalUx.myData.downloadData')}
+                          </Button>
+                        )}
                       </Box>
                       {previewError && <Alert severity="warning">{previewError}</Alert>}
                       {preview && (

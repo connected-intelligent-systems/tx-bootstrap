@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { buildCurlCommand, supportsPullAccess } from '../../pages/dataProducts/TransferAccessDetailsDialog'
+import {
+  buildCurlCommand,
+  supportsHttpDownload,
+  supportsPullAccess,
+} from '../../pages/dataProducts/TransferAccessDetailsDialog'
+import type { Dataset } from '../../types/catalog'
 import type { TransferProcess } from '../../types/transferProcess'
 
 const transfer = (values: Partial<TransferProcess>): TransferProcess => ({
@@ -38,5 +43,20 @@ describe('HTTP pull transfer access details', () => {
   it('does not expose access details for provider or non-pull transfers', () => {
     expect(supportsPullAccess(transfer({ transferDirection: 'PROVIDER' }))).toBe(false)
     expect(supportsPullAccess(transfer({ transferType: 'HttpData-PUSH' }))).toBe(false)
+  })
+
+  it('offers downloads only for consumer HTTP pull datasets without an API description', () => {
+    const fileDataset = { id: 'asset-1' } satisfies Dataset
+    const apiDataset = { id: 'asset-1', apiDescription: { openapi: '3.1.0', info: { title: 'API', version: '1' } } }
+
+    expect(supportsHttpDownload(transfer({}), fileDataset, 'https://example.test/file.csv')).toBe(true)
+    expect(supportsHttpDownload(transfer({}), apiDataset, 'https://example.test/api')).toBe(false)
+    expect(supportsHttpDownload(transfer({ transferDirection: 'PROVIDER' }), fileDataset, 'https://example.test')).toBe(
+      false,
+    )
+    expect(supportsHttpDownload(transfer({ transferType: 'AmazonS3-PULL' }), fileDataset, 's3://bucket/key')).toBe(
+      false,
+    )
+    expect(supportsHttpDownload(transfer({}), fileDataset)).toBe(false)
   })
 })
