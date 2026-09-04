@@ -50,6 +50,16 @@ describe('participant portal authentication', () => {
     await expect(requireAdmin(clientRequest)).rejects.toMatchObject({ status: 403 })
   })
 
+  it('enforces the application data proxy scope', async () => {
+    config.auth.mode = 'none'
+    const clientRequest = request({ authorization: `Bearer txb_${'a'.repeat(36)}.${'b'.repeat(43)}` })
+    authenticateMock.mockResolvedValueOnce({ id: 'client', name: 'Client', scopes: new Set(['data:proxy']) })
+    await expect(requireScope(clientRequest, 'data:proxy')).resolves.toMatchObject({ kind: 'api-client' })
+
+    authenticateMock.mockResolvedValueOnce({ id: 'client', name: 'Client', scopes: new Set(['transfers:read']) })
+    await expect(requireScope(clientRequest, 'data:proxy')).rejects.toMatchObject({ status: 403 })
+  })
+
   it('rejects invalid bearer tokens even when human authentication is disabled', async () => {
     config.auth.mode = 'none'
     authenticateMock.mockResolvedValue(null)

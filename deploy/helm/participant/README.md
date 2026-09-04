@@ -147,19 +147,20 @@ machine-readable participant API contract without credentials. It contains
 only gateway-allowlisted operations and identifies each operation's scope in
 `x-required-scope`.
 
-| Scope                                                           | Exposed capability                             |
-| --------------------------------------------------------------- | ---------------------------------------------- |
-| `federated-catalog:read`                                        | cached dataset search, detail, and crawl state |
-| `federated-catalog:sparql`                                      | bounded read-only SPARQL                       |
-| `catalog:read`                                                  | live EDC catalog/dataset requests              |
-| `assets:read`, `assets:write`                                   | asset query/get and mutations                  |
-| `policies:read`, `policies:write`                               | policy query/get and mutations                 |
-| `business-partner-groups:read`, `business-partner-groups:write` | partner-group reads and mutations              |
-| `contract-definitions:read`, `contract-definitions:write`       | offer-definition reads and mutations           |
-| `contract-negotiations:read`, `contract-negotiations:write`     | negotiation query/get and initiate/terminate   |
-| `contract-agreements:read`, `contract-agreements:retire`        | agreement reads and retirement/reactivation    |
-| `transfers:read`, `transfers:write`                             | transfer query/get and start/terminate         |
-| `edr:data-address:read`                                         | EDR data-address credentials                   |
+| Scope                                                           | Exposed capability                              |
+| --------------------------------------------------------------- | ----------------------------------------------- |
+| `federated-catalog:read`                                        | cached dataset search, detail, and crawl state  |
+| `federated-catalog:sparql`                                      | bounded read-only SPARQL                        |
+| `catalog:read`                                                  | live EDC catalog/dataset requests               |
+| `assets:read`, `assets:write`                                   | asset query/get and mutations                   |
+| `policies:read`, `policies:write`                               | policy query/get and mutations                  |
+| `business-partner-groups:read`, `business-partner-groups:write` | partner-group reads and mutations               |
+| `contract-definitions:read`, `contract-definitions:write`       | offer-definition reads and mutations            |
+| `contract-negotiations:read`, `contract-negotiations:write`     | negotiation query/get and initiate/terminate    |
+| `contract-agreements:read`, `contract-agreements:retire`        | agreement reads and retirement/reactivation     |
+| `transfers:read`, `transfers:write`                             | transfer query/get and start/terminate          |
+| `data:proxy`                                                    | authenticated HTTP access through consumer EDRs |
+| `edr:data-address:read`                                         | EDR data-address credentials                    |
 
 QuerySpec `POST .../request` operations count as reads. Generic agreement
 mutations, generic negotiation/transfer CRUD, DSP proxying, and unmapped EDC

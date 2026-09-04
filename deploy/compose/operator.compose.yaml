@@ -173,7 +173,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          "wget -q --spider http://localhost:8080/api/check/startup || exit 1",
+          "wget -q --spider http://localhost:8080/api/check/readiness || exit 1",
         ]
       interval: 10s
       timeout: 5s

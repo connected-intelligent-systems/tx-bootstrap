@@ -144,6 +144,66 @@
     },
     {
       "method": "GET",
+      "path": "/api/data/{transferProcessId}",
+      "scope": "data:proxy"
+    },
+    {
+      "method": "HEAD",
+      "path": "/api/data/{transferProcessId}",
+      "scope": "data:proxy"
+    },
+    {
+      "method": "POST",
+      "path": "/api/data/{transferProcessId}",
+      "scope": "data:proxy"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/data/{transferProcessId}",
+      "scope": "data:proxy"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/data/{transferProcessId}",
+      "scope": "data:proxy"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/data/{transferProcessId}",
+      "scope": "data:proxy"
+    },
+    {
+      "method": "GET",
+      "path": "/api/data/{transferProcessId}/{path}",
+      "scope": "data:proxy"
+    },
+    {
+      "method": "HEAD",
+      "path": "/api/data/{transferProcessId}/{path}",
+      "scope": "data:proxy"
+    },
+    {
+      "method": "POST",
+      "path": "/api/data/{transferProcessId}/{path}",
+      "scope": "data:proxy"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/data/{transferProcessId}/{path}",
+      "scope": "data:proxy"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/data/{transferProcessId}/{path}",
+      "scope": "data:proxy"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/data/{transferProcessId}/{path}",
+      "scope": "data:proxy"
+    },
+    {
+      "method": "GET",
       "path": "/api/federated-catalog/v1/datasets",
       "scope": "federated-catalog:read"
     },

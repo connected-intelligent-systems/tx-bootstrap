@@ -9,6 +9,7 @@ import {
   Alert,
   Box,
   Button,
+  Chip,
   CircularProgress,
   Dialog,
   DialogActions,
@@ -20,6 +21,7 @@ import {
   Tabs,
   TextField,
   Tooltip,
+  Typography,
 } from '@mui/material'
 import { RecordContextProvider, useGetOne, useNotify, useTranslate } from 'react-admin'
 import type { Dataset } from '../../types/catalog'
@@ -43,6 +45,18 @@ export const buildCurlCommand = (data?: TransferDataAddress) => {
   if (!data?.endpoint) return ''
   const authorization = data.authorization ? ` -H ${shellQuote(`Authorization: ${data.authorization}`)}` : ''
   return `curl --fail-with-body${authorization} ${shellQuote(data.endpoint)}`
+}
+
+export const buildParticipantProxyPath = (transferProcessId: string) =>
+  `/api/data/${encodeURIComponent(transferProcessId)}`
+
+export const buildParticipantProxyCurlCommand = (transferProcessId: string) => {
+  const path = buildParticipantProxyPath(transferProcessId)
+  return [
+    'export PARTICIPANT_API_BASE=https://participant-api.example',
+    'export PARTICIPANT_API_TOKEN=txb_...',
+    `curl --fail-with-body -H "Authorization: Bearer \${PARTICIPANT_API_TOKEN}" "\${PARTICIPANT_API_BASE}${path}"`,
+  ].join('\n')
 }
 
 interface TransferPreview {
@@ -76,10 +90,20 @@ const CopyButton = ({ value, label }: { value?: string; label: string }) => {
 export const supportsPullAccess = (transfer: TransferProcess) =>
   transfer.transferDirection.toUpperCase() === 'CONSUMER' && /-pull$/i.test(transfer.transferType || '')
 
-export const supportsHttpDownload = (transfer: TransferProcess, dataset?: Dataset, endpoint?: string) =>
+export const supportsHttpProxy = (transfer: TransferProcess) =>
+  /httpdata.*-pull$/i.test(transfer.transferType || '') && transfer.transferDirection.toUpperCase() === 'CONSUMER'
+
+export const supportsHttpDownload = (transfer: TransferProcess, dataset?: Dataset) =>
   /httpdata.*-pull$/i.test(transfer.transferType || '') &&
   transfer.transferDirection.toUpperCase() === 'CONSUMER' &&
-  Boolean(dataset && !dataset.apiDescription && endpoint)
+  Boolean(dataset && !dataset.apiDescription)
+
+export type TransferAccessTab = 'proxy' | 'preview' | 'openapi' | 'direct'
+
+export const transferAccessTabs = (transfer: TransferProcess, dataset?: Dataset): TransferAccessTab[] => {
+  if (!supportsHttpProxy(transfer)) return ['direct']
+  return ['proxy', 'preview', ...(dataset?.apiDescription ? (['openapi'] as const) : []), 'direct']
+}
 
 export const TransferAccessDetailsAction = ({
   transfer,
@@ -89,8 +113,10 @@ export const TransferAccessDetailsAction = ({
   dataset?: Dataset
 }) => {
   const translate = useTranslate()
+  const httpProxySupported = supportsHttpProxy(transfer)
+  const availableTabs = transferAccessTabs(transfer, dataset)
   const [open, setOpen] = useState(false)
-  const [tab, setTab] = useState<'access' | 'openapi'>('access')
+  const [tab, setTab] = useState<TransferAccessTab>(availableTabs[0])
   const [showToken, setShowToken] = useState(false)
   const [preview, setPreview] = useState<TransferPreview>()
   const [previewError, setPreviewError] = useState<string>()
@@ -98,16 +124,19 @@ export const TransferAccessDetailsAction = ({
   const { data, error, isPending, refetch } = useGetOne<TransferDataAddress>(
     'datarequests',
     { id: transfer.id },
-    { enabled: open },
+    { enabled: open && tab === 'direct' },
   )
 
   if (!supportsPullAccess(transfer)) return null
 
-  const supportsOpenApi =
-    /httpdata.*-pull$/i.test(transfer.transferType || '') && Boolean(dataset?.apiDescription && data?.endpoint)
-  const supportsHttpPreview = /httpdata.*-pull$/i.test(transfer.transferType || '') && Boolean(data?.endpoint)
-  const supportsDownload = supportsHttpDownload(transfer, dataset, data?.endpoint)
+  const supportsDownload = supportsHttpDownload(transfer, dataset)
   const curlCommand = buildCurlCommand(data)
+  const proxyPath = buildParticipantProxyPath(transfer.id)
+  const proxyCurlCommand = buildParticipantProxyCurlCommand(transfer.id)
+  const proxyEndpoint = new URL(
+    proxyPath,
+    typeof window === 'undefined' ? 'http://localhost' : window.location.origin,
+  ).toString()
   const downloadUrl = `/api/portal/transfers/${encodeURIComponent(transfer.id)}/download`
 
   const loadPreview = async () => {
@@ -128,7 +157,7 @@ export const TransferAccessDetailsAction = ({
 
   const close = () => {
     setOpen(false)
-    setTab('access')
+    setTab(availableTabs[0])
     setShowToken(false)
     setPreview(undefined)
     setPreviewError(undefined)
@@ -149,15 +178,127 @@ export const TransferAccessDetailsAction = ({
         </DialogTitle>
         <Tabs
           value={tab}
-          onChange={(_, value: 'access' | 'openapi') => setTab(value)}
+          onChange={(_, value: TransferAccessTab) => setTab(value)}
           sx={{ px: 3, borderBottom: 1, borderColor: 'divider' }}
+          variant="scrollable"
+          scrollButtons="auto"
         >
-          <Tab value="access" label={translate('portalUx.myData.accessDetails')} />
-          {supportsOpenApi && <Tab value="openapi" label={translate('portalUx.myData.openapi')} />}
+          {availableTabs.map((value) => (
+            <Tab
+              key={value}
+              value={value}
+              label={translate(
+                value === 'proxy'
+                  ? 'portalUx.myData.applicationProxy'
+                  : value === 'preview'
+                    ? supportsDownload
+                      ? 'portalUx.myData.previewAndDownload'
+                      : 'portalUx.myData.previewData'
+                    : value === 'openapi'
+                      ? 'portalUx.myData.openapi'
+                      : httpProxySupported
+                        ? 'portalUx.myData.directEdr'
+                        : 'portalUx.myData.accessDetails',
+              )}
+            />
+          ))}
         </Tabs>
         <DialogContent dividers sx={{ minHeight: 360 }}>
-          {tab === 'access' && (
+          {tab === 'proxy' && (
+            <Box sx={{ display: 'grid', gap: 2 }}>
+              <Alert severity="success">{translate('portalUx.myData.proxyRecommended')}</Alert>
+              <TextField
+                label={translate('portalUx.myData.proxyPath')}
+                value={proxyPath}
+                helperText={translate('portalUx.myData.proxyPathHelp')}
+                fullWidth
+                slotProps={{
+                  input: {
+                    readOnly: true,
+                    endAdornment: <CopyButton value={proxyPath} label={translate('portalUx.myData.proxyPath')} />,
+                  },
+                }}
+              />
+              <Box>
+                <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                  {translate('portalUx.myData.supportedMethods')}
+                </Typography>
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                  {['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE'].map((method) => (
+                    <Chip key={method} label={method} size="small" variant="outlined" />
+                  ))}
+                  <Chip label="data:proxy" size="small" color="primary" />
+                </Box>
+              </Box>
+              <TextField
+                label={translate('portalUx.myData.proxyCurlCommand')}
+                value={proxyCurlCommand}
+                helperText={translate('portalUx.myData.proxyCurlHelp')}
+                fullWidth
+                multiline
+                minRows={4}
+                slotProps={{
+                  input: {
+                    readOnly: true,
+                    endAdornment: (
+                      <CopyButton value={proxyCurlCommand} label={translate('portalUx.myData.proxyCurlCommand')} />
+                    ),
+                  },
+                }}
+              />
+            </Box>
+          )}
+          {tab === 'preview' && (
+            <Box sx={{ display: 'grid', gap: 2 }}>
+              <Alert severity="info">{translate('portalUx.myData.previewProxyDescription')}</Alert>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                <Button
+                  variant="contained"
+                  startIcon={previewing ? <CircularProgress size={18} color="inherit" /> : <PlayArrowIcon />}
+                  disabled={previewing}
+                  onClick={() => void loadPreview()}
+                >
+                  {translate('portalUx.myData.previewData')}
+                </Button>
+                {supportsDownload && (
+                  <Button component="a" href={downloadUrl} download variant="outlined" startIcon={<DownloadIcon />}>
+                    {translate('portalUx.myData.downloadData')}
+                  </Button>
+                )}
+              </Box>
+              {previewError && <Alert severity="warning">{previewError}</Alert>}
+              {preview && (
+                <Box>
+                  <Alert
+                    severity={preview.status >= 200 && preview.status < 300 ? 'success' : 'warning'}
+                    sx={{ mb: 1 }}
+                  >
+                    {translate('portalUx.myData.previewStatus', {
+                      status: preview.status,
+                      contentType: preview.contentType,
+                    })}
+                    {preview.truncated ? ` · ${translate('portalUx.myData.previewTruncated')}` : ''}
+                  </Alert>
+                  <TextField
+                    label={translate('portalUx.myData.responsePreview')}
+                    value={preview.body}
+                    fullWidth
+                    multiline
+                    minRows={6}
+                    maxRows={18}
+                    slotProps={{ input: { readOnly: true } }}
+                  />
+                </Box>
+              )}
+            </Box>
+          )}
+          {tab === 'direct' && (
             <>
+              {httpProxySupported && (
+                <Alert severity="warning" sx={{ mb: 2 }}>
+                  {translate('portalUx.myData.directEdrWarning')}
+                </Alert>
+              )}
               {isPending && (
                 <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
                   <CircularProgress />
@@ -191,69 +332,22 @@ export const TransferAccessDetailsAction = ({
                       },
                     }}
                   />
-                  {supportsHttpPreview && (
-                    <Box sx={{ display: 'grid', gap: 2 }}>
-                      <TextField
-                        label={translate('portalUx.myData.curlCommand')}
-                        value={curlCommand}
-                        fullWidth
-                        multiline
-                        minRows={2}
-                        slotProps={{
-                          input: {
-                            readOnly: true,
-                            endAdornment: (
-                              <CopyButton value={curlCommand} label={translate('portalUx.myData.curlCommand')} />
-                            ),
-                          },
-                        }}
-                      />
-                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                        <Button
-                          variant="contained"
-                          startIcon={previewing ? <CircularProgress size={18} color="inherit" /> : <PlayArrowIcon />}
-                          disabled={previewing}
-                          onClick={() => void loadPreview()}
-                        >
-                          {translate('portalUx.myData.previewData')}
-                        </Button>
-                        {supportsDownload && (
-                          <Button
-                            component="a"
-                            href={downloadUrl}
-                            download
-                            variant="outlined"
-                            startIcon={<DownloadIcon />}
-                          >
-                            {translate('portalUx.myData.downloadData')}
-                          </Button>
-                        )}
-                      </Box>
-                      {previewError && <Alert severity="warning">{previewError}</Alert>}
-                      {preview && (
-                        <Box>
-                          <Alert
-                            severity={preview.status >= 200 && preview.status < 300 ? 'success' : 'warning'}
-                            sx={{ mb: 1 }}
-                          >
-                            {translate('portalUx.myData.previewStatus', {
-                              status: preview.status,
-                              contentType: preview.contentType,
-                            })}
-                            {preview.truncated ? ` · ${translate('portalUx.myData.previewTruncated')}` : ''}
-                          </Alert>
-                          <TextField
-                            label={translate('portalUx.myData.responsePreview')}
-                            value={preview.body}
-                            fullWidth
-                            multiline
-                            minRows={6}
-                            maxRows={18}
-                            slotProps={{ input: { readOnly: true } }}
-                          />
-                        </Box>
-                      )}
-                    </Box>
+                  {data.endpoint && (
+                    <TextField
+                      label={translate('portalUx.myData.curlCommand')}
+                      value={curlCommand}
+                      fullWidth
+                      multiline
+                      minRows={2}
+                      slotProps={{
+                        input: {
+                          readOnly: true,
+                          endAdornment: (
+                            <CopyButton value={curlCommand} label={translate('portalUx.myData.curlCommand')} />
+                          ),
+                        },
+                      }}
+                    />
                   )}
                   <TextField
                     label={translate('portalUx.myData.authenticationType')}
@@ -309,7 +403,7 @@ export const TransferAccessDetailsAction = ({
                   </Box>
                 }
               >
-                <OpenAPIViewer authToken={data?.authorization} endpoint={data?.endpoint} />
+                <OpenAPIViewer endpoint={proxyEndpoint} useBrowserCredentials />
               </Suspense>
             </RecordContextProvider>
           )}

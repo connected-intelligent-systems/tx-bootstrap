@@ -365,6 +365,9 @@ services:
       PARTICIPANT_PORTAL_UPSTREAM_TIMEOUT_MS: "${PARTICIPANT_PORTAL_UPSTREAM_TIMEOUT_MS:-10000}"
       PARTICIPANT_PORTAL_PREVIEW_ALLOWED_PRIVATE_HOSTS: "${PARTICIPANT_PORTAL_PREVIEW_ALLOWED_PRIVATE_HOSTS:-}"
       PARTICIPANT_PORTAL_DOWNLOAD_TIMEOUT_MS: "${PARTICIPANT_PORTAL_DOWNLOAD_TIMEOUT_MS:-300000}"
+      PARTICIPANT_PORTAL_DATA_PROXY_ALLOWED_PRIVATE_HOSTS: "${PARTICIPANT_PORTAL_DATA_PROXY_ALLOWED_PRIVATE_HOSTS:-${PARTICIPANT_PORTAL_PREVIEW_ALLOWED_PRIVATE_HOSTS:-}}"
+      PARTICIPANT_PORTAL_DATA_PROXY_TIMEOUT_MS: "${PARTICIPANT_PORTAL_DATA_PROXY_TIMEOUT_MS:-300000}"
+      PARTICIPANT_PORTAL_DATA_PROXY_MAX_REQUEST_BYTES: "${PARTICIPANT_PORTAL_DATA_PROXY_MAX_REQUEST_BYTES:-52428800}"
       PORTAL_TITLE: "${PORTAL_TITLE:-Participant Portal}"
       PARTICIPANT_PORTAL_NAME: "${PARTICIPANT_PORTAL_NAME:-${PORTAL_TITLE:-Participant Portal}}"
       DATABASE_URL: "${PARTICIPANT_PORTAL_DATABASE_URL:?PARTICIPANT_PORTAL_DATABASE_URL must be set}"
@@ -559,6 +562,20 @@ configs:
               proxy_pass http://${PARTICIPANT_ROLE:?PARTICIPANT_ROLE must be set}-controlplane:8085/.well-known/api/;
               proxy_set_header Host $$host;
               proxy_set_header X-Real-IP $$remote_addr;
+          }
+
+          location ^~ /api/data/ {
+              client_max_body_size ${PARTICIPANT_PORTAL_DATA_PROXY_MAX_REQUEST_BYTES:-52428800};
+              proxy_pass $$portal_backend;
+              proxy_http_version 1.1;
+              proxy_request_buffering off;
+              proxy_buffering off;
+              proxy_read_timeout ${PARTICIPANT_PORTAL_DATA_PROXY_TIMEOUT_MS:-300000}ms;
+              proxy_send_timeout ${PARTICIPANT_PORTAL_DATA_PROXY_TIMEOUT_MS:-300000}ms;
+              proxy_set_header Host $$host;
+              proxy_set_header X-Real-IP $$remote_addr;
+              proxy_set_header X-Forwarded-For $$proxy_add_x_forwarded_for;
+              proxy_set_header X-Forwarded-Proto $$scheme;
           }
 
           location / {

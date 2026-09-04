@@ -19,6 +19,7 @@ export const API_CLIENT_SCOPES = [
   'contract-agreements:retire',
   'transfers:read',
   'transfers:write',
+  'data:proxy',
   'edr:data-address:read',
 ] as const
 

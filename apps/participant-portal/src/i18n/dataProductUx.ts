@@ -21,10 +21,24 @@ export const dataProductUxEnglish = {
       datasetUnavailable: 'No catalog metadata is available for this data access record.',
       openapi: 'OpenAPI',
       openapiDescription:
-        'The API contract is endpoint-neutral. Requests are restricted to the negotiated data-plane endpoint.',
+        'The API contract runs through the participant proxy. Requests remain restricted to this transfer and the browser never receives the EDR token.',
       noMatchesText: 'Choose another status or clear the filter to see other data access records.',
       clearFilters: 'Clear filters',
       accessDetails: 'Access details',
+      applicationProxy: 'Application proxy',
+      previewAndDownload: 'Preview & download',
+      directEdr: 'Direct EDR',
+      proxyRecommended:
+        'Recommended for applications: authenticate to the participant API with a client token scoped to data:proxy. The participant resolves and refreshes the EDR without exposing provider credentials.',
+      proxyPath: 'Participant proxy path',
+      proxyPathHelp: 'Append API path segments and query parameters to this path on the participant API gateway.',
+      supportedMethods: 'Supported methods and required scope',
+      proxyCurlCommand: 'Application curl template',
+      proxyCurlHelp: 'Set the participant API gateway base URL and an API-client token before running this command.',
+      previewProxyDescription:
+        'Preview and download are performed by the participant backend. The browser does not receive the EDR authorization token.',
+      directEdrWarning:
+        'Advanced compatibility access. These provider endpoint and authorization values are credentials; prefer the application proxy and do not place them in application configuration or logs.',
       accessDetailsUnavailable: 'Access details are not available yet. The transfer may still be provisioning them.',
       endpoint: 'Endpoint',
       authenticationType: 'Authentication type',
@@ -69,10 +83,26 @@ export const dataProductUxGerman = {
       datasetUnavailable: 'Für diesen Datenzugriff sind keine Katalogmetadaten verfügbar.',
       openapi: 'OpenAPI',
       openapiDescription:
-        'Der API-Vertrag ist endpunktneutral. Anfragen sind auf den ausgehandelten Data-Plane-Endpunkt beschränkt.',
+        'Der API-Vertrag wird über den Teilnehmer-Proxy ausgeführt. Anfragen bleiben auf diesen Transfer beschränkt und der Browser erhält das EDR-Token nicht.',
       noMatchesText: 'Wählen Sie einen anderen Status oder entfernen Sie den Filter.',
       clearFilters: 'Filter entfernen',
       accessDetails: 'Zugriffsdaten',
+      applicationProxy: 'Anwendungs-Proxy',
+      previewAndDownload: 'Vorschau & Download',
+      directEdr: 'Direkte EDR',
+      proxyRecommended:
+        'Für Anwendungen empfohlen: Authentifizieren Sie sich mit einem Client-Token mit dem Scope data:proxy an der Teilnehmer-API. Der Teilnehmer löst und erneuert die EDR, ohne Anbieter-Zugangsdaten offenzulegen.',
+      proxyPath: 'Teilnehmer-Proxy-Pfad',
+      proxyPathHelp:
+        'Hängen Sie API-Pfadsegmente und Query-Parameter an diesen Pfad auf dem Gateway der Teilnehmer-API an.',
+      supportedMethods: 'Unterstützte Methoden und benötigter Scope',
+      proxyCurlCommand: 'curl-Vorlage für Anwendungen',
+      proxyCurlHelp:
+        'Setzen Sie die Basis-URL des Teilnehmer-API-Gateways und ein API-Client-Token, bevor Sie diesen Befehl ausführen.',
+      previewProxyDescription:
+        'Vorschau und Download werden vom Teilnehmer-Backend ausgeführt. Der Browser erhält das EDR-Autorisierungstoken nicht.',
+      directEdrWarning:
+        'Erweiterter Kompatibilitätszugriff. Anbieter-Endpunkt und Autorisierungswerte sind Zugangsdaten; verwenden Sie bevorzugt den Anwendungs-Proxy und übernehmen Sie diese Werte nicht in Anwendungskonfigurationen oder Logs.',
       accessDetailsUnavailable:
         'Die Zugriffsdaten sind noch nicht verfügbar. Der Transfer wird möglicherweise noch bereitgestellt.',
       endpoint: 'Endpunkt',

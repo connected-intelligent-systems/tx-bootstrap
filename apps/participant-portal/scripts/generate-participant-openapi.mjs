@@ -37,6 +37,7 @@ for (const operation of manifest.operations.filter(({ path }) => path.startsWith
 
 const referencedComponents = collectReferencedComponents(paths, upstream.components ?? {})
 Object.assign(paths, federatedCatalogPaths())
+Object.assign(paths, dataProxyPaths())
 
 const scopes = [...new Set(manifest.operations.map(({ scope }) => scope))]
 const document = {
@@ -56,6 +57,7 @@ const document = {
   tags: [
     { name: 'Federated Catalog', description: 'Search the participant-local catalog cache.' },
     { name: 'Federated Catalog SPARQL', description: 'Run bounded, read-only semantic queries.' },
+    { name: 'Data Access Proxy', description: 'Use negotiated HTTP data without handling EDR credentials.' },
   ],
   paths,
   components: {
@@ -240,6 +242,55 @@ function federatedCatalogPaths() {
       }),
     },
   }
+}
+
+function dataProxyPaths() {
+  const paths = {}
+  const proxyOperations = manifest.operations.filter(({ path }) => path.startsWith('/api/data/'))
+  for (const operation of proxyOperations) {
+    const method = operation.method.toLowerCase()
+    const hasWildcard = operation.path.endsWith('/{path}')
+    const parameters = [
+      pathParameter('transferProcessId', 'Consumer transfer-process identifier whose EDR authorizes the request.'),
+      ...(hasWildcard
+        ? [
+            {
+              ...pathParameter('path', 'Remaining upstream path. It may contain multiple slash-separated segments.'),
+              allowReserved: true,
+              schema: { type: 'string', minLength: 1 },
+              'x-greedy-path': true,
+            },
+          ]
+        : []),
+    ]
+    const supportsBody = ['post', 'put', 'patch', 'delete'].includes(method)
+    const documentedOperation = protectedOperation(operation.scope, {
+      tags: ['Data Access Proxy'],
+      summary: `${operation.method} negotiated HTTP data`,
+      description:
+        'Resolves and refreshes the transfer EDR inside the participant, replaces the local bearer token with the EDR authorization, and streams the provider response.',
+      operationId: `${method}TransferData${hasWildcard ? 'Path' : 'Root'}`,
+      parameters,
+      ...(supportsBody
+        ? {
+            requestBody: {
+              required: false,
+              content: { '*/*': { schema: { type: 'string', format: 'binary' } } },
+            },
+          }
+        : {}),
+      responses: {
+        200: { description: 'Provider response. Status, media type, and body are passed through.' },
+        405: gatewayErrorResponse('The HTTP method is not supported by the participant data proxy.'),
+        413: gatewayErrorResponse('The request body exceeds the configured proxy limit.'),
+        422: gatewayErrorResponse('The EDR endpoint or requested path is invalid or unsafe.'),
+        502: gatewayErrorResponse('EDR resolution or the provider request failed.'),
+        504: gatewayErrorResponse('The provider request exceeded the configured timeout.'),
+      },
+    })
+    ;(paths[operation.path] ??= {})[method] = documentedOperation
+  }
+  return paths
 }
 
 function queryParameter(name, description, schema) {

@@ -19,10 +19,16 @@ import { getNetworkParticipants } from './services/network-participant-service.j
 import { downloadHttpPullTransfer, previewHttpPullTransfer } from './services/transfer-preview-service.js'
 import { resolvePrincipal, requireAdmin } from './services/auth-service.js'
 import { apiClientRouter } from './routes/api-client-routes.js'
+import { dataProxyRouter } from './routes/data-proxy-routes.js'
 import participantApiOpenApi from './openapi/participant-api.openapi.json' with { type: 'json' }
 
 export function createApp() {
-  const app = createStandardFastifyApp({ logLevel: config.logLevel })
+  const app = createStandardFastifyApp({
+    logLevel: config.logLevel,
+    // Proxy query values may contain provider-specific secrets. The proxy emits
+    // its own structured completion record without the URL or query string.
+    disableRequestLogging: (request) => request.url === '/api/data' || request.url.startsWith('/api/data/'),
+  })
   registerAppPlugins(app, config)
   app.after(() => registerRoutes(app))
   return app
@@ -75,6 +81,7 @@ function registerRoutes(app: StandardFastifyApp): void {
     { prefix: '/api/portal' },
   )
   app.register(apiClientRouter, { prefix: '/api/portal' })
+  app.register(dataProxyRouter, { prefix: '/api/data' })
 
   app.all('/api/management', proxyToManagementApi)
   app.all('/api/management/*', proxyToManagementApi)

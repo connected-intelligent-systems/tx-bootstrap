@@ -222,6 +222,10 @@ portal:
   title: Participant Portal
   name: Participant Portal
   upstreamTimeoutMs: 10000
+  dataProxy:
+    timeoutMs: 300000
+    maxRequestBytes: 52428800
+    allowedPrivateHosts: []
   httpsHeaders: true
   rateLimit:
     enabled: true
