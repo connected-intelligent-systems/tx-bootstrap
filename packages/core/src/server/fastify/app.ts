@@ -3,7 +3,7 @@ import helmet, { type FastifyHelmetOptions } from "@fastify/helmet";
 import rateLimit, { type RateLimitPluginOptions } from "@fastify/rate-limit";
 import swagger, { type SwaggerOptions } from "@fastify/swagger";
 import swaggerUi, { type FastifySwaggerUiOptions } from "@fastify/swagger-ui";
-import fastify, { LogController } from "fastify";
+import fastify, { LogController, type FastifyRequest } from "fastify";
 import { ZodError } from "zod";
 import {
   serializerCompiler,
@@ -20,6 +20,7 @@ type StandardErrorHandlerApp = Pick<StandardFastifyApp, "setErrorHandler">;
 export type CreateStandardFastifyAppOptions = {
   logLevel: LogLevel;
   prettyLogs?: boolean;
+  disableRequestLogging?: boolean | ((request: FastifyRequest) => boolean);
 };
 
 export type StandardErrorHandlerOptions = {
@@ -46,6 +47,7 @@ export const standardSwaggerUiOptions = {
 export function createStandardFastifyApp({
   logLevel,
   prettyLogs = process.env.NODE_ENV === "development",
+  disableRequestLogging = false,
 }: CreateStandardFastifyAppOptions) {
   const app = fastify({
     logger: {
@@ -63,7 +65,7 @@ export function createStandardFastifyApp({
     },
     logController: new LogController({
       requestIdLogLabel: "reqId",
-      disableRequestLogging: false,
+      disableRequestLogging,
     }),
   }).withTypeProvider<ZodTypeProvider>();
 

@@ -2,8 +2,8 @@ apiVersion: v2
 name: tx-bootstrap-participant
 description: Tractus-X participant services for tx-bootstrap
 type: application
-version: 0.1.5
-appVersion: "0.1.5"
+version: 0.1.6
+appVersion: "0.1.6"
 kubeVersion: ">=1.27.0-0"
 home: https://github.com/connected-intelligent-systems/tx-bootstrap
 sources:

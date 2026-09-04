@@ -9,7 +9,7 @@ PROVIDER_DID_HOST="${PROVIDER_DID_HOST:-provider-did}"
 CONSUMER_DID_HOST="${CONSUMER_DID_HOST:-consumer-did}"
 BDRS_API_KEY="${BDRS_API_KEY:-password}"
 EDC_API_KEY="${EDC_API_KEY:-password}"
-PROVIDER_DEMO_ASSET_URL="${PROVIDER_DEMO_ASSET_URL:-https://jsonplaceholder.typicode.com/todos/1}"
+PROVIDER_DEMO_ASSET_URL="${PROVIDER_DEMO_ASSET_URL:-http://demo-data-api:8080/data}"
 CREDENTIAL_POLL_INTERVAL="${CREDENTIAL_POLL_INTERVAL:-3}"
 CREDENTIAL_POLL_RETRIES="${CREDENTIAL_POLL_RETRIES:-30}"
 
@@ -149,7 +149,7 @@ step "Waiting for services"
 wait_for_health "issuer Identity Hub" "http://issuer-identityhub:8081/api/check/readiness"
 wait_for_health "provider Identity Hub" "http://provider-identityhub:8081/api/check/readiness"
 wait_for_health "consumer Identity Hub" "http://consumer-identityhub:8081/api/check/readiness"
-wait_for_health "BDRS" "http://bdrs-server:8080/api/check/startup"
+wait_for_health "BDRS" "http://bdrs-server:8080/api/check/readiness"
 wait_for_health "provider control plane" "http://provider-controlplane:8080/api/check/health"
 wait_for_health "consumer control plane" "http://consumer-controlplane:8080/api/check/health"
 wait_for_health "provider data plane" "http://provider-dataplane:8080/api/check/startup"
@@ -184,8 +184,12 @@ asset_body="$(jq -n --arg url "$PROVIDER_DEMO_ASSET_URL" '{
         description: "Infrastructure-only E2E test dataset"
     },
     dataAddress: {
-        type: "HttpData",
-        baseUrl: $url
+        type: "ProxyHttpData",
+        baseUrl: $url,
+        proxyPath: "true",
+        proxyQueryParams: "true",
+        proxyMethod: "true",
+        proxyBody: "true"
     }
 }')"
 http_code="$(curl -s -o /dev/null -w "%{http_code}" \
@@ -193,7 +197,14 @@ http_code="$(curl -s -o /dev/null -w "%{http_code}" \
     -H "Content-Type: application/json" \
     -H "X-Api-Key: ${EDC_API_KEY}" \
     -d "$asset_body" 2>/dev/null || true)"
-case "$http_code" in 200|204|409) ok "provider asset ready" ;; *) fail "asset creation failed with HTTP ${http_code}" ;; esac
+if [ "$http_code" = "409" ]; then
+    http_code="$(curl -s -o /dev/null -w "%{http_code}" \
+        -X PUT "${PROVIDER_MGMT_URL}/management/v3/assets" \
+        -H "Content-Type: application/json" \
+        -H "X-Api-Key: ${EDC_API_KEY}" \
+        -d "$asset_body" 2>/dev/null || true)"
+fi
+case "$http_code" in 200|204) ok "provider asset ready" ;; *) fail "asset creation or update failed with HTTP ${http_code}" ;; esac
 
 membership_policy='{
   "@context": [

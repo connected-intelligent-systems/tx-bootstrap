@@ -1,27 +1,14 @@
 import type { FastifyReply, FastifyRequest } from 'fastify'
-import { config } from '../config/index.js'
-import { fetchUpstream } from '../lib/http-client.js'
+import { resolveHttpEndpointDataReference } from './edr-service.js'
 import { fetchPublicHttpDownload, fetchPublicHttpPreview } from './public-http-preview.js'
-
-type DataAddress = Record<string, unknown>
-
-const property = (record: DataAddress, name: string): string | undefined => {
-  const value =
-    record[name] ?? Object.entries(record).find(([key]) => key.endsWith('/' + name) || key.endsWith('#' + name))?.[1]
-  return typeof value === 'string' && value ? value : undefined
-}
-
-type TransferEndpoint = { target: URL; authorization?: string }
-type TransferEndpointError = { status: number; error: string }
 
 export async function previewHttpPullTransfer(
   request: FastifyRequest<{ Params: { transferId: string } }>,
   reply: FastifyReply,
 ) {
-  const resolved = await resolveHttpPullTransfer(request.params.transferId)
-  if ('error' in resolved) return reply.code(resolved.status).send({ error: resolved.error })
+  const resolved = await resolveHttpEndpointDataReference(request.params.transferId)
 
-  const preview = await fetchPublicHttpPreview(resolved.target, resolved.authorization)
+  const preview = await fetchPublicHttpPreview(resolved.endpoint, resolved.authorization)
   return reply.header('Cache-Control', 'no-store').send({
     ...preview,
   })
@@ -31,10 +18,9 @@ export async function downloadHttpPullTransfer(
   request: FastifyRequest<{ Params: { transferId: string } }>,
   reply: FastifyReply,
 ) {
-  const resolved = await resolveHttpPullTransfer(request.params.transferId)
-  if ('error' in resolved) return reply.code(resolved.status).send({ error: resolved.error })
+  const resolved = await resolveHttpEndpointDataReference(request.params.transferId)
 
-  const response = await fetchPublicHttpDownload(resolved.target, resolved.authorization)
+  const response = await fetchPublicHttpDownload(resolved.endpoint, resolved.authorization)
   const status = validStatus(response.statusCode) ? response.statusCode : 502
   const contentType = firstHeader(response.headers['content-type']) || 'application/octet-stream'
   const contentLength = firstHeader(response.headers['content-length'])
@@ -49,35 +35,6 @@ export async function downloadHttpPullTransfer(
     )
   }
   return reply.send(response)
-}
-
-async function resolveHttpPullTransfer(transferIdValue: string): Promise<TransferEndpoint | TransferEndpointError> {
-  const transferId = encodeURIComponent(transferIdValue)
-  const edrResponse = await fetchUpstream(
-    new URL(`v3/edrs/${transferId}/dataaddress`, config.edc.managementApiUrl),
-    { headers: { accept: 'application/json', 'x-api-key': config.edc.apiKey } },
-    { upstreamName: 'EDC' },
-  )
-  if (!edrResponse.ok) {
-    return { status: edrResponse.status, error: 'Access details are not available for this transfer.' }
-  }
-
-  const dataAddress = (await edrResponse.json()) as DataAddress
-  const endpoint = property(dataAddress, 'endpoint')
-  const authorization = property(dataAddress, 'authorization')
-  if (!endpoint) return { status: 422, error: 'The transfer does not provide an HTTP endpoint.' }
-
-  let target: URL
-  try {
-    target = new URL(endpoint)
-  } catch {
-    return { status: 422, error: 'The transfer does not provide a valid HTTP endpoint.' }
-  }
-  if (target.protocol !== 'http:' && target.protocol !== 'https:') {
-    return { status: 422, error: 'Only HTTP data endpoints can be accessed.' }
-  }
-
-  return { target, authorization }
 }
 
 function firstHeader(value: string | string[] | undefined): string | undefined {

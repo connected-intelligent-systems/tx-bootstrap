@@ -2,6 +2,41 @@
 # This file is loaded by deploy/local_compose/scripts/up.sh alongside compose.yaml.
 
 services:
+  demo-data-api:
+    image: ${PARTICIPANT_PORTAL_BACKEND_IMAGE:-tx-bootstrap-participant-portal-backend:local}
+    init: true
+    restart: unless-stopped
+    command:
+      - node
+      - --input-type=module
+      - -e
+      - |
+        import { createServer } from 'node:http';
+        createServer(async (request, response) => {
+          const chunks = [];
+          for await (const chunk of request) chunks.push(Buffer.from(chunk));
+          response.writeHead(200, { 'content-type': 'application/json' });
+          response.end(JSON.stringify({
+            method: request.method,
+            url: request.url,
+            contentType: request.headers['content-type'] ?? null,
+            body: Buffer.concat(chunks).toString('utf8')
+          }));
+        }).listen(8080, '0.0.0.0');
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:8080/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    networks:
+      backend: {}
+
   public-gateway:
     ports:
       - "${PUBLIC_HTTP_BIND:-127.0.0.1}:${PROVIDER_PUBLIC_HTTP_HOST_PORT:-29284}:80"

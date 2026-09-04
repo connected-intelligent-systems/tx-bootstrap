@@ -31,6 +31,7 @@ jq -e '
   .info.title == "tx-bootstrap Participant API" and
   .paths["/api/management/v3/assets"].post["x-required-scope"] == "assets:write" and
   .paths["/api/federated-catalog/v1/datasets"].get["x-required-scope"] == "federated-catalog:read" and
+  .paths["/api/data/{transferProcessId}/{path}"].post["x-required-scope"] == "data:proxy" and
   .paths["/api/management/v3/contractagreements"] == null
 ' "$TMPDIR/participant_openapi.json" >/dev/null || fail "participant OpenAPI contract is incomplete or exposes a blocked route"
 
@@ -290,6 +291,39 @@ grep -qi '^content-disposition: attachment' "$TMPDIR/data_download.headers" || {
     cat "$TMPDIR/data_download.headers"
     fail "participant portal data download is missing an attachment disposition"
 }
-ok "valid JSON data received directly and through the participant portal preview and download"
+
+data_client_response="$(curl -fsS "${PORTAL_ADMIN_AUTH[@]}" -X POST \
+    "$CONSUMER_PORTAL/api/portal/api-clients" \
+    -H 'Content-Type: application/json' \
+    -d '{"name":"e2e-data-proxy","scopes":["data:proxy"],"expiresInDays":1}')"
+data_client_token="$(printf '%s' "$data_client_response" | jq -r '.token')"
+[ "$data_client_token" != "null" ] && [ -n "$data_client_token" ] || {
+    printf '%s\n' "$data_client_response"
+    fail "data-proxy API client was not created"
+}
+curl -fsS "$CONSUMER_API/api/data/$TRANSFER_ID?mode=e2e-get" \
+    -H "Authorization: Bearer $data_client_token" > "$TMPDIR/data_proxy_get.json"
+jq -e '
+  .method == "GET" and
+  .url == "/data?mode=e2e-get" and
+  .body == ""
+' "$TMPDIR/data_proxy_get.json" >/dev/null || {
+    jq . "$TMPDIR/data_proxy_get.json"
+    fail "participant application data proxy did not preserve the GET request"
+}
+curl -fsS -X POST "$CONSUMER_API/api/data/$TRANSFER_ID/orders/42?mode=e2e" \
+    -H "Authorization: Bearer $data_client_token" \
+    -H 'Content-Type: application/json' \
+    -d '{"status":"ready"}' > "$TMPDIR/data_proxy.json"
+jq -e '
+  .method == "POST" and
+  .url == "/data/orders/42?mode=e2e" and
+  .contentType == "application/json" and
+  (.body | fromjson | .status == "ready")
+' "$TMPDIR/data_proxy.json" >/dev/null || {
+    jq . "$TMPDIR/data_proxy.json"
+    fail "participant application data proxy did not preserve the REST request"
+}
+ok "valid JSON data received directly, through portal preview/download, and through the application data proxy"
 
 printf "\nE2E complete: asset=%s agreement=%s transfer=%s\n" "$ASSET_ID" "$CONTRACT_AGREEMENT_ID" "$TRANSFER_ID"

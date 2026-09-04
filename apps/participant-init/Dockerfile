@@ -1,7 +1,7 @@
 FROM alpine:3.24
 
 RUN apk upgrade --no-cache \
-    && apk add --no-cache ca-certificates coreutils curl jq \
+    && apk add --no-cache ca-certificates coreutils curl 'jq>=1.8.2-r0' \
     && addgroup -S participant \
     && adduser -S -D -H -G participant participant
 

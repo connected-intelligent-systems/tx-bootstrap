@@ -36,7 +36,7 @@ describe('transfer preview service', () => {
     await previewHttpPullTransfer({ params: { transferId: 'transfer-1' } } as never, reply as never)
 
     expect(fetchMock.mock.calls[0][0].toString()).toBe(
-      new URL('v3/edrs/transfer-1/dataaddress', config.edc.managementApiUrl).toString(),
+      new URL('v3/edrs/transfer-1/dataaddress?auto_refresh=true', config.edc.managementApiUrl).toString(),
     )
     expect(fetchMock).toHaveBeenCalledTimes(1)
     expect(fetchPublicHttpPreviewMock).toHaveBeenCalledWith(new URL('https://data.test/public'), 'Bearer token')

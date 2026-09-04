@@ -8,9 +8,10 @@ import { isRequestWithinEndpoint } from '../../utils/apiDescriptionUtils'
 interface OpenAPIViewerProps {
   authToken?: string
   endpoint?: string
+  useBrowserCredentials?: boolean
 }
 
-export const OpenAPIViewer = ({ authToken, endpoint }: OpenAPIViewerProps) => {
+export const OpenAPIViewer = ({ authToken, endpoint, useBrowserCredentials = false }: OpenAPIViewerProps) => {
   const record = useRecordContext()
   const translate = useTranslate()
   const theme = useTheme()
@@ -102,7 +103,7 @@ export const OpenAPIViewer = ({ authToken, endpoint }: OpenAPIViewerProps) => {
               throw new Error('OpenAPI request outside the negotiated endpoint was blocked')
             }
 
-            request.credentials = 'omit'
+            request.credentials = useBrowserCredentials ? 'same-origin' : 'omit'
             request.redirect = 'error'
             if (authToken) {
               request.headers.Authorization = authToken

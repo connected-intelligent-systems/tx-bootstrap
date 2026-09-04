@@ -58,7 +58,7 @@ const presets: Record<string, string[]> = {
     'contract-agreements:read',
     'transfers:read',
     'transfers:write',
-    'edr:data-address:read',
+    'data:proxy',
   ],
   provider: [
     'assets:read',

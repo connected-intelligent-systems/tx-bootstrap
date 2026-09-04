@@ -18,6 +18,18 @@ export const config = {
     allowedPrivateHosts: parseCsvEnv('PARTICIPANT_PORTAL_PREVIEW_ALLOWED_PRIVATE_HOSTS', []),
     downloadTimeoutMs: positiveIntegerEnv('PARTICIPANT_PORTAL_DOWNLOAD_TIMEOUT_MS', 300_000),
   },
+  dataProxy: {
+    allowedPrivateHosts: parseCsvEnv(
+      'PARTICIPANT_PORTAL_DATA_PROXY_ALLOWED_PRIVATE_HOSTS',
+      parseCsvEnv('PARTICIPANT_PORTAL_PREVIEW_ALLOWED_PRIVATE_HOSTS', []),
+    ),
+    timeoutMs: positiveIntegerEnv('PARTICIPANT_PORTAL_DATA_PROXY_TIMEOUT_MS', 300_000, 2_147_483_647),
+    maxRequestBytes: positiveIntegerEnv(
+      'PARTICIPANT_PORTAL_DATA_PROXY_MAX_REQUEST_BYTES',
+      50 * 1024 * 1024,
+      2_147_483_647,
+    ),
+  },
   databaseUrl: process.env.DATABASE_URL ?? buildDatabaseUrl(),
   dataspaceAdminApiUrl: trimTrailingSlash(
     process.env.ONBOARDING_DATASPACE_ADMIN_API_URL ??
@@ -115,7 +127,7 @@ export function parseAuthMode(
   throw new Error('PARTICIPANT_PORTAL_AUTH_MODE must be none or forwarded-header')
 }
 
-function positiveIntegerEnv(name: string, fallback: number): number {
+function positiveIntegerEnv(name: string, fallback: number, maximum = 300_000): number {
   const value = Number(process.env[name] ?? fallback)
-  return Number.isInteger(value) && value > 0 && value <= 300_000 ? value : fallback
+  return Number.isInteger(value) && value > 0 && value <= maximum ? value : fallback
 }

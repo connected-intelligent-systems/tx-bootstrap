@@ -22,6 +22,10 @@
     {
       "name": "Federated Catalog SPARQL",
       "description": "Run bounded, read-only semantic queries."
+    },
+    {
+      "name": "Data Access Proxy",
+      "description": "Use negotiated HTTP data without handling EDR credentials."
     }
   ],
   "paths": {
@@ -2785,6 +2789,1144 @@
         "security": [{ "apiClientToken": [] }],
         "x-required-scope": "federated-catalog:sparql"
       }
+    },
+    "/api/data/{transferProcessId}": {
+      "get": {
+        "tags": ["Data Access Proxy"],
+        "summary": "GET negotiated HTTP data",
+        "description": "Resolves and refreshes the transfer EDR inside the participant, replaces the local bearer token with the EDR authorization, and streams the provider response.",
+        "operationId": "getTransferDataRoot",
+        "parameters": [
+          {
+            "name": "transferProcessId",
+            "in": "path",
+            "required": true,
+            "description": "Consumer transfer-process identifier whose EDR authorizes the request.",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Provider response. Status, media type, and body are passed through."
+          },
+          "401": {
+            "description": "A valid API-client token is required.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "403": {
+            "description": "The API client does not have the required scope.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "404": {
+            "description": "The operation or resource is not exposed by this participant.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "405": {
+            "description": "The HTTP method is not supported by the participant data proxy.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "413": {
+            "description": "The request body exceeds the configured proxy limit.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "422": {
+            "description": "The EDR endpoint or requested path is invalid or unsafe.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "502": {
+            "description": "EDR resolution or the provider request failed.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "504": {
+            "description": "The provider request exceeded the configured timeout.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          }
+        },
+        "security": [{ "apiClientToken": [] }],
+        "x-required-scope": "data:proxy"
+      },
+      "head": {
+        "tags": ["Data Access Proxy"],
+        "summary": "HEAD negotiated HTTP data",
+        "description": "Resolves and refreshes the transfer EDR inside the participant, replaces the local bearer token with the EDR authorization, and streams the provider response.",
+        "operationId": "headTransferDataRoot",
+        "parameters": [
+          {
+            "name": "transferProcessId",
+            "in": "path",
+            "required": true,
+            "description": "Consumer transfer-process identifier whose EDR authorizes the request.",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Provider response. Status, media type, and body are passed through."
+          },
+          "401": {
+            "description": "A valid API-client token is required.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "403": {
+            "description": "The API client does not have the required scope.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "404": {
+            "description": "The operation or resource is not exposed by this participant.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "405": {
+            "description": "The HTTP method is not supported by the participant data proxy.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "413": {
+            "description": "The request body exceeds the configured proxy limit.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "422": {
+            "description": "The EDR endpoint or requested path is invalid or unsafe.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "502": {
+            "description": "EDR resolution or the provider request failed.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "504": {
+            "description": "The provider request exceeded the configured timeout.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          }
+        },
+        "security": [{ "apiClientToken": [] }],
+        "x-required-scope": "data:proxy"
+      },
+      "post": {
+        "tags": ["Data Access Proxy"],
+        "summary": "POST negotiated HTTP data",
+        "description": "Resolves and refreshes the transfer EDR inside the participant, replaces the local bearer token with the EDR authorization, and streams the provider response.",
+        "operationId": "postTransferDataRoot",
+        "parameters": [
+          {
+            "name": "transferProcessId",
+            "in": "path",
+            "required": true,
+            "description": "Consumer transfer-process identifier whose EDR authorizes the request.",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "*/*": { "schema": { "type": "string", "format": "binary" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Provider response. Status, media type, and body are passed through."
+          },
+          "401": {
+            "description": "A valid API-client token is required.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "403": {
+            "description": "The API client does not have the required scope.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "404": {
+            "description": "The operation or resource is not exposed by this participant.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "405": {
+            "description": "The HTTP method is not supported by the participant data proxy.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "413": {
+            "description": "The request body exceeds the configured proxy limit.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "422": {
+            "description": "The EDR endpoint or requested path is invalid or unsafe.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "502": {
+            "description": "EDR resolution or the provider request failed.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "504": {
+            "description": "The provider request exceeded the configured timeout.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          }
+        },
+        "security": [{ "apiClientToken": [] }],
+        "x-required-scope": "data:proxy"
+      },
+      "put": {
+        "tags": ["Data Access Proxy"],
+        "summary": "PUT negotiated HTTP data",
+        "description": "Resolves and refreshes the transfer EDR inside the participant, replaces the local bearer token with the EDR authorization, and streams the provider response.",
+        "operationId": "putTransferDataRoot",
+        "parameters": [
+          {
+            "name": "transferProcessId",
+            "in": "path",
+            "required": true,
+            "description": "Consumer transfer-process identifier whose EDR authorizes the request.",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "*/*": { "schema": { "type": "string", "format": "binary" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Provider response. Status, media type, and body are passed through."
+          },
+          "401": {
+            "description": "A valid API-client token is required.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "403": {
+            "description": "The API client does not have the required scope.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "404": {
+            "description": "The operation or resource is not exposed by this participant.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "405": {
+            "description": "The HTTP method is not supported by the participant data proxy.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "413": {
+            "description": "The request body exceeds the configured proxy limit.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "422": {
+            "description": "The EDR endpoint or requested path is invalid or unsafe.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "502": {
+            "description": "EDR resolution or the provider request failed.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "504": {
+            "description": "The provider request exceeded the configured timeout.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          }
+        },
+        "security": [{ "apiClientToken": [] }],
+        "x-required-scope": "data:proxy"
+      },
+      "patch": {
+        "tags": ["Data Access Proxy"],
+        "summary": "PATCH negotiated HTTP data",
+        "description": "Resolves and refreshes the transfer EDR inside the participant, replaces the local bearer token with the EDR authorization, and streams the provider response.",
+        "operationId": "patchTransferDataRoot",
+        "parameters": [
+          {
+            "name": "transferProcessId",
+            "in": "path",
+            "required": true,
+            "description": "Consumer transfer-process identifier whose EDR authorizes the request.",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "*/*": { "schema": { "type": "string", "format": "binary" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Provider response. Status, media type, and body are passed through."
+          },
+          "401": {
+            "description": "A valid API-client token is required.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "403": {
+            "description": "The API client does not have the required scope.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "404": {
+            "description": "The operation or resource is not exposed by this participant.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "405": {
+            "description": "The HTTP method is not supported by the participant data proxy.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "413": {
+            "description": "The request body exceeds the configured proxy limit.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "422": {
+            "description": "The EDR endpoint or requested path is invalid or unsafe.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "502": {
+            "description": "EDR resolution or the provider request failed.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "504": {
+            "description": "The provider request exceeded the configured timeout.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          }
+        },
+        "security": [{ "apiClientToken": [] }],
+        "x-required-scope": "data:proxy"
+      },
+      "delete": {
+        "tags": ["Data Access Proxy"],
+        "summary": "DELETE negotiated HTTP data",
+        "description": "Resolves and refreshes the transfer EDR inside the participant, replaces the local bearer token with the EDR authorization, and streams the provider response.",
+        "operationId": "deleteTransferDataRoot",
+        "parameters": [
+          {
+            "name": "transferProcessId",
+            "in": "path",
+            "required": true,
+            "description": "Consumer transfer-process identifier whose EDR authorizes the request.",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "*/*": { "schema": { "type": "string", "format": "binary" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Provider response. Status, media type, and body are passed through."
+          },
+          "401": {
+            "description": "A valid API-client token is required.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "403": {
+            "description": "The API client does not have the required scope.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "404": {
+            "description": "The operation or resource is not exposed by this participant.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "405": {
+            "description": "The HTTP method is not supported by the participant data proxy.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "413": {
+            "description": "The request body exceeds the configured proxy limit.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "422": {
+            "description": "The EDR endpoint or requested path is invalid or unsafe.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "502": {
+            "description": "EDR resolution or the provider request failed.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "504": {
+            "description": "The provider request exceeded the configured timeout.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          }
+        },
+        "security": [{ "apiClientToken": [] }],
+        "x-required-scope": "data:proxy"
+      }
+    },
+    "/api/data/{transferProcessId}/{path}": {
+      "get": {
+        "tags": ["Data Access Proxy"],
+        "summary": "GET negotiated HTTP data",
+        "description": "Resolves and refreshes the transfer EDR inside the participant, replaces the local bearer token with the EDR authorization, and streams the provider response.",
+        "operationId": "getTransferDataPath",
+        "parameters": [
+          {
+            "name": "transferProcessId",
+            "in": "path",
+            "required": true,
+            "description": "Consumer transfer-process identifier whose EDR authorizes the request.",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "path",
+            "in": "path",
+            "required": true,
+            "description": "Remaining upstream path. It may contain multiple slash-separated segments.",
+            "schema": { "type": "string", "minLength": 1 },
+            "allowReserved": true,
+            "x-greedy-path": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Provider response. Status, media type, and body are passed through."
+          },
+          "401": {
+            "description": "A valid API-client token is required.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "403": {
+            "description": "The API client does not have the required scope.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "404": {
+            "description": "The operation or resource is not exposed by this participant.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "405": {
+            "description": "The HTTP method is not supported by the participant data proxy.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "413": {
+            "description": "The request body exceeds the configured proxy limit.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "422": {
+            "description": "The EDR endpoint or requested path is invalid or unsafe.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "502": {
+            "description": "EDR resolution or the provider request failed.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "504": {
+            "description": "The provider request exceeded the configured timeout.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          }
+        },
+        "security": [{ "apiClientToken": [] }],
+        "x-required-scope": "data:proxy"
+      },
+      "head": {
+        "tags": ["Data Access Proxy"],
+        "summary": "HEAD negotiated HTTP data",
+        "description": "Resolves and refreshes the transfer EDR inside the participant, replaces the local bearer token with the EDR authorization, and streams the provider response.",
+        "operationId": "headTransferDataPath",
+        "parameters": [
+          {
+            "name": "transferProcessId",
+            "in": "path",
+            "required": true,
+            "description": "Consumer transfer-process identifier whose EDR authorizes the request.",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "path",
+            "in": "path",
+            "required": true,
+            "description": "Remaining upstream path. It may contain multiple slash-separated segments.",
+            "schema": { "type": "string", "minLength": 1 },
+            "allowReserved": true,
+            "x-greedy-path": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Provider response. Status, media type, and body are passed through."
+          },
+          "401": {
+            "description": "A valid API-client token is required.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "403": {
+            "description": "The API client does not have the required scope.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "404": {
+            "description": "The operation or resource is not exposed by this participant.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "405": {
+            "description": "The HTTP method is not supported by the participant data proxy.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "413": {
+            "description": "The request body exceeds the configured proxy limit.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "422": {
+            "description": "The EDR endpoint or requested path is invalid or unsafe.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "502": {
+            "description": "EDR resolution or the provider request failed.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "504": {
+            "description": "The provider request exceeded the configured timeout.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          }
+        },
+        "security": [{ "apiClientToken": [] }],
+        "x-required-scope": "data:proxy"
+      },
+      "post": {
+        "tags": ["Data Access Proxy"],
+        "summary": "POST negotiated HTTP data",
+        "description": "Resolves and refreshes the transfer EDR inside the participant, replaces the local bearer token with the EDR authorization, and streams the provider response.",
+        "operationId": "postTransferDataPath",
+        "parameters": [
+          {
+            "name": "transferProcessId",
+            "in": "path",
+            "required": true,
+            "description": "Consumer transfer-process identifier whose EDR authorizes the request.",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "path",
+            "in": "path",
+            "required": true,
+            "description": "Remaining upstream path. It may contain multiple slash-separated segments.",
+            "schema": { "type": "string", "minLength": 1 },
+            "allowReserved": true,
+            "x-greedy-path": true
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "*/*": { "schema": { "type": "string", "format": "binary" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Provider response. Status, media type, and body are passed through."
+          },
+          "401": {
+            "description": "A valid API-client token is required.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "403": {
+            "description": "The API client does not have the required scope.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "404": {
+            "description": "The operation or resource is not exposed by this participant.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "405": {
+            "description": "The HTTP method is not supported by the participant data proxy.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "413": {
+            "description": "The request body exceeds the configured proxy limit.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "422": {
+            "description": "The EDR endpoint or requested path is invalid or unsafe.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "502": {
+            "description": "EDR resolution or the provider request failed.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "504": {
+            "description": "The provider request exceeded the configured timeout.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          }
+        },
+        "security": [{ "apiClientToken": [] }],
+        "x-required-scope": "data:proxy"
+      },
+      "put": {
+        "tags": ["Data Access Proxy"],
+        "summary": "PUT negotiated HTTP data",
+        "description": "Resolves and refreshes the transfer EDR inside the participant, replaces the local bearer token with the EDR authorization, and streams the provider response.",
+        "operationId": "putTransferDataPath",
+        "parameters": [
+          {
+            "name": "transferProcessId",
+            "in": "path",
+            "required": true,
+            "description": "Consumer transfer-process identifier whose EDR authorizes the request.",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "path",
+            "in": "path",
+            "required": true,
+            "description": "Remaining upstream path. It may contain multiple slash-separated segments.",
+            "schema": { "type": "string", "minLength": 1 },
+            "allowReserved": true,
+            "x-greedy-path": true
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "*/*": { "schema": { "type": "string", "format": "binary" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Provider response. Status, media type, and body are passed through."
+          },
+          "401": {
+            "description": "A valid API-client token is required.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "403": {
+            "description": "The API client does not have the required scope.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "404": {
+            "description": "The operation or resource is not exposed by this participant.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "405": {
+            "description": "The HTTP method is not supported by the participant data proxy.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "413": {
+            "description": "The request body exceeds the configured proxy limit.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "422": {
+            "description": "The EDR endpoint or requested path is invalid or unsafe.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "502": {
+            "description": "EDR resolution or the provider request failed.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "504": {
+            "description": "The provider request exceeded the configured timeout.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          }
+        },
+        "security": [{ "apiClientToken": [] }],
+        "x-required-scope": "data:proxy"
+      },
+      "patch": {
+        "tags": ["Data Access Proxy"],
+        "summary": "PATCH negotiated HTTP data",
+        "description": "Resolves and refreshes the transfer EDR inside the participant, replaces the local bearer token with the EDR authorization, and streams the provider response.",
+        "operationId": "patchTransferDataPath",
+        "parameters": [
+          {
+            "name": "transferProcessId",
+            "in": "path",
+            "required": true,
+            "description": "Consumer transfer-process identifier whose EDR authorizes the request.",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "path",
+            "in": "path",
+            "required": true,
+            "description": "Remaining upstream path. It may contain multiple slash-separated segments.",
+            "schema": { "type": "string", "minLength": 1 },
+            "allowReserved": true,
+            "x-greedy-path": true
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "*/*": { "schema": { "type": "string", "format": "binary" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Provider response. Status, media type, and body are passed through."
+          },
+          "401": {
+            "description": "A valid API-client token is required.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "403": {
+            "description": "The API client does not have the required scope.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "404": {
+            "description": "The operation or resource is not exposed by this participant.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "405": {
+            "description": "The HTTP method is not supported by the participant data proxy.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "413": {
+            "description": "The request body exceeds the configured proxy limit.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "422": {
+            "description": "The EDR endpoint or requested path is invalid or unsafe.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "502": {
+            "description": "EDR resolution or the provider request failed.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "504": {
+            "description": "The provider request exceeded the configured timeout.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          }
+        },
+        "security": [{ "apiClientToken": [] }],
+        "x-required-scope": "data:proxy"
+      },
+      "delete": {
+        "tags": ["Data Access Proxy"],
+        "summary": "DELETE negotiated HTTP data",
+        "description": "Resolves and refreshes the transfer EDR inside the participant, replaces the local bearer token with the EDR authorization, and streams the provider response.",
+        "operationId": "deleteTransferDataPath",
+        "parameters": [
+          {
+            "name": "transferProcessId",
+            "in": "path",
+            "required": true,
+            "description": "Consumer transfer-process identifier whose EDR authorizes the request.",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "path",
+            "in": "path",
+            "required": true,
+            "description": "Remaining upstream path. It may contain multiple slash-separated segments.",
+            "schema": { "type": "string", "minLength": 1 },
+            "allowReserved": true,
+            "x-greedy-path": true
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "*/*": { "schema": { "type": "string", "format": "binary" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Provider response. Status, media type, and body are passed through."
+          },
+          "401": {
+            "description": "A valid API-client token is required.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "403": {
+            "description": "The API client does not have the required scope.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "404": {
+            "description": "The operation or resource is not exposed by this participant.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "405": {
+            "description": "The HTTP method is not supported by the participant data proxy.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "413": {
+            "description": "The request body exceeds the configured proxy limit.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "422": {
+            "description": "The EDR endpoint or requested path is invalid or unsafe.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "502": {
+            "description": "EDR resolution or the provider request failed.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "504": {
+            "description": "The provider request exceeded the configured timeout.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          }
+        },
+        "security": [{ "apiClientToken": [] }],
+        "x-required-scope": "data:proxy"
+      }
     }
   },
   "components": {
@@ -3784,6 +4926,7 @@
     "transfers:read",
     "transfers:write",
     "edr:data-address:read",
+    "data:proxy",
     "federated-catalog:read",
     "federated-catalog:sparql"
   ],
