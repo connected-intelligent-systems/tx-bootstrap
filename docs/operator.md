@@ -60,9 +60,10 @@ Keep these internal/admin-only: `operator-console`, BDRS management, issuer
 admin, Vault, PostgreSQL, provisioning credentials, and migration jobs.
 
 The application creates its edge network by default. Set
-`OPERATOR_EDGE_NETWORK` to the platform network name and
-`OPERATOR_EDGE_NETWORK_EXTERNAL=true` when that network is managed outside this
-Compose application.
+`OPERATOR_EDGE_NETWORK` to the platform network name and override
+`networks.edge.external: true` when that network is managed outside this
+Compose application. The local deployment overlay defaults to an external
+network and accepts `OPERATOR_EDGE_NETWORK_EXTERNAL` as a local override.
 
 Participant-owned status and metadata calls require the `x-participant-token` header. Do not place participant tokens in URLs. A verified BPN plus the operator-issued token authorizes automatic setup; the public service queues work while only the internal operator console can write BDRS or issuer state. Failed automatic attempts appear in the admin work queue.
 

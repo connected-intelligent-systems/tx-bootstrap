@@ -605,7 +605,7 @@ networks:
     name: ${PARTICIPANT_EGRESS_NETWORK:-${COMPOSE_PROJECT_PREFIX:-tx-bootstrap}-${PARTICIPANT_ROLE:?PARTICIPANT_ROLE must be set}-egress}
   public:
     name: ${PARTICIPANT_PUBLIC_NETWORK:-tx-bootstrap-public}
-    external: ${PARTICIPANT_PUBLIC_NETWORK_EXTERNAL:-false}
+    external: false
 
 volumes:
   federated-catalog-data:

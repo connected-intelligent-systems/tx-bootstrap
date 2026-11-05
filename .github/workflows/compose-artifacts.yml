@@ -132,6 +132,8 @@ jobs:
         run: |
           compose_file="deploy/compose/${{ matrix.artifact }}.compose.yaml"
           docker compose -f "$compose_file" config --quiet
+          docker compose -f "$compose_file" \
+            config --no-interpolate --no-env-resolution --no-consistency --quiet
           docker compose --dry-run -f "$compose_file" \
             publish "example.invalid/tx-bootstrap-${{ matrix.artifact }}:validation" --yes
 

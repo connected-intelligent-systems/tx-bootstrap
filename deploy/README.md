@@ -19,10 +19,23 @@ Helm charts and adds Rancher Desktop-specific PostgreSQL, Vault, Traefik, and
 application values. PostgreSQL and Vault are intentionally not part of the
 reusable operator or participant applications.
 
-The published applications create their edge/public networks by default. Set
-`OPERATOR_EDGE_NETWORK_EXTERNAL=true` or
-`PARTICIPANT_PUBLIC_NETWORK_EXTERNAL=true` when the corresponding network is
-owned by the deployment platform, as the local deployments do.
+The published applications create their edge/public networks by default. When
+the deployment platform owns a shared network, set `external: true` in a
+deployment override. Use `edge` for the operator or `public` for a participant:
+
+```yaml
+networks:
+  public:
+    external: true
+```
+
+Network names remain configurable through `OPERATOR_EDGE_NETWORK` and
+`PARTICIPANT_PUBLIC_NETWORK`. The local deployment overrides select external
+networks by default and retain `OPERATOR_EDGE_NETWORK_EXTERNAL` and
+`PARTICIPANT_PUBLIC_NETWORK_EXTERNAL` for local overrides. Those flags no
+longer affect the reusable base manifests; existing consumers using them must
+add the explicit deployment override above. The publisher inspects unresolved
+templates, so boolean fields in published manifests must use literal values.
 
 ## Compose template contract
 

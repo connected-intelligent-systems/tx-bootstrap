@@ -13,3 +13,7 @@ services:
   portal-gateway:
     ports:
       - "${INTERNAL_HTTP_BIND:-127.0.0.1}:${CONSUMER_INTERNAL_HTTP_HOST_PORT:-19283}:80"
+
+networks:
+  public:
+    external: ${PARTICIPANT_PUBLIC_NETWORK_EXTERNAL:-true}
