@@ -21,7 +21,7 @@ tested combination of those dependencies; it does not relabel them.
 Set the next stable version from the repository root:
 
 ```sh
-npm run version:set -- 0.1.3
+npm run version:set -- 0.2.0
 npm run version:check
 ```
 
@@ -39,7 +39,7 @@ A push to `main` derives one immutable prerelease identifier from `VERSION` and
 the commit SHA:
 
 ```text
-0.1.2-dev.sha.<commit>
+0.2.0-dev.sha.<commit>
 ```
 
 CI applies that exact identifier to all published first-party images, Compose
@@ -56,8 +56,8 @@ Create a stable release only after the version update has reached the target
 commit:
 
 ```sh
-git tag v0.1.2
-git push origin v0.1.2
+git tag v0.2.0
+git push origin v0.2.0
 ```
 
 The release workflow first verifies that the tag, `VERSION`, every package,
@@ -65,3 +65,7 @@ both lock files, and both charts agree. It then publishes all first-party
 images and Compose artifacts before publishing the matching Helm charts. Helm
 defaults repository-owned image tags to the chart `appVersion`, while explicit
 tags and immutable digests remain supported for deployment overrides.
+
+## Release notes
+
+- [0.2.0](releases/0.2.0.md)
