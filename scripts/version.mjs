@@ -48,6 +48,7 @@ const firstPartyRepositories = [
   "ghcr.io/connected-intelligent-systems/tx-bootstrap-participant-init",
   "ghcr.io/connected-intelligent-systems/tx-bootstrap-participant-portal-backend",
   "ghcr.io/connected-intelligent-systems/tx-bootstrap-federated-catalog",
+  "ghcr.io/connected-intelligent-systems/tx-bootstrap-edc-dataplane",
 ];
 
 function path(relativePath) {

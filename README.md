@@ -18,6 +18,7 @@ verified from one checkout.
   consumer, including authenticated participant portals.
 - Production-oriented Helm charts and reusable Compose applications that do
   not bundle PostgreSQL or Vault.
+- An optional data-plane image for S3 sources over authenticated HTTP-pull.
 
 ## Quick start
 
@@ -76,6 +77,7 @@ apps/
   operator-console/                Internal operator UI and admin API
   operator-onboarding-service/     Public participant onboarding API
   participant-init/                Participant Identity Hub and EDC initialization image
+  edc-dataplane/                   Optional S3 HTTP-pull data-plane extension image
   participant-portal/              Participant portal, onboarding UI, and backend
 packages/
   core/                            Shared domain, API, and database migration code
@@ -121,6 +123,7 @@ All repository-owned components follow one lockstep stack version. See
 - [Helm charts](deploy/helm/README.md)
 - [Operator stack](docs/operator.md)
 - [Participant stack](docs/participant.md)
+- [S3 HTTP-pull configuration](docs/s3-http-pull.md)
 - [Local Compose deployment](docs/local-deployment.md)
 - [Local Kubernetes deployment](deploy/local_k8s/README.md)
 - [PostgreSQL provisioning](deploy/database/README.md)

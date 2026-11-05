@@ -82,6 +82,11 @@ catalog service. `PARTICIPANT_INIT_IMAGE`,
 `PARTICIPANT_PORTAL_BACKEND_IMAGE`, and `FEDERATED_CATALOG_IMAGE` must be set to
 release tags or digests.
 
+`EDC_DATAPLANE_IMAGE` optionally selects a custom participant data-plane image.
+When unset or empty, the existing stock image and `TRACTUSX_EDC_TAG` selection
+apply. See [S3 HTTP-pull configuration](../docs/s3-http-pull.md) for the optional
+extension image and its provider-side storage credentials.
+
 The participant exposes one application-facing API through the portal
 gateway. Native, allowlisted EDC management operations remain under
 `/api/management`, while catalog search and read-only SPARQL use
