@@ -1,9 +1,16 @@
 # Optional S3 HTTP-pull data plane
 
-This image adds a small extension to the pinned `0.12.1` base runtime. It lets
+This image adds a small extension to the pinned `0.12.2` base runtime. It lets
 an S3 source use the existing authenticated HTTP-pull endpoint and EDR service.
-The original runtime JAR is preserved; the extension is loaded from a separate
-JAR through the standard service-provider mechanism.
+The runtime is rebuilt from checksum-verified, commit-pinned source with patched
+serializer dependencies. OS packages are upgraded, and the base image supplies
+the instrumentation agent. The extension is loaded from a separate JAR through
+the standard service-provider mechanism.
+
+[dependency-security.init.gradle](dependency-security.init.gradle) pins the
+serializer maintenance releases during the upstream build. The first build
+downloads the source and build dependencies; subsequent builds reuse the
+build cache.
 
 Build from the repository root:
 

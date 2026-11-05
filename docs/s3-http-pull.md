@@ -40,7 +40,9 @@ A published deployment can select its versioned image through a service image
 override. Release images follow the stack version under
 `ghcr.io/<namespace>/tx-bootstrap-edc-dataplane:<stack-version>`; use the tag or
 digest of a published build. The optional image pins its own base runtime to
-`0.12.1`, independently of `TRACTUSX_EDC_TAG`.
+`0.12.2`, independently of `TRACTUSX_EDC_TAG`. Its runtime is rebuilt from pinned,
+checksum-verified source with patched serializer dependencies, and its OS
+packages are upgraded during the image build.
 
 For the participant chart, use the existing `dataPlane.image` values. For
 example, with an image built locally and available to the cluster:
