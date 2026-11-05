@@ -36,6 +36,9 @@ jobs:
           - image: federated-catalog
             context: apps/federated-catalog
             dockerfile: apps/federated-catalog/Dockerfile
+          - image: edc-dataplane
+            context: apps/edc-dataplane
+            dockerfile: apps/edc-dataplane/Dockerfile
 
     steps:
       - name: Check out repository

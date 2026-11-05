@@ -30,6 +30,10 @@ to the non-root IDs provided by that image. Both gateways use the official
 unprivileged NGINX image and listen on container port 8080; their Services
 continue to expose port 80.
 
+The optional S3 HTTP-pull image is selected through `dataPlane.image`. See
+[S3 HTTP-pull configuration](../../../docs/s3-http-pull.md) for image values,
+source addresses and provider-side secret formatting.
+
 ## Database and initialization lifecycle
 
 Run [`deploy/database/participant/provision.sh`](../../database/participant/provision.sh)

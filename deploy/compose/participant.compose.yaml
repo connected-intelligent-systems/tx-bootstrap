@@ -237,7 +237,7 @@ services:
 
   dataplane:
     <<: *java-runtime
-    image: tractusx/edc-dataplane-hashicorp-vault:${TRACTUSX_EDC_TAG:-0.12.1}
+    image: ${EDC_DATAPLANE_IMAGE:-tractusx/edc-dataplane-hashicorp-vault:${TRACTUSX_EDC_TAG:-0.12.1}}
     configs:
       - source: opentelemetry
         target: /app/opentelemetry.properties
@@ -500,6 +500,12 @@ configs:
       otel.sdk.disabled=true
   nginx-participant-public:
     content: |
+      upstream participant_data_plane {
+          zone participant_data_plane 64k;
+          resolver 127.0.0.11 valid=5s ipv6=off;
+          server ${PARTICIPANT_ROLE:?PARTICIPANT_ROLE must be set}-dataplane:8081 resolve;
+      }
+
       server {
           listen 80;
           server_name ${PARTICIPANT_PUBLIC_HOST:?PARTICIPANT_PUBLIC_HOST must be set} ${PARTICIPANT_DID_HOST:?PARTICIPANT_DID_HOST must be set} _;
@@ -511,7 +517,7 @@ configs:
           }
 
           location /api/public/ {
-              proxy_pass http://${PARTICIPANT_ROLE:?PARTICIPANT_ROLE must be set}-dataplane:8081/api/public/;
+              proxy_pass http://participant_data_plane/api/public/;
               proxy_set_header Host $$host;
               proxy_set_header X-Real-IP $$remote_addr;
           }
@@ -599,7 +605,7 @@ networks:
     name: ${PARTICIPANT_EGRESS_NETWORK:-${COMPOSE_PROJECT_PREFIX:-tx-bootstrap}-${PARTICIPANT_ROLE:?PARTICIPANT_ROLE must be set}-egress}
   public:
     name: ${PARTICIPANT_PUBLIC_NETWORK:-tx-bootstrap-public}
-    external: ${PARTICIPANT_PUBLIC_NETWORK_EXTERNAL:-false}
+    external: false
 
 volumes:
   federated-catalog-data:

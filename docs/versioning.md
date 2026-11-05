@@ -8,7 +8,7 @@ The lockstep version covers:
 
 - all `@tx-bootstrap/*` npm workspaces;
 - the federated catalog Python package;
-- the five repository-owned container images;
+- the six repository-owned container images, including the optional data-plane image;
 - the operator and participant Compose application artifacts; and
 - the operator and participant Helm charts.
 

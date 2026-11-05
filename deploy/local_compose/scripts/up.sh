@@ -18,6 +18,7 @@ OPERATOR_ONBOARDING_SERVICE_DIR="$ROOT/apps/operator-onboarding-service"
 PARTICIPANT_INIT_DIR="$ROOT/apps/participant-init"
 PARTICIPANT_PORTAL_DIR="$ROOT/apps/participant-portal"
 FEDERATED_CATALOG_DIR="$ROOT/apps/federated-catalog"
+EDC_DATAPLANE_DIR="$ROOT/apps/edc-dataplane"
 export OPERATOR_EDGE_NETWORK="${OPERATOR_EDGE_NETWORK:-$PUBLIC_NETWORK}"
 export OPERATOR_COMPOSE_REF="${OPERATOR_COMPOSE_REF:-$ROOT/deploy/compose/operator.compose.yaml}"
 export OPERATOR_CONSOLE_IMAGE="${OPERATOR_CONSOLE_IMAGE:-tx-bootstrap-operator-console:local}"
@@ -60,6 +61,10 @@ build_local_images() {
 
     if [ "$FEDERATED_CATALOG_IMAGE" = "tx-bootstrap-federated-catalog:local" ] && [ -d "$FEDERATED_CATALOG_DIR" ]; then
         docker build -t "$FEDERATED_CATALOG_IMAGE" -f "$FEDERATED_CATALOG_DIR/Dockerfile" "$FEDERATED_CATALOG_DIR"
+    fi
+
+    if [ "${EDC_DATAPLANE_IMAGE:-}" = "tx-bootstrap-edc-dataplane:local" ]; then
+        docker build -t "$EDC_DATAPLANE_IMAGE" -f "$EDC_DATAPLANE_DIR/Dockerfile" "$EDC_DATAPLANE_DIR"
     fi
 }
 

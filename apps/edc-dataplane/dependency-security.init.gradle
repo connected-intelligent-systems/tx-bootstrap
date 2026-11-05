@@ -1,0 +1,15 @@
+allprojects {
+    configurations.configureEach {
+        resolutionStrategy.eachDependency { dependency ->
+            if (dependency.requested.name in ["jackson-core", "jackson-databind"]) {
+                if (dependency.requested.group == "com.fasterxml.jackson.core") {
+                    dependency.useVersion("2.21.7")
+                    dependency.because("Use the patched serializer maintenance release")
+                } else if (dependency.requested.group == "tools.jackson.core") {
+                    dependency.useVersion("3.2.3")
+                    dependency.because("Use the patched serializer maintenance release")
+                }
+            }
+        }
+    }
+}

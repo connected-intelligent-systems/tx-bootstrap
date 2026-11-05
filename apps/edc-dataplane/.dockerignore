@@ -1,0 +1,8 @@
+*
+!dependency-security.init.gradle
+!src/
+!src/**
+!resources/
+!resources/**
+!tests/
+!tests/**

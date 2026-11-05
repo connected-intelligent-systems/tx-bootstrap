@@ -86,6 +86,10 @@ services:
     ports:
       - "${OPERATOR_HTTP_BIND:-127.0.0.1}:${OPERATOR_ONBOARDING_SERVICE_HOST_PORT:-39085}:3000"
 
+networks:
+  edge:
+    external: ${OPERATOR_EDGE_NETWORK_EXTERNAL:-true}
+
 volumes:
   operator-vault-data:
   operator-vault-bootstrap:

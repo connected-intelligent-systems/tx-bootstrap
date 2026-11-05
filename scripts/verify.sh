@@ -27,6 +27,13 @@ find apps deploy scripts -type f -name '*.sh' -print0 | while IFS= read -r -d ''
   bash -n "$script"
 done
 
+# Publication also decodes the templates before interpolation.
+for application in operator participant; do
+  docker compose \
+    -f "deploy/compose/$application.compose.yaml" \
+    config --no-interpolate --no-env-resolution --no-consistency --quiet
+done
+
 docker compose \
   --env-file deploy/local_compose/local.env.example \
   -f deploy/local_compose/compose.yaml \

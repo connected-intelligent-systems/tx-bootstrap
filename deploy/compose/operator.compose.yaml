@@ -463,4 +463,4 @@ networks:
     name: ${OPERATOR_ADMIN_ACCESS_NETWORK:-${COMPOSE_PROJECT_PREFIX:-tx-bootstrap}-admin-access}
   edge:
     name: ${OPERATOR_EDGE_NETWORK:-tx-bootstrap-operator-edge}
-    external: ${OPERATOR_EDGE_NETWORK_EXTERNAL:-false}
+    external: false
