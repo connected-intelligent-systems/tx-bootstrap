@@ -150,6 +150,7 @@ const englishMessages: Partial<TranslationMessages> = {
           bucketName: 'Bucket Name',
           objectName: 'Object Name',
           objectPrefix: 'Object Prefix',
+          keyName: 'Secret reference',
           accessKeyId: 'Access Key ID',
           secretAccessKey: 'Secret Access Key',
           yes: 'Yes',
@@ -263,6 +264,9 @@ const englishMessages: Partial<TranslationMessages> = {
             objectNameHelper: 'The name of the S3 object.',
             objectPrefix: 'Object Prefix',
             objectPrefixHelper: 'The prefix of the S3 object.',
+            keyName: 'Secret reference',
+            keyNameHelper:
+              'Name of an existing secret in the provider secret store, e.g. document-reader. Leave Access Key ID and Secret Access Key empty when using a reference.',
             accessKeyId: 'Access Key ID',
             accessKeyIdHelper: 'The access key ID of the S3 bucket.',
             secretAccessKey: 'Secret Access Key',

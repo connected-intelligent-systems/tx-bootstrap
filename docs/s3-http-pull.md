@@ -80,6 +80,13 @@ permissions. The storage endpoint must be reachable from the provider data
 plane. Use the endpoint and region appropriate to the deployment; plain HTTP
 is intended for local environments.
 
+In the participant portal, select **Amazon S3** as the data source and enter
+the existing alias, such as `document-reader`, in **Secret reference**. Leave
+**Access Key ID** and **Secret Access Key** empty when using a reference. The
+alias is displayed in the asset's **Data Address** tab and preserved when
+editing the asset. Direct credentials remain supported; the secret key is
+masked in the form. The reference field does not create or validate a secret.
+
 In the provider's configured secret-store KV mount, provision the
 `document-reader` alias. Its `content` field must contain a JSON **string**
 with this typed credential structure:

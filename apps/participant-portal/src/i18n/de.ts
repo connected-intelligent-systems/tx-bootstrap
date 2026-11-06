@@ -157,6 +157,7 @@ const germanMessages: Partial<TranslationMessages> = {
           bucketName: 'Bucket-Name',
           objectName: 'Objekt-Name',
           objectPrefix: 'Objekt-Präfix',
+          keyName: 'Secret-Referenz',
           accessKeyId: 'Access Key ID',
           secretAccessKey: 'Secret Access Key',
           yes: 'Ja',
@@ -261,6 +262,9 @@ const germanMessages: Partial<TranslationMessages> = {
             objectNameHelper: 'Der Name des S3-Objekts.',
             objectPrefix: 'Objektpräfix',
             objectPrefixHelper: 'Das Präfix des S3-Objekts.',
+            keyName: 'Secret-Referenz',
+            keyNameHelper:
+              'Name eines vorhandenen Secrets im Secret Store des Anbieters, z. B. document-reader. Bei Verwendung einer Referenz Access Key ID und Secret Access Key leer lassen.',
             accessKeyId: 'Access Key ID',
             accessKeyIdHelper: 'Die Access Key ID des S3-Buckets.',
             secretAccessKey: 'Secret Access Key',

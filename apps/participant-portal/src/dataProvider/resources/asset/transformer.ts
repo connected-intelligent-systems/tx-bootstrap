@@ -225,6 +225,7 @@ export function serializeAssetToJsonLd(asset: AssetFormData): any {
       'bucketName',
       'objectName',
       'objectPrefix',
+      'keyName',
       'accessKeyId',
       'secretAccessKey',
     ]

@@ -42,6 +42,39 @@ describe('Asset Transformers', () => {
     expect(result.properties['dcat:mediaType']).toBe('application/json')
   })
 
+  it.each(['AmazonS3', 's3'])('preserves the secret reference when editing a %s asset', (type) => {
+    const dataAddress = {
+      type,
+      region: 'us-east-1',
+      endpointOverride: 'http://object-storage:9000',
+      bucketName: 'shared-documents',
+      objectName: 'documents/example.txt',
+      keyName: 'document-reader',
+    }
+    const parsed = parseAssetFromJsonLd({ ...sampleJsonLdAsset, dataAddress })
+
+    const serialized = serializeAssetToJsonLd({ ...parsed, title: 'Updated document title', titles: undefined })
+
+    expect(serialized.properties['dct:title']).toBe('Updated document title')
+    expect(serialized.dataAddress).toEqual(dataAddress)
+    expect(serialized.dataAddress).not.toHaveProperty('accessKeyId')
+    expect(serialized.dataAddress).not.toHaveProperty('secretAccessKey')
+  })
+
+  it('preserves direct S3 credentials when no secret reference is configured', () => {
+    const dataAddress = {
+      type: 'AmazonS3',
+      region: 'us-east-1',
+      bucketName: 'shared-documents',
+      objectName: 'documents/example.txt',
+      accessKeyId: 'example-reader',
+      secretAccessKey: 'example-secret',
+    }
+    const parsed = parseAssetFromJsonLd({ ...sampleJsonLdAsset, dataAddress })
+
+    expect(serializeAssetToJsonLd(parsed).dataAddress).toEqual(dataAddress)
+  })
+
   it('should persist an endpoint-neutral API description as a JSON-LD literal', async () => {
     const result = await serializeAssetToJsonLd({
       id: 'weather-api',

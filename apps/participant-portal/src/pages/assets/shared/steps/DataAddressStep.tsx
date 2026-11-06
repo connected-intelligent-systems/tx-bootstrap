@@ -149,12 +149,18 @@ const AmazonS3Input = ({ translate }: { translate: any }) => {
         fullWidth
       />
       <TextInput
+        source="dataAddress.keyName"
+        label={translate('resources.assets.create.dataAddress.fields.keyName')}
+        helperText={translate('resources.assets.create.dataAddress.fields.keyNameHelper')}
+        fullWidth
+      />
+      <TextInput
         source="dataAddress.accessKeyId"
         label={translate('resources.assets.create.dataAddress.fields.accessKeyId')}
         helperText={translate('resources.assets.create.dataAddress.fields.accessKeyIdHelper')}
         fullWidth
       />
-      <TextInput
+      <PasswordInput
         source="dataAddress.secretAccessKey"
         label={translate('resources.assets.create.dataAddress.fields.secretAccessKey')}
         helperText={translate('resources.assets.create.dataAddress.fields.secretAccessKeyHelper')}

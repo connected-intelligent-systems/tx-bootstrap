@@ -158,6 +158,10 @@ const AmazonS3 = () => {
         <TextField source="dataAddress.objectPrefix" emptyText="-" />
       </Labeled>
 
+      <Labeled fullWidth label={translate('resources.assets.tabs.dataAddressTab.keyName')}>
+        <TextField source="dataAddress.keyName" emptyText="-" />
+      </Labeled>
+
       <Labeled fullWidth label={translate('resources.assets.tabs.dataAddressTab.accessKeyId')}>
         <TextField source="dataAddress.accessKeyId" emptyText="-" />
       </Labeled>
