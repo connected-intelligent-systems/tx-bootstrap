@@ -11,6 +11,8 @@ def _int(name: str, default: int) -> int:
 @dataclass(frozen=True)
 class Settings:
     store_path: str = os.getenv("FEDERATED_CATALOG_STORE_PATH", "/tmp/tx-bootstrap-federated-catalog/oxigraph")
+    # Read-only query checkpoints; defaults to "<store_path>-query-snapshots" (same volume for hard links).
+    snapshot_path: str = os.getenv("FEDERATED_CATALOG_SNAPSHOT_PATH", "")
     api_key: str = os.getenv("FEDERATED_CATALOG_API_KEY", "")
     participant_bpn: str = os.getenv("PARTICIPANT_BPN", "")
     directory_url: str = os.getenv("PARTICIPANT_DIRECTORY_URL", "http://operator-onboarding-service:3000/api").rstrip(
