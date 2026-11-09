@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { PatchStateInput, StateRow } from '../types.js'
+import { encodeRegistrationToken } from '@tx-bootstrap/core/api/registration-token.js'
+import { config } from '../config/index.js'
 
 const mocks = vi.hoisted(() => ({
   dataspaceFetch: vi.fn(),
@@ -41,7 +43,13 @@ vi.mock('../db/state-repository.js', () => ({
   upsertState: vi.fn(),
 }))
 
-import { buildStateResponse } from './onboarding-service.js'
+import { attachOnboardingCase, attachConfiguredOnboardingCase, buildStateResponse } from './onboarding-service.js'
+
+beforeEach(() => {
+  vi.restoreAllMocks()
+  vi.clearAllMocks()
+  config.onboardingRegistrationToken = ''
+})
 
 describe('participant onboarding credential polling', () => {
   let row: StateRow
@@ -107,6 +115,94 @@ describe('participant onboarding credential polling', () => {
         body: expect.objectContaining({ status: 'failed' }),
       }),
     )
+  })
+
+  it.each(['did:web:unrelated-issuer', 'did:web:issuer.example:BPNL000000000001'])(
+    'only completes onboarding for the requested issuer (%s)',
+    async (issuer) => {
+      mocks.dataspaceFetch.mockImplementation(async () => row.case_data)
+      mocks.identityHubFetch.mockImplementation(async (path: string) =>
+        path.endsWith('/credentials')
+          ? [
+              {
+                id: 'membership-1',
+                state: 500,
+                verifiableCredential: {
+                  credential: {
+                    type: ['VerifiableCredential', 'MembershipCredential'],
+                    issuer,
+                    credentialSubject: { id: 'did:web:provider.example:BPNL000000000002' },
+                  },
+                },
+              },
+            ]
+          : { status: 'REQUESTED' },
+      )
+      const response = await buildStateResponse({ autoProgress: true })
+      expect(response.state).toBe(issuer === 'did:web:unrelated-issuer' ? 'CREDENTIALS_REQUESTED' : 'ONBOARDED')
+      expect(mocks.dataspaceFetch.mock.calls.some(([, options]) => options?.body?.status === 'issued')).toBe(
+        issuer !== 'did:web:unrelated-issuer',
+      )
+    },
+  )
+})
+
+describe('reattaching a rotated invitation', () => {
+  let row: StateRow
+  beforeEach(() => {
+    row = credentialRequestRow()
+    row.participant_token = 'old-token'
+    mocks.loadStateRow.mockImplementation(async () => row)
+    mocks.patchState.mockImplementation(async (patch: PatchStateInput) => {
+      row = {
+        ...row,
+        participant_token: patch.participantToken ?? row.participant_token,
+        state: patch.state ?? row.state,
+        case_data: patch.caseData ?? row.case_data,
+        credential_request: patch.credentialRequest ?? row.credential_request,
+        credentials: patch.credentials ?? row.credentials,
+        last_error: patch.lastError ?? row.last_error,
+      }
+    })
+    mocks.identityHubFetch.mockImplementation(async (path: string) =>
+      path.endsWith('/credentials') ? [] : { status: 'REQUESTED' },
+    )
+    mocks.dataspaceFetch.mockImplementation(async (_path: string, options?: { token?: string }) => {
+      if (options?.token !== 'new-token') throw Object.assign(new Error('Unauthorized'), { status: 401 })
+      return row.case_data
+    })
+  })
+
+  it.each(['manual', 'configured', 'monitor'])('saves and uses the validated replacement token (%s)', async (mode) => {
+    const requestBefore = row.credential_request
+    const registrationToken = encodeRegistrationToken({ caseId: row.case_id!, participantToken: 'new-token' })
+    if (mode === 'manual') await attachOnboardingCase({ registrationToken })
+    else {
+      config.onboardingRegistrationToken = registrationToken
+      if (mode === 'monitor') await buildStateResponse({ autoProgress: true })
+      else await attachConfiguredOnboardingCase()
+    }
+    expect(row.participant_token).toBe('new-token')
+    expect(row.credential_request).toEqual(requestBefore)
+    expect(mocks.dataspaceFetch.mock.calls.every(([, options]) => options?.token === 'new-token')).toBe(true)
+  })
+
+  it('preserves the saved secret when a replacement does not authenticate', async () => {
+    const registrationToken = encodeRegistrationToken({ caseId: row.case_id!, participantToken: 'invalid-token' })
+    await expect(attachOnboardingCase({ registrationToken })).rejects.toMatchObject({ status: 401 })
+    expect(row.participant_token).toBe('old-token')
+    expect(mocks.patchState).not.toHaveBeenCalled()
+  })
+
+  it('continues with a newer saved token when the environment still contains an old one', async () => {
+    row.participant_token = 'new-token'
+    config.onboardingRegistrationToken = encodeRegistrationToken({
+      caseId: row.case_id!,
+      participantToken: 'old-token',
+    })
+    const response = await buildStateResponse({ autoProgress: true })
+    expect(row.participant_token).toBe('new-token')
+    expect(response.state).toBe('CREDENTIALS_REQUESTED')
   })
 })
 

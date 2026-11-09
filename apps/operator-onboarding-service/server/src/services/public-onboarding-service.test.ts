@@ -226,9 +226,9 @@ describe("public onboarding service", () => {
     });
     let updateParams: unknown[] | undefined;
     const query = vi.fn(async (sql: string, params: unknown[]) => {
-      if (sql.includes("SELECT c.* FROM onboarding_cases"))
+      if (sql.includes("onboarding_public_get_token_recovery_case"))
         return { rows: [row] };
-      if (sql.includes("UPDATE onboarding_cases")) {
+      if (sql.includes("onboarding_public_rotate_participant_token")) {
         updateParams = params;
         return { rows: [] };
       }
@@ -252,14 +252,60 @@ describe("public onboarding service", () => {
       { email: "ops@example.test" },
     );
 
-    expect(updateParams?.[0]).not.toBe(hashToken(oldToken));
+    expect(updateParams?.[2]).not.toBe(hashToken(oldToken));
     const email = sendEmail.mock.calls[0]?.[0] as { text: string };
     const token = email.text.match(/Registration token: ([^\s]+)/)?.[1];
     expect(token).toBeTruthy();
     const decoded = decodeRegistrationToken(String(token));
     expect(decoded.caseId).toBe(row.id);
-    expect(updateParams?.[0]).toBe(hashToken(decoded.participantToken));
+    expect(updateParams?.[2]).toBe(hashToken(decoded.participantToken));
+    expect(updateParams?.slice(0, 2)).toEqual([row.id, "ops@example.test"]);
+    expect(sendEmail.mock.invocationCallOrder[0]).toBeLessThan(
+      query.mock.invocationCallOrder[1],
+    );
   });
+  it("keeps the previous token when delivery is disabled or fails", async () => {
+    const row = onboardingCaseRow();
+    const query = vi.fn(async (sql: string) => {
+      if (sql.includes("onboarding_public_get_token_recovery_case"))
+        return { rows: [row] };
+      throw new Error("Token must not be rotated after failed delivery");
+    });
+    const service = createPublicOnboardingService({
+      config: testConfig,
+      pool: { query } as unknown as Pool,
+      emailService: {
+        sendEmail: vi.fn().mockResolvedValue(false),
+      } as unknown as EmailService,
+    });
+    const response = responseRecorder();
+    await service.resendToken({} as IncomingMessage, response.raw, row.id, {
+      email: "ops@example.test",
+    });
+    expect(response.statusCode).toBe(200);
+    expect(query).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not send or rotate anything for an unmatched email", async () => {
+    const query = vi.fn().mockResolvedValue({ rows: [] });
+    const sendEmail = vi.fn();
+    const service = createPublicOnboardingService({
+      config: testConfig,
+      pool: { query } as unknown as Pool,
+      emailService: { sendEmail } as unknown as EmailService,
+    });
+    const response = responseRecorder();
+    await service.resendToken(
+      {} as IncomingMessage,
+      response.raw,
+      "11111111-1111-4111-8111-111111111111",
+      { email: "other@example.test" },
+    );
+    expect(response.statusCode).toBe(200);
+    expect(sendEmail).not.toHaveBeenCalled();
+    expect(query).toHaveBeenCalledTimes(1);
+  });
+
   it("queues authenticated technical metadata for automatic setup", async () => {
     const token = "participant-secret";
     const row = onboardingCaseRow({

@@ -36,6 +36,11 @@ the [Compose application](../deploy/README.md) or
 
 The participant guide covers [the participant's steps](participant.md#onboarding).
 
+An invitation can be rejected before connector setup is queued. Once setup
+is queued, use **Revoke** instead: directory or issuer access may already
+exist, including after a failed setup attempt. Rejection and the setup
+worker's claim cannot take effect at the same time.
+
 ## Revoke a participant
 
 Revocation permanently removes a participant from the dataspace. Open the

@@ -11,6 +11,7 @@ import { decodeRegistrationToken } from '@tx-bootstrap/core/api/registration-tok
 import { isRecord } from '../lib/objects.js'
 import { extractCredentials, normalizeCaseData, normalizeOnboardingInput } from '../lib/onboarding-normalizers.js'
 import { preserveCredentialRequestState } from '../lib/onboarding-state.js'
+import { hasExpectedCredentials } from '../lib/onboarding-credentials.js'
 import { errorMessage } from '../types.js'
 import type { CredentialSummary, ExpectedCredential, JsonRecord, OnboardingInput, StateRow } from '../types.js'
 
@@ -58,7 +59,7 @@ export async function attachOnboardingCase(body: JsonRecord = {}): Promise<JsonR
   const { caseId, participantToken } = inviteCredentialsFromBody(body)
 
   const row = await loadStateRow()
-  if (row?.case_id === caseId) return refreshOnboardingForRow(row)
+  if (row?.case_id === caseId) return reattachCase(row, participantToken)
   return attachCase(caseId, participantToken, { message: 'Operator invite attached.' })
 }
 
@@ -72,10 +73,25 @@ export async function attachConfiguredOnboardingCase(): Promise<JsonRecord> {
   }
 
   const row = await loadStateRow()
-  if (row?.case_id === invite.caseId) return refreshOnboardingForRow(row)
+  if (row?.case_id === invite.caseId) return reattachCase(row, invite.participantToken)
   return attachCase(invite.caseId, invite.participantToken, {
     message: 'Configured onboarding case attached.',
   })
+}
+
+async function reattachCase(row: StateRow, participantToken: string): Promise<JsonRecord> {
+  return refreshOnboardingForRow(await replaceParticipantToken(row, participantToken))
+}
+
+async function replaceParticipantToken(row: StateRow, participantToken: string): Promise<StateRow> {
+  if (row.participant_token === participantToken) return row
+  const updated = { ...row, participant_token: participantToken }
+  assertParticipantCase(updated)
+  // Authenticate the replacement before changing the saved secret. Preserve
+  // the request id and credentials so readmission can still detect old VCs.
+  const caseData = await fetchCase(updated)
+  await patchState({ participantToken, caseData, lastError: '' })
+  return { ...updated, case_data: caseData }
 }
 
 export async function requestCredentials(): Promise<JsonRecord> {
@@ -134,6 +150,15 @@ async function runAutoProgress(): Promise<void> {
   }
 
   if (!row || !row.case_id) return
+  const invite = tryConfiguredInviteCredentials()
+  if (invite?.caseId === row.case_id && invite.participantToken !== row.participant_token) {
+    try {
+      row = await replaceParticipantToken(row, invite.participantToken)
+    } catch {
+      // A manually attached secret can be newer than the environment. Keep
+      // using the saved secret unless the configured replacement authenticates.
+    }
+  }
   if (row.state === 'ONBOARDED' || row.state === 'FAILED' || row.state === 'REVOKED') {
     if (!(await checkOperatorAccess(row))) return
     row = await loadStateRow()
@@ -343,12 +368,11 @@ async function refreshOnboardingForRow(row: StateRow): Promise<JsonRecord> {
           '/v1alpha/participants/' + encodeURIComponent(getIdentityHubParticipantContextPathId()) + '/credentials',
         )
         credentials = extractCredentials(identityHubResponse)
-        const expected = expectedCredentials(credentialRequest)
-        issued =
-          expected.length > 0 &&
-          expected.every((item) =>
-            credentials.some((credential) => credential.type === item.type || credential.id === item.id),
-          )
+        issued = hasExpectedCredentials(
+          identityHubResponse,
+          credentialRequest,
+          String(caseData.did ?? onboardingDefaults().did ?? ''),
+        )
 
         if (issued || requestFailed) {
           const receipt = await reportReceipt(row.case_id, row.participant_token, {

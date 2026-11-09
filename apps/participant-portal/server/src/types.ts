@@ -48,6 +48,7 @@ export interface UpsertStateInput {
 }
 
 export interface PatchStateInput {
+  participantToken?: string
   state?: string
   caseData?: unknown
   credentialRequest?: unknown

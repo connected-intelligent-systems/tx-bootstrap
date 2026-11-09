@@ -105,16 +105,65 @@ export function createBusinessPartnerRepository(db: Kysely<Database>) {
         .execute();
     },
 
-    async reject(id: string, reason: string): Promise<void> {
-      await db
-        .updateTable("business_partners")
-        .set({
-          verification_status: "REJECTED",
-          verification_notes: reason,
-          updated_at: new Date(),
-        })
-        .where("id", "=", id)
-        .execute();
+    /** Reject only invitations that have never entered connector setup. */
+    async reject(
+      id: string,
+      reason: string,
+      lease: ParticipantAccessLease,
+    ): Promise<boolean> {
+      return db.transaction().execute(async (trx) => {
+        lease.assertActive();
+        const partner = await trx
+          .selectFrom("business_partners")
+          .select("verification_status")
+          .where("id", "=", id)
+          .where("access_lease_token", "=", lease.token)
+          .where("access_lease_until", ">", sql<Date>`clock_timestamp()`)
+          .forUpdate()
+          .executeTakeFirst();
+        if (!partner) throw new ParticipantLeaseLostError();
+        if (["REJECTED", "REVOKED"].includes(partner.verification_status))
+          return false;
+        // The setup worker locks both the participant and case when claiming.
+        // Holding the same rows makes the eligibility check and rejection
+        // atomic with that claim and with public metadata submission.
+        const cases = await trx
+          .selectFrom("onboarding_cases")
+          .select(["state", "setup_started_at", "setup_attempt_count"])
+          .where("business_partner_id", "=", id)
+          .forUpdate()
+          .execute();
+        if (
+          !cases.length ||
+          cases.some(
+            (row) =>
+              row.state !== "REQUESTED" ||
+              row.setup_started_at !== null ||
+              row.setup_attempt_count !== 0,
+          )
+        )
+          return false;
+        await trx
+          .updateTable("business_partners")
+          .set({
+            verification_status: "REJECTED",
+            verification_notes: reason,
+            updated_at: new Date(),
+          })
+          .where("id", "=", id)
+          .execute();
+        await trx
+          .updateTable("onboarding_cases")
+          .set({
+            state: "REJECTED",
+            rejection_reason: reason,
+            updated_at: new Date(),
+          })
+          .where("business_partner_id", "=", id)
+          .execute();
+        lease.assertActive();
+        return true;
+      });
     },
 
     /**
