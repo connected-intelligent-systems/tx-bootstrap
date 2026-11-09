@@ -104,6 +104,15 @@ Additional paths, query parameters, methods, and bodies require the provider
 asset to enable the corresponding HTTP proxy capabilities. Prefer this proxy
 to retrieving the underlying endpoint and credentials directly.
 
+Provider responses are untrusted content. The proxy replaces their browser
+security headers with a sandbox policy, so a document opened in the browser
+cannot run scripts. Loading a proxy response as a script, style sheet, worker,
+or frame returns HTTP 403.
+
+SPARQL queries are read-only and bounded: they need an outer `LIMIT`, are
+stopped after the configured timeout, and cannot use `SERVICE` to query other
+endpoints. Only one query runs at a time; a concurrent request receives HTTP 503.
+
 ## API descriptions for shared data
 
 A provider can attach an OpenAPI 3.x JSON or YAML description to an asset.
