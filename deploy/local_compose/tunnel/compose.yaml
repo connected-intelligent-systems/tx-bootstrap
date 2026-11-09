@@ -1,0 +1,11 @@
+name: ${COMPOSE_PROJECT_PREFIX:-tx-bootstrap}-tunnel
+
+# Local tunnel for TX_BOOTSTRAP_TUNNEL=1: the reusable tunnel ingress plus a
+# throwaway Headscale, with an HTTP-only ingress on the shared local "internet"
+# network. Started and wired by deploy/local_compose/scripts/up.sh.
+include:
+  - path:
+      - ../../compose/tunnel.compose.yaml
+      - headscale.compose.yaml
+      - local.override.yml
+    env_file: local.env

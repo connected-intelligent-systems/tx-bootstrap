@@ -137,7 +137,8 @@
             "issuerClaimsDatabaseUrl": { "$ref": "#/definitions/secretKey" },
             "bdrsApiKey": { "$ref": "#/definitions/secretKey" },
             "operatorConsoleApiKey": { "type": "string" },
-            "issuerApiKey": { "type": "string" }
+            "issuerApiKey": { "type": "string" },
+            "headscaleApiKey": { "type": "string" }
           }
         }
       }
@@ -222,7 +223,49 @@
             "subtitle": { "type": "string" },
             "configJson": { "type": "string" },
             "themeJson": { "type": "string" },
-            "httpsHeaders": { "type": "boolean" }
+            "httpsHeaders": { "type": "boolean" },
+            "headscale": {
+              "type": "object",
+              "required": [
+                "enabled",
+                "url",
+                "participantTag",
+                "participantDomain",
+                "enrollmentTtlSeconds",
+                "invitationTtlSeconds",
+                "staleNodeSeconds",
+                "timeoutMs"
+              ],
+              "properties": {
+                "enabled": { "type": "boolean" },
+                "url": { "type": "string" },
+                "participantTag": {
+                  "type": "string",
+                  "pattern": "^tag:[a-z][a-z0-9-]*$"
+                },
+                "participantDomain": { "type": "string" },
+                "enrollmentTtlSeconds": {
+                  "type": "integer",
+                  "minimum": 60,
+                  "maximum": 3600
+                },
+                "invitationTtlSeconds": {
+                  "type": "integer",
+                  "minimum": 3600,
+                  "maximum": 2592000
+                },
+                "staleNodeSeconds": {
+                  "type": "integer",
+                  "minimum": 3600,
+                  "maximum": 31536000
+                },
+                "timeoutMs": {
+                  "type": "integer",
+                  "minimum": 100,
+                  "maximum": 30000
+                }
+              }
+            }
           }
         }
       ]
@@ -268,6 +311,42 @@
     "affinity": { "type": "object" }
   },
   "allOf": [
+    {
+      "if": {
+        "properties": {
+          "operatorConsole": {
+            "required": ["headscale"],
+            "properties": {
+              "headscale": { "properties": { "enabled": { "const": true } } }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "operatorConsole": {
+            "properties": {
+              "headscale": {
+                "properties": {
+                  "url": { "pattern": "^https://[^/?#@]+/?$" },
+                  "participantDomain": {
+                    "pattern": "^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$"
+                  }
+                }
+              }
+            }
+          },
+          "existingSecret": {
+            "properties": {
+              "keys": {
+                "required": ["headscaleApiKey"],
+                "properties": { "headscaleApiKey": { "minLength": 1 } }
+              }
+            }
+          }
+        }
+      }
+    },
     {
       "if": {
         "properties": {

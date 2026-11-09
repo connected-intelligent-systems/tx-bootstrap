@@ -298,6 +298,64 @@ internalGateway:
       cpu: 500m
       memory: 128Mi
 
+# Optional: publish the public gateway through the operator's tunnel instead
+# of ingress.public. Use the tunnel settings from the operator: HEADSCALE_URL
+# and TAILNET_HOSTNAME here, PARTICIPANT_PUBLIC_HOST and PARTICIPANT_DID_HOST as
+# identity.participantPublicHost and identity.participantDidHost, and
+# TAILNET_AUTHKEY in existingSecret under tunnel.authKeySecretKey.
+# The node runs in userspace mode (no capabilities, no TUN device) and only
+# forwards tailnet TCP 18080 to the public gateway.
+tunnel:
+  enabled: false
+  headscaleUrl: ""
+  hostname: ""
+  # Key in existingSecret that holds TAILNET_AUTHKEY.
+  authKeySecretKey: tailnet-authkey
+  securityContext:
+    runAsUser: 1000
+    runAsGroup: 1000
+  image:
+    repository: tailscale/tailscale
+    tag: v1.104.4
+    digest: sha256:ed6480b33c6eb67c9cbd203ed42b9fb57e361986725b6856def71b7a3d9e276c
+    pullPolicy: IfNotPresent
+  # The participant's own TLS endpoint behind the operator's TLS-passthrough
+  # ingress. It obtains a certificate for identity.participantPublicHost from
+  # the ACME CA with TLS-ALPN-01 through the tunnel; the operator never holds it.
+  tls:
+    acmeCaServer: https://acme-v02.api.letsencrypt.org/directory
+    acmeEmail: ""
+    # Request limits for all public traffic (the ingress cannot see requests).
+    rateLimit:
+      average: 100
+      burst: 200
+    maxConcurrentRequests: 64
+    image:
+      repository: traefik
+      tag: v3.7.17
+      digest: sha256:f4bb143d1135a579b630ed491e17ec50f6f7c9c6a30585ff3d385471d2a86f5a
+      pullPolicy: IfNotPresent
+    resources:
+      requests:
+        cpu: 25m
+        memory: 64Mi
+      limits:
+        cpu: 500m
+        memory: 256Mi
+  # The key is single-use; after the first start the node identity (and the
+  # TLS certificate) live in this volume, so keep it across upgrades.
+  persistence:
+    existingClaim: ""
+    storageClassName: ""
+    size: 1Gi
+  resources:
+    requests:
+      cpu: 25m
+      memory: 64Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
 ingress:
   public:
     enabled: false

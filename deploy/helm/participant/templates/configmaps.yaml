@@ -113,7 +113,7 @@ data:
         }
 
         location ^~ /api/data/ {
-            client_max_body_size {{ .Values.portal.dataProxy.maxRequestBytes }};
+            client_max_body_size {{ int64 .Values.portal.dataProxy.maxRequestBytes }};
             proxy_pass http://{{ include "tx-bootstrap-participant.componentName" (dict "root" . "component" "portal") }}:3000;
             proxy_http_version 1.1;
             proxy_request_buffering off;

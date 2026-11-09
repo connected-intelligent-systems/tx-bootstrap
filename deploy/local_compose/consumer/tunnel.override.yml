@@ -1,0 +1,24 @@
+# Local tunnel wiring for the consumer (see tunnel.compose.yaml).
+services:
+  public-gateway:
+    networks:
+      public:
+        aliases:
+          - consumer-tunnel-gateway
+
+  # The local stack uses plain HTTP (port 18080); no TLS endpoint.
+  tailnet-tls:
+    profiles: [tls]
+
+  tailnet:
+    # Started by bootstrap.sh once the console has issued an enrollment key.
+    profiles: [tunnel]
+    networks:
+      public: {}
+      # Outbound path to Headscale through the local "internet".
+      internet: {}
+
+networks:
+  internet:
+    name: ${TX_BOOTSTRAP_PUBLIC_NETWORK:-tx-bootstrap-public}
+    external: true

@@ -26,8 +26,10 @@ import {
   updateTechnicalMetadata,
   type ParticipantFilters,
 } from "../api/participants-api";
+import { createNetworkEnrollment } from "../api/network-api";
 import type {
   Participant,
+  ParticipantCreateInput,
   ParticipantOrganizationUpdate,
   TechnicalMetadataUpdate,
 } from "../types";
@@ -40,7 +42,10 @@ import {
 import { CreateParticipantDialog } from "./create-participant-dialog";
 import { DashboardStats } from "./dashboard-stats";
 import { ParticipantDrawer, type DrawerTab } from "./participant-detail-drawer";
-import { ParticipantInviteDialog } from "./participant-invite-dialog";
+import {
+  ParticipantInviteDialog,
+  type CreatedParticipant,
+} from "./participant-invite-dialog";
 import { ParticipantTaskWorkspace } from "./participant-task-workspace";
 import { ParticipantsFilters } from "./participants-filters";
 import { ErrorAlert, MonoText, StatusChip } from "./participant-ui";
@@ -51,9 +56,7 @@ export function ParticipantsPage() {
   const [taskId, setTaskId] = useState("");
   const [drawerTab, setDrawerTab] = useState<DrawerTab>(0);
   const [createOpen, setCreateOpen] = useState(false);
-  const [lastInvite, setLastInvite] = useState<Awaited<
-    ReturnType<typeof createParticipant>
-  > | null>(null);
+  const [lastInvite, setLastInvite] = useState<CreatedParticipant | null>(null);
   const [activeQueue, setActiveQueue] = useState<ParticipantTaskQueue | "all">(
     "all",
   );
@@ -118,7 +121,27 @@ export function ParticipantsPage() {
   }
 
   const createMutation = useMutation({
-    mutationFn: createParticipant,
+    mutationFn: async ({
+      body,
+      tunnel,
+    }: {
+      body: ParticipantCreateInput;
+      tunnel: boolean;
+    }): Promise<CreatedParticipant> => {
+      const invite = await createParticipant(body);
+      if (!tunnel) return { invite };
+      // The participant exists now; a failed key is reported in the invite
+      // dialog and can be issued again from the Tunnel tab.
+      try {
+        const enrollment = await createNetworkEnrollment(
+          invite.participant.id,
+          "invitation",
+        );
+        return { invite, tunnel: { enrollment } };
+      } catch (error) {
+        return { invite, tunnel: { error } };
+      }
+    },
     onSuccess: (invite) => {
       setLastInvite(invite);
       setCreateOpen(false);
@@ -428,13 +451,13 @@ export function ParticipantsPage() {
           open
           saving={createMutation.isPending}
           onClose={() => setCreateOpen(false)}
-          onCreate={(body) => createMutation.mutate(body)}
+          onCreate={(body, tunnel) => createMutation.mutate({ body, tunnel })}
         />
       ) : null}
 
       {lastInvite ? (
         <ParticipantInviteDialog
-          invite={lastInvite}
+          created={lastInvite}
           onClose={() => setLastInvite(null)}
         />
       ) : null}

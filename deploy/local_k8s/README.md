@@ -23,6 +23,11 @@ single-node topology and `local-path` storage are local-test limitations. A
 production environment must choose its own availability, backup, storage,
 auto-unseal, TLS, and secret-delivery design.
 
+For convenience, the local Vault pod has an `auto-unseal` sidecar that reads
+the unseal key from the `vault-bootstrap` Secret in `tx-infra` and unseals
+Vault after a pod, k3s or Rancher Desktop restart. Keeping the unseal key next
+to Vault defeats sealing; this is acceptable only for local tests.
+
 ## Prerequisites
 
 - Rancher Desktop Kubernetes context named `rancher-desktop`

@@ -19,23 +19,15 @@ if [ "${1:-}" = "-v" ] || [ "${1:-}" = "--volumes" ]; then
     DOWN_ARGS+=(-v)
 fi
 
-compose() {
-    local domain="$1"
-    local compose_file
-    if [ "$domain" = "infrastructure" ]; then
-        compose_file="$LOCAL_DIR/compose.yaml"
-    else
-        compose_file="$LOCAL_DIR/$domain/compose.yaml"
-    fi
-    local compose_args=(--env-file "$ENV_FILE" -f "$compose_file")
-    shift
+# shellcheck source=compose-lib.sh
+source "$(dirname "${BASH_SOURCE[0]}")/compose-lib.sh"
 
-    docker compose "${compose_args[@]}" "$@"
-}
-
-compose consumer "${DOWN_ARGS[@]}"
+compose consumer --profile tunnel "${DOWN_ARGS[@]}"
 compose provider "${DOWN_ARGS[@]}"
 compose operator "${DOWN_ARGS[@]}"
+if tunnel_enabled || docker compose -p "${COMPOSE_PROJECT_PREFIX:-tx-bootstrap}-tunnel" ps -aq 2>/dev/null | grep -q .; then
+    compose tunnel "${DOWN_ARGS[@]}"
+fi
 compose infrastructure "${DOWN_ARGS[@]}"
 
 if [ "${REMOVE_NETWORK:-0}" = "1" ]; then

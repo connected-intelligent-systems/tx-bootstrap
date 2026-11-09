@@ -4,6 +4,7 @@ import { createBusinessPartnerRepository } from "./business-partners.js";
 import { createIssuerPolicyClaimsRepository } from "./issuer-policy-claims.js";
 import { createOnboardingCaseRepository } from "./onboarding-cases.js";
 import { createParticipantEventRepository } from "./participant-events.js";
+import { createNetworkEnrollmentRepository } from "./network-enrollments.js";
 
 export function createRepositories(
   db: Kysely<Database>,
@@ -14,6 +15,7 @@ export function createRepositories(
     issuerPolicyClaims: createIssuerPolicyClaimsRepository(issuerClaimsDb),
     onboardingCases: createOnboardingCaseRepository(db),
     participantEvents: createParticipantEventRepository(db),
+    networkEnrollments: createNetworkEnrollmentRepository(db),
   };
 }
 

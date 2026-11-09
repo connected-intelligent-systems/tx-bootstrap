@@ -1,0 +1,288 @@
+# Optional operator tunnel ingress: a public endpoint for participants that
+# cannot accept inbound connections. It joins an existing Headscale server,
+# which the operator runs like Postgres or Vault.
+#
+#   <name>.${TUNNEL_DOMAIN}:443 ──▶ traefik (TLS passthrough, routes by SNI)
+#                                ──▶ tunnel-router (nginx stream in tunnel-node)
+#                                ──▶ <name>.<MagicDNS domain>:18443 over WireGuard
+#                                ──▶ participant's own TLS endpoint
+#
+# The ingress never decrypts participant traffic and holds no certificates:
+# each participant terminates TLS itself with its own certificate (see
+# participant.tailnet.override.yaml and docs/participant-tunnel.md).
+# Public ports: TCP 80 (redirect to HTTPS), TCP 443 and UDP 41641 (direct
+# WireGuard, announced as TUNNEL_PUBLIC_ENDPOINT).
+# Required: TUNNEL_HEADSCALE_URL, TUNNEL_DOMAIN and a tag:txb-ingress pre-auth
+# key in TUNNEL_INGRESS_AUTHKEY_FILE for the first start.
+
+name: ${COMPOSE_PROJECT_NAME:-tx-bootstrap-tunnel}
+
+x-runtime-defaults: &runtime-defaults
+  restart: "${RESTART_POLICY:-unless-stopped}"
+  init: true
+  pids_limit: 256
+  stop_grace_period: 30s
+  security_opt:
+    - no-new-privileges:true
+  logging:
+    driver: "${LOG_DRIVER:-json-file}"
+    options:
+      max-size: "${LOG_MAX_SIZE:-10m}"
+      max-file: "${LOG_MAX_FILES:-3}"
+
+services:
+  # The ingress's own WireGuard peer. Kernel mode so the router sharing its
+  # network namespace can reach tailnet addresses and MagicDNS (100.100.100.100).
+  # The key is only used for the first start; the node identity then lives in
+  # the tunnel-node-state volume.
+  tunnel-node:
+    <<: *runtime-defaults
+    image: tailscale/tailscale:v1.104.4@sha256:ed6480b33c6eb67c9cbd203ed42b9fb57e361986725b6856def71b7a3d9e276c
+    hostname: ${TUNNEL_INGRESS_HOSTNAME:-txb-ingress}
+    environment:
+      TS_AUTHKEY: file:/run/secrets/ingress-authkey
+      TS_AUTH_ONCE: "true"
+      TS_HOSTNAME: ${TUNNEL_INGRESS_HOSTNAME:-txb-ingress}
+      TS_STATE_DIR: /var/lib/tailscale
+      TS_USERSPACE: "false"
+      TS_ACCEPT_DNS: "true"
+      TS_EXTRA_ARGS: --login-server=${TUNNEL_HEADSCALE_URL:?TUNNEL_HEADSCALE_URL must be set} --accept-routes=false --ssh=false
+      # Fixed WireGuard port, published below, so participants behind NAT
+      # connect directly instead of through a DERP relay.
+      TS_TAILSCALED_EXTRA_ARGS: --port=41641
+      # Behind Docker's NAT the node cannot discover its public address and
+      # port, so announce them (e.g. 203.0.113.10:41641). Empty: relay only.
+      TS_DEBUG_PRETENDPOINT: ${TUNNEL_PUBLIC_ENDPOINT:-}
+      TS_ENABLE_HEALTH_CHECK: "true"
+      TS_LOCAL_ADDR_PORT: 127.0.0.1:9002
+    secrets:
+      - ingress-authkey
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    volumes:
+      - tunnel-node-state:/var/lib/tailscale
+    ports:
+      - target: 41641
+        published: "41641"
+        protocol: udp
+    networks:
+      - tunnel
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "-q",
+          "-O",
+          "/dev/null",
+          "http://127.0.0.1:9002/healthz",
+        ]
+      interval: 10s
+      timeout: 3s
+      retries: 30
+      start_period: 15s
+    mem_limit: 256m
+    cpus: 0.5
+
+  # Maps <name>.${TUNNEL_DOMAIN} to the tailnet node of the same name, by the
+  # TLS server name without decrypting. Node names are assigned by the
+  # operator console, never by participants.
+  tunnel-router:
+    <<: *runtime-defaults
+    image: nginxinc/nginx-unprivileged:1.30.4-alpine3.24@sha256:adf5042a17f4ecdd200c595fa9ffd1be37efb18f89a830bd1a00e4ab4d59d42c
+    network_mode: service:tunnel-node
+    cap_drop:
+      - ALL
+    configs:
+      - source: tunnel-router-nginx
+        target: /etc/nginx/nginx.conf
+      - source: tunnel-router
+        target: /etc/nginx/conf.d/default.conf
+    depends_on:
+      tunnel-node:
+        condition: service_healthy
+        restart: true
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "-q",
+          "-O",
+          "/dev/null",
+          "http://127.0.0.1:8081/healthz",
+        ]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+    mem_limit: 128m
+    cpus: 0.5
+
+  traefik:
+    <<: *runtime-defaults
+    image: traefik:v3.7.17@sha256:f4bb143d1135a579b630ed491e17ec50f6f7c9c6a30585ff3d385471d2a86f5a
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    command:
+      - --log.level=INFO
+      - --ping.entryPoint=health
+      - --entryPoints.health.address=127.0.0.1:8082
+      - --entryPoints.web.address=:80
+      - --entryPoints.web.http.redirections.entryPoint.to=websecure
+      - --entryPoints.websecure.address=:443
+      # A directory, so operators can add routes (for example to a Headscale
+      # behind the same Traefik) as extra files without replacing these.
+      - --providers.file.directory=/etc/traefik/dynamic
+    configs:
+      - source: traefik-dynamic
+        target: /etc/traefik/dynamic/participants.yaml
+    ports:
+      - target: 80
+        published: "${TUNNEL_HTTP_PORT:-80}"
+        protocol: tcp
+      - target: 443
+        published: "${TUNNEL_HTTPS_PORT:-443}"
+        protocol: tcp
+    networks:
+      - tunnel
+    # No dependency on the tunnel node: Traefik may also front the operator's
+    # Headscale, which the node needs before it can become healthy.
+    # Participant requests return 502 until the router is up.
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "traefik",
+          "healthcheck",
+          "--ping",
+          "--ping.entryPoint=health",
+          "--entryPoints.health.address=127.0.0.1:8082",
+        ]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+    mem_limit: 256m
+    cpus: 0.5
+
+configs:
+  # Default nginx.conf of the image plus a stream block for TLS passthrough.
+  tunnel-router-nginx:
+    content: |
+      worker_processes auto;
+      error_log /dev/stderr notice;
+      pid /tmp/nginx.pid;
+
+      events {
+          worker_connections 4096;
+      }
+
+      # Production path: forward the still-encrypted connection to the
+      # participant node chosen by the TLS server name (SNI).
+      stream {
+          resolver 100.100.100.100 valid=10s ipv6=off;
+          resolver_timeout 3s;
+
+          map $$ssl_preread_server_name $$participant {
+              "~^(?<node>[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)\.${TUNNEL_DOMAIN:?TUNNEL_DOMAIN must be set}$$" "$$node.${TUNNEL_MAGICDNS_DOMAIN:-tailnet.internal}:18443";
+              default "";
+          }
+
+          # No per-name connection limit here: nginx applies limit_conn before
+          # it reads the server name. Request limits live at each participant;
+          # Traefik caps connections per client address.
+          server {
+              listen 8443;
+              ssl_preread on;
+              proxy_pass $$participant;
+              proxy_connect_timeout 5s;
+              proxy_timeout 300s;
+          }
+      }
+
+      http {
+          proxy_temp_path /tmp/proxy_temp;
+          client_body_temp_path /tmp/client_temp;
+          fastcgi_temp_path /tmp/fastcgi_temp;
+          uwsgi_temp_path /tmp/uwsgi_temp;
+          scgi_temp_path /tmp/scgi_temp;
+          access_log off;
+          include /etc/nginx/conf.d/*.conf;
+      }
+
+  # Health endpoint, plus a plain-HTTP path (Host header to node:18080) used
+  # only by the local stack, which runs without TLS.
+  tunnel-router:
+    content: |
+      server {
+          listen 127.0.0.1:8081;
+          location = /healthz { return 204; }
+      }
+
+      server {
+          listen 8080 default_server;
+          return 404;
+      }
+
+      server {
+          listen 8080;
+          server_name "~^(?<node>[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)\.${TUNNEL_DOMAIN:?TUNNEL_DOMAIN must be set}$$";
+          resolver 100.100.100.100 valid=10s ipv6=off;
+          resolver_timeout 3s;
+          client_max_body_size 0;
+          proxy_request_buffering off;
+          proxy_buffering off;
+
+          location / {
+              proxy_pass http://$$node.${TUNNEL_MAGICDNS_DOMAIN:-tailnet.internal}:18080;
+              proxy_http_version 1.1;
+              proxy_set_header Host $$host;
+              proxy_set_header X-Forwarded-Host $$host;
+              proxy_set_header X-Forwarded-For $$proxy_add_x_forwarded_for;
+              proxy_connect_timeout 5s;
+              proxy_read_timeout 300s;
+          }
+      }
+
+  traefik-dynamic:
+    content: |
+      tcp:
+        routers:
+          # TLS passthrough: Traefik reads only the server name and never
+          # decrypts. Clients without SNI are not routed.
+          participants:
+            rule: HostSNIRegexp(`^[a-z0-9-]+\.${TUNNEL_DOMAIN:?TUNNEL_DOMAIN must be set}$$`)
+            priority: 10
+            entryPoints: [websecure]
+            service: participants
+            middlewares:
+              - per-client-connections
+            tls:
+              passthrough: true
+        middlewares:
+          # Slow clients can hold connections open; cap what a single client
+          # address can hold.
+          per-client-connections:
+            inFlightConn:
+              amount: ${TUNNEL_MAX_CONNECTIONS_PER_CLIENT:-16}
+        services:
+          participants:
+            loadBalancer:
+              servers:
+                - address: tunnel-node:8443
+
+networks:
+  tunnel:
+    name: ${COMPOSE_PROJECT_NAME:-tx-bootstrap-tunnel}
+
+secrets:
+  # Single-use tag:txb-ingress pre-auth key from the operator's Headscale.
+  ingress-authkey:
+    file: ${TUNNEL_INGRESS_AUTHKEY_FILE:-./secrets/ingress-authkey}
+
+volumes:
+  tunnel-node-state:

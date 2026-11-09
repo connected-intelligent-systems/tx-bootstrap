@@ -1,0 +1,145 @@
+# Local and CI only: a throwaway Headscale for deploy/compose/tunnel.compose.yaml.
+# Real deployments bring their own Headscale (see docs/participant-tunnel.md);
+# this file doubles as a working example of the configuration and policy the
+# tunnel needs. Apply it on top of tunnel.compose.yaml, which it extends.
+#
+# Uses Tailscale's public DERP map, because the embedded relay needs HTTPS.
+
+services:
+  headscale:
+    image: headscale/headscale:0.29.7@sha256:11f81665e842809db9fe3006a38c56a66e968baa5abd4bac498e86445572b970
+    restart: "${RESTART_POLICY:-unless-stopped}"
+    init: true
+    security_opt:
+      - no-new-privileges:true
+    command: ["serve"]
+    configs:
+      - source: headscale-config
+        target: /etc/headscale/config.yaml
+      - source: headscale-policy
+        target: /etc/headscale/policy.json
+    volumes:
+      - headscale-data:/var/lib/headscale
+      - headscale-socket:/var/run/headscale
+    networks:
+      - tunnel
+    healthcheck:
+      test: ["CMD", "headscale", "health"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    mem_limit: 512m
+    cpus: 1.0
+
+  # Creates the ingress node's single-use key once, which an operator would
+  # otherwise put into TUNNEL_INGRESS_AUTHKEY_FILE.
+  tunnel-bootstrap:
+    image: headscale/headscale:0.29.7-debug@sha256:e13ad8980c5831a3bf4eff0d4303e438c10d7d87945d72722d3e92550057aa06
+    restart: "no"
+    security_opt:
+      - no-new-privileges:true
+    entrypoint: ["/busybox/sh", "-ec"]
+    command:
+      - |
+        umask 077
+        key_file=/bootstrap/ingress-authkey
+        [ -s "$$key_file" ] && exit 0
+        out=$$(/ko-app/headscale preauthkeys create --tags tag:txb-ingress --expiration 1h --output json)
+        key=$$(printf '%s\n' "$$out" | sed -n 's/.*"key": *"\([^"]*\)".*/\1/p' | head -n 1)
+        [ -n "$$key" ] || { echo "Ingress key creation failed" >&2; exit 1; }
+        printf '%s' "$$key" > "$$key_file.tmp"
+        mv "$$key_file.tmp" "$$key_file"
+        echo "Ingress enrollment key prepared"
+    configs:
+      - source: headscale-config
+        target: /etc/headscale/config.yaml
+    volumes:
+      - headscale-socket:/var/run/headscale
+      - tunnel-bootstrap:/bootstrap
+    depends_on:
+      headscale:
+        condition: service_healthy
+    network_mode: none
+
+  tunnel-node:
+    environment:
+      TS_AUTHKEY: file:/bootstrap/ingress-authkey
+      # The ingress reaches Headscale inside the project.
+      TS_EXTRA_ARGS: --login-server=http://headscale:8080 --accept-routes=false --ssh=false
+    secrets: !reset []
+    volumes:
+      - tunnel-bootstrap:/bootstrap:ro
+    depends_on:
+      headscale:
+        condition: service_healthy
+      tunnel-bootstrap:
+        condition: service_completed_successfully
+
+configs:
+  headscale-config:
+    content: |
+      server_url: ${TUNNEL_HEADSCALE_URL:?TUNNEL_HEADSCALE_URL must be set}
+      listen_addr: 0.0.0.0:8080
+      metrics_listen_addr: ""
+      grpc_listen_addr: 127.0.0.1:50443
+      grpc_allow_insecure: false
+      disable_check_updates: true
+      noise:
+        private_key_path: /var/lib/headscale/noise_private.key
+      prefixes:
+        v4: 100.64.0.0/10
+        v6: fd7a:115c:a1e0::/48
+        allocation: sequential
+      derp:
+        server:
+          enabled: false
+        urls: [https://controlplane.tailscale.com/derpmap/default]
+        paths: []
+        auto_update_enabled: false
+      database:
+        type: sqlite
+        sqlite:
+          path: /var/lib/headscale/db.sqlite
+          write_ahead_log: true
+      dns:
+        # The ingress resolves <name>.<base_domain> through MagicDNS.
+        magic_dns: true
+        base_domain: ${TUNNEL_MAGICDNS_DOMAIN:-tailnet.internal}
+        override_local_dns: false
+        nameservers:
+          global: []
+          split: {}
+        search_domains: []
+        extra_records: []
+      policy:
+        mode: file
+        path: /etc/headscale/policy.json
+      unix_socket: /var/run/headscale/headscale.sock
+      unix_socket_permission: "0770"
+      log:
+        level: info
+        format: json
+
+  # Only the ingress may reach participants, and only their tunnel port.
+  # Participants get no grants: no peer-to-peer access, no access to the ingress.
+  headscale-policy:
+    content: |
+      {
+        "tagOwners": {
+          "tag:txb-ingress": [],
+          "tag:txb-participant": []
+        },
+        "grants": [
+          {
+            "src": ["tag:txb-ingress"],
+            "dst": ["tag:txb-participant"],
+            "ip": ["tcp:18443", "tcp:18080"]
+          }
+        ]
+      }
+
+volumes:
+  headscale-data:
+  headscale-socket:
+  tunnel-bootstrap:

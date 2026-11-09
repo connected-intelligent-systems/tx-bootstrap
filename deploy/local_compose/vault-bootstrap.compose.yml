@@ -1,5 +1,41 @@
 # Shared local-only Vault initialization and unseal logic.
 configs:
+  # Starts Vault and unseals it with the key vault-init stored, so the local
+  # stack survives a Docker restart without running vault-init again.
+  local-vault-server:
+    content: |
+      #!/bin/sh
+      set -eu
+
+      docker-entrypoint.sh server &
+      pid=$$!
+      trap 'kill -TERM "$$pid" 2>/dev/null || true' TERM INT
+
+      bootstrap_file="$${VAULT_BOOTSTRAP_FILE:-/vault/bootstrap/credentials}"
+      if [ -s "$$bootstrap_file" ]; then
+          # vault status: 0 unsealed, 1 unreachable, 2 sealed.
+          while :; do
+              rc=0
+              vault status >/dev/null 2>&1 || rc=$$?
+              [ "$$rc" -ne 1 ] && break
+              kill -0 "$$pid" 2>/dev/null || break
+              sleep 1
+          done
+          if [ "$$rc" -eq 2 ]; then
+              unseal_key="$$(sed -n 's/^UNSEAL_KEY=//p' "$$bootstrap_file")"
+              vault operator unseal "$$unseal_key" >/dev/null
+              echo "Local Vault unsealed with the stored key."
+          fi
+      fi
+
+      status=0
+      wait "$$pid" || status=$$?
+      # A trapped signal interrupts wait; wait until Vault has shut down.
+      while kill -0 "$$pid" 2>/dev/null; do
+          wait "$$pid" || status=$$?
+      done
+      exit "$$status"
+
   local-vault-bootstrap:
     content: |
       #!/bin/sh

@@ -34,6 +34,8 @@ CONSUMER_PORTAL_DIRECTORY_URL="${CONSUMER_PORTAL_DIRECTORY_URL:-http://consumer-
 PORTAL_ADMIN_USERNAME="${PORTAL_ADMIN_USERNAME:-admin}"
 PORTAL_ADMIN_PASSWORD="${PORTAL_ADMIN_PASSWORD:-local-admin-password}"
 PORTAL_ADMIN_AUTH=(-u "${PORTAL_ADMIN_USERNAME}:${PORTAL_ADMIN_PASSWORD}")
+TUNNEL_ENABLED="${TX_BOOTSTRAP_TUNNEL:-0}"
+TUNNEL_ROUTABLE_RETRIES="${TUNNEL_ROUTABLE_RETRIES:-60}"
 
 step() { printf "\n=== %s ===\n" "$1"; }
 ok() { printf "  OK %s\n" "$1"; }
@@ -61,6 +63,45 @@ wait_for_health() {
     return 1
 }
 
+
+# Tunnel mode: enroll the participant through the operator console, hand the
+# single-use key to bootstrap.sh (which starts the sidecar), and wait until
+# the console has assigned the node its canonical name.
+enroll_tunnel() {
+    local label="$1" business_partner_id="$2" bpn="$3" did_host="$4"
+    local deployment_id tmp http_code response attempt routable
+    deployment_id="$(cat /proc/sys/kernel/random/uuid)"
+    tmp="$(mktemp)"
+    http_code="$(curl -s -w "%{http_code}" -o "$tmp" \
+        -X POST "${OPERATOR_CONSOLE_API_URL}/admin/participants/${business_partner_id}/network-enrollments" \
+        -H "Content-Type: application/json" \
+        "${OPERATOR_CONSOLE_AUTH_HEADERS[@]}" \
+        -d "{\"deploymentId\":\"${deployment_id}\"}" 2>/dev/null || true)"
+    if [ "$http_code" != "201" ]; then
+        cat "$tmp"; rm -f "$tmp"
+        fail "${label} tunnel enrollment failed with HTTP ${http_code}"
+    fi
+    (umask 022; jq -r '.authKey' "$tmp" >/handoff/consumer-authkey.tmp)
+    rm -f "$tmp"
+    mv /handoff/consumer-authkey.tmp /handoff/consumer-authkey
+    ok "${label} enrolled in the operator tunnel"
+
+    attempt=0
+    while [ "$attempt" -lt "$TUNNEL_ROUTABLE_RETRIES" ]; do
+        response="$(curl -sf "${OPERATOR_CONSOLE_AUTH_HEADERS[@]}" \
+            "${OPERATOR_CONSOLE_API_URL}/admin/participants/${business_partner_id}/network-enrollments" 2>/dev/null || true)"
+        routable="$(printf "%s" "$response" | jq -r --arg id "$deployment_id" \
+            '.[] | select(.deploymentId == $id) | .node.routable // false' 2>/dev/null || true)"
+        if [ "$routable" = "true" ] && curl -sf "http://${did_host}/${bpn}/did.json" >/dev/null 2>&1; then
+            ok "${label} reachable through the tunnel at http://${did_host}"
+            return
+        fi
+        attempt=$((attempt + 1))
+        sleep 2
+    done
+    printf "%s\n" "$response"
+    fail "${label} did not become reachable through the tunnel"
+}
 
 onboard_participant() {
     local label="$1" org_name="$2" bpn="$3" did="$4" dsp_endpoint="$5" credential_endpoint="$6" gateway_url="$7"
@@ -110,6 +151,10 @@ onboard_participant() {
     [ -n "$business_partner_id" ] && [ "$business_partner_id" != "null" ] || fail "${label} onboarding case did not return businessPartnerId"
     [ "$assigned_bpn" = "$bpn" ] || fail "${label} participant creation returned unexpected BPN ${assigned_bpn:-missing}"
     ok "${label} participant created with verified BPN"
+
+    if [ "$TUNNEL_ENABLED" = "1" ] && [ "$label" = "consumer" ]; then
+        enroll_tunnel "$label" "$business_partner_id" "$bpn" "$CONSUMER_DID_HOST"
+    fi
 
     tmp="$(mktemp)"
     http_code="$(curl -s -w "%{http_code}" -o "$tmp" \
@@ -277,7 +322,10 @@ http_code="$(curl -s -o /dev/null -w "%{http_code}" \
 case "$http_code" in 200|204|409) ok "contract definition ready" ;; *) fail "contract definition failed with HTTP ${http_code}" ;; esac
 
 step "Verifying DID documents"
-for entry in "provider-did|${BPN_PROVIDER}" "consumer-did|${BPN_CONSUMER}"; do
+did_entries=("${PROVIDER_DID_HOST}|${BPN_PROVIDER}")
+# A tunnelled consumer is only reachable after its enrollment during onboarding.
+[ "$TUNNEL_ENABLED" = "1" ] || did_entries+=("${CONSUMER_DID_HOST}|${BPN_CONSUMER}")
+for entry in "${did_entries[@]}"; do
     host="${entry%%|*}"
     bpn="${entry#*|}"
     did_document="$(curl -sf "http://${host}/${bpn}/did.json")"

@@ -60,6 +60,26 @@ spec:
               {{- end }}
             - name: OPERATOR_CONSOLE_HTTPS_HEADERS
               value: {{ .Values.operatorConsole.httpsHeaders | quote }}
+            {{- if .Values.operatorConsole.headscale.enabled }}
+            - name: HEADSCALE_ENABLED
+              value: "true"
+            - name: HEADSCALE_URL
+              value: {{ .Values.operatorConsole.headscale.url | quote }}
+            - name: HEADSCALE_API_KEY
+              {{- include "tx-bootstrap-operator.secretValue" (dict "root" . "key" "headscaleApiKey") | nindent 14 }}
+            - name: HEADSCALE_PARTICIPANT_TAG
+              value: {{ .Values.operatorConsole.headscale.participantTag | quote }}
+            - name: HEADSCALE_PARTICIPANT_DOMAIN
+              value: {{ .Values.operatorConsole.headscale.participantDomain | quote }}
+            - name: HEADSCALE_ENROLLMENT_TTL_SECONDS
+              value: {{ .Values.operatorConsole.headscale.enrollmentTtlSeconds | quote }}
+            - name: HEADSCALE_INVITATION_TTL_SECONDS
+              value: {{ .Values.operatorConsole.headscale.invitationTtlSeconds | quote }}
+            - name: HEADSCALE_STALE_NODE_SECONDS
+              value: {{ .Values.operatorConsole.headscale.staleNodeSeconds | quote }}
+            - name: HEADSCALE_TIMEOUT_MS
+              value: {{ .Values.operatorConsole.headscale.timeoutMs | quote }}
+            {{- end }}
             - name: BDRS_MANAGEMENT_URL
               value: "http://{{ include "tx-bootstrap-operator.componentName" (dict "root" . "component" "bdrs") }}:8081/api/management"
             - name: BDRS_API_KEY

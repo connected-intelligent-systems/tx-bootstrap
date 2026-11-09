@@ -1,0 +1,18 @@
+name: ${COMPOSE_PROJECT_PREFIX:-tx-bootstrap}-consumer
+
+# Consumer variant for TX_BOOTSTRAP_TUNNEL=1: no direct public endpoint. Its
+# public gateway sits on a private edge network and is reachable only through
+# the operator tunnel at http://bpnl00000003azqp.tunnel.test.
+include:
+  - path:
+      - ${PARTICIPANT_COMPOSE_REF:-oci://ghcr.io/connected-intelligent-systems/tx-bootstrap-participant:latest}
+      - ../vault-bootstrap.compose.yml
+      - ../participant-vault.override.yml
+      - ../participant-database.override.yml
+      - ../participant-auth.override.yml
+      - compose.override.yml
+      - ../../compose/participant.tailnet.override.yaml
+      - tunnel.override.yml
+    env_file:
+      - .env.example
+      - tunnel.env

@@ -156,7 +156,8 @@ deploy/local_compose/scripts/down.sh
 The shared local PostgreSQL data, role-specific Vault data, and local-only
 unseal material are stored in named volumes, so a plain `down` followed by `up`
 preserves database and Vault state. Provisioning and migration jobs are safe to
-rerun. The unseal
+rerun. The stack also survives a Docker restart: each local Vault restarts with
+its services and unseals itself with the stored key. The unseal
 material is intentionally automated for this local deployment only; production
 deployments must provide an externally managed Vault through the reusable
 template contract.

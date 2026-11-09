@@ -66,6 +66,8 @@ existingSecret:
     operatorConsoleApiKey: operator-console-api-key
     # Leave empty to let the console retrieve the key from Vault.
     issuerApiKey: ""
+    # Required only when operatorConsole.headscale.enabled=true.
+    headscaleApiKey: ""
 
 jobs:
   migrator:
@@ -197,6 +199,18 @@ operatorConsole:
   configJson: ""
   themeJson: ""
   httpsHeaders: true
+  headscale:
+    enabled: false
+    url: ""
+    participantTag: tag:txb-participant
+    # Public DNS zone served by the tunnel ingress; required when enabled.
+    participantDomain: ""
+    enrollmentTtlSeconds: 900
+    # Lifetime of keys sent with a participant invitation.
+    invitationTtlSeconds: 604800
+    # Offline nodes older than this are flagged as stale in the console.
+    staleNodeSeconds: 604800
+    timeoutMs: 5000
   service:
     type: ClusterIP
     port: 3000

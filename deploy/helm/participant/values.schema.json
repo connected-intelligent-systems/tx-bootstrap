@@ -17,6 +17,7 @@
     "portal",
     "publicGateway",
     "internalGateway",
+    "tunnel",
     "ingress"
   ],
   "properties": {
@@ -391,6 +392,70 @@
     },
     "publicGateway": { "$ref": "#/definitions/httpComponent" },
     "internalGateway": { "$ref": "#/definitions/httpComponent" },
+    "tunnel": {
+      "type": "object",
+      "required": [
+        "enabled",
+        "headscaleUrl",
+        "hostname",
+        "authKeySecretKey",
+        "securityContext",
+        "image",
+        "tls",
+        "persistence",
+        "resources"
+      ],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "headscaleUrl": { "type": "string", "pattern": "^$|^https://[^/]+/?$" },
+        "hostname": {
+          "type": "string",
+          "pattern": "^$|^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$"
+        },
+        "authKeySecretKey": { "$ref": "#/definitions/secretKey" },
+        "securityContext": { "$ref": "#/definitions/runtimeIdentity" },
+        "image": { "$ref": "#/definitions/image" },
+        "tls": {
+          "type": "object",
+          "required": [
+            "acmeCaServer",
+            "acmeEmail",
+            "rateLimit",
+            "maxConcurrentRequests",
+            "image",
+            "resources"
+          ],
+          "properties": {
+            "acmeCaServer": { "type": "string", "pattern": "^https://" },
+            "acmeEmail": { "type": "string" },
+            "rateLimit": {
+              "type": "object",
+              "required": ["average", "burst"],
+              "properties": {
+                "average": { "type": "integer", "minimum": 1 },
+                "burst": { "type": "integer", "minimum": 1 }
+              }
+            },
+            "maxConcurrentRequests": { "type": "integer", "minimum": 1 },
+            "image": { "$ref": "#/definitions/image" },
+            "resources": { "$ref": "#/definitions/resources" }
+          }
+        },
+        "persistence": {
+          "type": "object",
+          "required": ["existingClaim", "storageClassName", "size"],
+          "properties": {
+            "existingClaim": { "type": "string" },
+            "storageClassName": { "type": "string" },
+            "size": {
+              "type": "string",
+              "pattern": "^[0-9]+(\\.[0-9]+)?(Ki|Mi|Gi|Ti|K|M|G|T)?$"
+            }
+          }
+        },
+        "resources": { "$ref": "#/definitions/resources" }
+      }
+    },
     "ingress": {
       "type": "object",
       "required": ["public", "internal"],
@@ -423,6 +488,23 @@
               "auth": {
                 "properties": { "allowInsecure": { "const": true } }
               }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "tunnel": { "properties": { "enabled": { "const": true } } }
+        }
+      },
+      "then": {
+        "properties": {
+          "tunnel": {
+            "properties": {
+              "headscaleUrl": { "minLength": 1 },
+              "hostname": { "minLength": 1 }
             }
           }
         }

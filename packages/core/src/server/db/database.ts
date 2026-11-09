@@ -107,6 +107,21 @@ export type SchemaMigrationTable = {
   executed_at: TimestampColumn;
 };
 
+export type NetworkEnrollmentState =
+  "CREATING" | "ISSUED" | "FAILED" | "REVOKING" | "REVOKED";
+export type NetworkEnrollmentTable = {
+  id: string;
+  business_partner_id: string;
+  control_url: string;
+  participant_tag: string;
+  pre_auth_key_id: string | null;
+  state: NetworkEnrollmentState;
+  expires_at: TimestampColumn;
+  created_at: TimestampColumn;
+  updated_at: TimestampColumn;
+};
+export type NetworkEnrollmentRow = Selectable<NetworkEnrollmentTable>;
+
 export type IssuerPolicyClaimsTable = {
   holder_id: string;
   holder_identifier: string;
@@ -124,6 +139,7 @@ export type Database = {
   business_partners: BusinessPartnerTable;
   onboarding_cases: OnboardingCaseTable;
   participant_events: ParticipantEventTable;
+  network_enrollments: NetworkEnrollmentTable;
   schema_migrations: SchemaMigrationTable;
 };
 

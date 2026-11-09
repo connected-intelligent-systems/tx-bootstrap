@@ -87,6 +87,20 @@ workloads use the chart-managed ServiceAccount.
 retrieve that key from Vault. All key names can be changed under
 `existingSecret.keys`.
 
+Headscale enrollment is optional and uses an existing external server. To
+enable it, set `operatorConsole.headscale.enabled=true`,
+`operatorConsole.headscale.url=https://headscale.example.org`,
+`operatorConsole.headscale.participantDomain` to the public tunnel DNS zone, and
+`existingSecret.keys.headscaleApiKey` to the key holding the administrative
+Headscale token in the same pre-existing Secret. Only the console receives
+this token. Configure `operatorConsole.headscale.participantTag` in Headscale's
+policy first; the chart does not deploy Headscale or manage its policy. The
+default enrollment lifetime is 900 seconds. See the
+[operator enrollment API](../../../docs/operator.md#optional-headscale-enrollment-api)
+for API behavior and [Participant tunnel](../../../docs/participant-tunnel.md)
+for the participant and ingress side. Disabled releases
+do not require a Headscale Secret key.
+
 `operatorConsole.auth.mode` supports `api-key` and `forwarded-header`. API-key
 mode requires the Secret key above. Forwarded-header mode trusts the configured
 `operatorConsole.auth.header` and must only be used behind an authenticating

@@ -13,12 +13,19 @@ if [ -f "$ENV_FILE" ]; then
     set +a
 fi
 
+# shellcheck source=compose-lib.sh
+source "$(dirname "${BASH_SOURCE[0]}")/compose-lib.sh"
+
 PREFIX="${COMPOSE_PROJECT_PREFIX:-tx-bootstrap}"
 PUBLIC_NETWORK="${TX_BOOTSTRAP_PUBLIC_NETWORK:-tx-bootstrap-public}"
 CONTAINER="tx-bootstrap-bootstrap-$$"
 
+HANDOFF="$(mktemp -d)"
+chmod 700 "$HANDOFF"
+
 cleanup() {
     docker rm -f "$CONTAINER" >/dev/null 2>&1 || true
+    rm -rf "$HANDOFF"
 }
 trap cleanup EXIT
 
@@ -38,13 +45,27 @@ docker exec \
     -e "PGPASSWORD=${POSTGRES_PASSWORD:-password}" \
     "$local_postgres" \
     psql -U "${POSTGRES_USER:-user}" -d dataspace_admin -v ON_ERROR_STOP=1 \
-    -c "DELETE FROM onboarding_cases WHERE bpn IN ('${BPN_PROVIDER}', '${BPN_CONSUMER}') OR requested_bpn IN ('${BPN_PROVIDER}', '${BPN_CONSUMER}') OR business_partner_id IN (SELECT id FROM business_partners WHERE assigned_bpn IN ('${BPN_PROVIDER}', '${BPN_CONSUMER}') OR requested_bpn IN ('${BPN_PROVIDER}', '${BPN_CONSUMER}')); DELETE FROM business_partners WHERE assigned_bpn IN ('${BPN_PROVIDER}', '${BPN_CONSUMER}') OR requested_bpn IN ('${BPN_PROVIDER}', '${BPN_CONSUMER}');" \
+    -c "DELETE FROM network_enrollments WHERE business_partner_id IN (SELECT id FROM business_partners WHERE assigned_bpn IN ('${BPN_PROVIDER}', '${BPN_CONSUMER}') OR requested_bpn IN ('${BPN_PROVIDER}', '${BPN_CONSUMER}')); DELETE FROM onboarding_cases WHERE bpn IN ('${BPN_PROVIDER}', '${BPN_CONSUMER}') OR requested_bpn IN ('${BPN_PROVIDER}', '${BPN_CONSUMER}') OR business_partner_id IN (SELECT id FROM business_partners WHERE assigned_bpn IN ('${BPN_PROVIDER}', '${BPN_CONSUMER}') OR requested_bpn IN ('${BPN_PROVIDER}', '${BPN_CONSUMER}')); DELETE FROM business_partners WHERE assigned_bpn IN ('${BPN_PROVIDER}', '${BPN_CONSUMER}') OR requested_bpn IN ('${BPN_PROVIDER}', '${BPN_CONSUMER}');" \
     >/dev/null 2>&1 || true
+
+RUNNER_TUNNEL_ARGS=()
+if tunnel_enabled; then
+    # Re-enroll from scratch: the previous node identity belongs to a deleted
+    # enrollment and is moved off the reserved name by the console.
+    compose consumer --profile tunnel rm -sf tailnet >/dev/null 2>&1 || true
+    docker volume rm -f "${PREFIX}-consumer_tailnet-state" >/dev/null 2>&1 || true
+    RUNNER_TUNNEL_ARGS=(
+        -e TX_BOOTSTRAP_TUNNEL=1
+        -e "CONSUMER_DID_HOST=$TUNNEL_CONSUMER_HOST"
+    )
+fi
 
 docker create \
     --name "$CONTAINER" \
     --network "$PUBLIC_NETWORK" \
     --env-file "$ENV_FILE" \
+    ${RUNNER_TUNNEL_ARGS[@]+"${RUNNER_TUNNEL_ARGS[@]}"} \
+    -v "$HANDOFF:/handoff" \
     -v "$LOCAL_DIR/scripts:/scripts:ro" \
     --entrypoint /bin/sh \
     "$RUNNER_IMAGE" \
@@ -59,7 +80,23 @@ for network in \
     docker network connect "$network" "$CONTAINER"
 done
 
-docker start -a "$CONTAINER"
+docker start -a "$CONTAINER" &
+runner_pid=$!
+
+if tunnel_enabled; then
+    # The runner enrolls the consumer through the console and hands over the
+    # single-use key; the sidecar must run before onboarding can continue.
+    while kill -0 "$runner_pid" 2>/dev/null; do
+        if [ -s "$HANDOFF/consumer-authkey" ]; then
+            install -m 600 "$HANDOFF/consumer-authkey" "$TUNNEL_CONSUMER_AUTHKEY"
+            rm -f "$HANDOFF/consumer-authkey"
+            compose consumer --profile tunnel up -d --no-deps tailnet
+            break
+        fi
+        sleep 1
+    done
+fi
+wait "$runner_pid" || true
 
 RUNNER_EXIT_CODE="$(docker inspect --format '{{.State.ExitCode}}' "$CONTAINER")"
 if [ "$RUNNER_EXIT_CODE" -ne 0 ]; then
