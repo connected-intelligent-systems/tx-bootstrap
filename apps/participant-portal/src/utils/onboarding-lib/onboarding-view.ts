@@ -6,7 +6,7 @@ import type { GatewayState, ParticipantDetails, SetupStep } from '../../types/on
 
 export type Message = { tone: 'ok' | 'info' | 'error'; text: string }
 export type PageState =
-  'needsInvite' | 'attachingInvite' | 'waitingForOperator' | 'settingUpCredentials' | 'failed' | 'ready'
+  'needsInvite' | 'attachingInvite' | 'waitingForOperator' | 'settingUpCredentials' | 'failed' | 'revoked' | 'ready'
 export type InviteInput = { registrationToken: string }
 
 export function buildParticipantDetails(state: GatewayState): ParticipantDetails {
@@ -66,6 +66,7 @@ export function activeStepIndex(steps: SetupStep[]) {
 
 export function derivePageState(state: GatewayState): PageState {
   if (state.onboarded) return 'ready'
+  if (state.state === 'REVOKED') return 'revoked'
   if (state.state === 'FAILED') return 'failed'
   if (!state.caseId && state.attachMode) return 'attachingInvite'
   if (!state.caseId) return 'needsInvite'
@@ -90,6 +91,8 @@ export function heroTitle(pageState: PageState, t: UiCopy) {
       return t.heroSettingUpCredentials
     case 'failed':
       return t.heroFailed
+    case 'revoked':
+      return t.heroRevoked
     case 'ready':
       return t.readyForPortal
   }
@@ -101,6 +104,8 @@ export function statusDescription(state: GatewayState, t: UiCopy) {
       return t.readyStatus
     case 'failed':
       return t.failedStatus
+    case 'revoked':
+      return t.revokedStatus
     case 'needsInvite':
       return t.preregistrationMissingStatus
     case 'attachingInvite':

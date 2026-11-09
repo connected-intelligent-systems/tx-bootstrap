@@ -146,6 +146,7 @@ export function ParticipantsFilters({
               <MenuItem value="IN_REVIEW">In review</MenuItem>
               <MenuItem value="VERIFIED">Verified</MenuItem>
               <MenuItem value="REJECTED">Rejected</MenuItem>
+              <MenuItem value="REVOKED">Revoked</MenuItem>
             </Select>
           </FormControl>
         </Box>

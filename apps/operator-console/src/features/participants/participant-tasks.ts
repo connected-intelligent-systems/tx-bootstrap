@@ -50,6 +50,12 @@ export function canEditConnectorMetadata(participant: Participant): boolean {
   );
 }
 
+export function canRevokeParticipant(participant: Participant): boolean {
+  return (
+    participant.stage !== "REVOKED" && Boolean(participant.bpn.assignedBpn)
+  );
+}
+
 export function isParticipantActive(participant: Participant): boolean {
   return (
     participant.stage === "CREDENTIALS" &&
@@ -77,6 +83,36 @@ export function deriveParticipantTask(
       description:
         "Connector setup failed. Review the failed checks, then retry the setup when the issue is fixed.",
       tableCue: "Retry setup",
+      severity: "error",
+    });
+  }
+
+  if (participant.stage === "REVOKED") {
+    if (participant.revocation?.failed) {
+      return statusTask({
+        queue: "admin",
+        title: "Revocation incomplete",
+        description:
+          "Some revocation steps failed. Review them on the participant and retry the revocation.",
+        tableCue: "Retry revocation",
+        severity: "error",
+      });
+    }
+    if (participant.revocation && !participant.revocation.complete) {
+      return statusTask({
+        queue: "waiting",
+        title: "Revocation in progress",
+        description:
+          "The console checks for late credential issuance and waits for tunnel keys to be revoked. No admin action is required.",
+        tableCue: "Revoking",
+        severity: "info",
+      });
+    }
+    return statusTask({
+      queue: "done",
+      title: "Participant revoked",
+      description: participant.revocation?.reason || "Participant was revoked.",
+      tableCue: "Revoked",
       severity: "error",
     });
   }

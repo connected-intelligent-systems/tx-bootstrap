@@ -16,6 +16,13 @@ import type { CredentialSummary, ExpectedCredential, JsonRecord, OnboardingInput
 
 const participantReadyStates = ['READY_FOR_PARTICIPANT', 'CREDENTIALS_REQUESTED']
 let autoProgressPromise: Promise<void> | null = null
+// After onboarding, the background monitor checks the operator case once a
+// minute to notice revocation and readmission. Portal page polling checks it
+// at most every 30 seconds; the shorter throttle keeps it from skipping
+// monitor ticks.
+const monitorIntervalMs = 60_000
+const operatorCheckIntervalMs = 30_000
+let lastOperatorCheck = 0
 
 type ParticipantStateRow = StateRow & { case_id: string; participant_token: string }
 
@@ -86,6 +93,18 @@ export async function buildStateResponse(options: BuildStateOptions = {}): Promi
   return buildRawStateResponse()
 }
 
+// Keeps onboarding moving, and follows revocation and readmission, while
+// nobody has the portal open. Returns a function that stops it.
+export function startOnboardingMonitor(intervalMs = monitorIntervalMs): () => void {
+  const timer = setInterval(() => {
+    autoProgressOnboarding().catch((error) => {
+      console.warn('Onboarding check failed:', errorMessage(error, 'unknown error'))
+    })
+  }, intervalMs)
+  timer.unref()
+  return () => clearInterval(timer)
+}
+
 export async function isOnboarded(): Promise<boolean> {
   await ensureDb()
   const row = await loadStateRow()
@@ -114,7 +133,12 @@ async function runAutoProgress(): Promise<void> {
     row = await loadStateRow()
   }
 
-  if (!row || !row.case_id || row.state === 'ONBOARDED' || row.state === 'FAILED') return
+  if (!row || !row.case_id) return
+  if (row.state === 'ONBOARDED' || row.state === 'FAILED' || row.state === 'REVOKED') {
+    if (!(await checkOperatorAccess(row))) return
+    row = await loadStateRow()
+    if (!row) return
+  }
 
   const refreshed = await refreshOnboardingForRow(row)
   row = await loadStateRow()
@@ -138,6 +162,64 @@ async function runAutoProgress(): Promise<void> {
 
   if (requestedCredentials && row && row.state !== 'ONBOARDED') {
     await refreshOnboardingForRow(row)
+  }
+}
+
+/**
+ * Follows the operator's revocation and readmission of this participant.
+ * Returns true when the participant was readmitted and should request new
+ * credentials.
+ */
+async function checkOperatorAccess(row: StateRow): Promise<boolean> {
+  if (!row.case_id || !row.participant_token) return false
+  const now = Date.now()
+  if (now - lastOperatorCheck < operatorCheckIntervalMs) return false
+  lastOperatorCheck = now
+
+  let caseData: JsonRecord
+  try {
+    caseData = await fetchCase(row as ParticipantStateRow)
+  } catch {
+    return false
+  }
+  const caseState = String(caseData.state ?? '')
+  if (caseState === 'REVOKED') {
+    if (row.state !== 'REVOKED') {
+      await patchState({ state: 'REVOKED', caseData, lastError: 'The operator revoked this participant.' })
+    }
+    return false
+  }
+  if (!participantReadyStates.includes(caseState)) return false
+  // Readmission gives the case a new credential request id. Comparing ids
+  // also catches a revocation and readmission that both happened while the
+  // portal was not watching, so it never saw the REVOKED state.
+  const caseRequestId = credentialRequestHolderPid(caseData.credentialRequest ?? caseData.credential_request)
+  const localRequestId = credentialRequestHolderPid(row.credential_request)
+  const readmitted =
+    row.state === 'REVOKED' || (!!caseRequestId && !!localRequestId && caseRequestId !== localRequestId)
+  if (!readmitted) return false
+
+  // Readmitted. Verifiers reject a presentation that still contains a revoked
+  // credential, so the issuer's old credentials are removed before new ones
+  // are requested under the case's new request id.
+  try {
+    await assertIdentityHubConfigured()
+    await removeIssuerCredentials(String(caseData.issuerDid ?? ''))
+  } catch (error) {
+    await patchState({ caseData, lastError: errorMessage(error, 'Could not remove revoked credentials') })
+    return false
+  }
+  const credentialRequest = credentialRequestFromCase(caseData, {})
+  await patchState({ state: caseState, caseData, credentialRequest, credentials: [], lastError: '' })
+  return true
+}
+
+async function removeIssuerCredentials(issuerDid: string): Promise<void> {
+  if (!issuerDid) return
+  const base = '/v1alpha/participants/' + encodeURIComponent(getIdentityHubParticipantContextPathId()) + '/credentials'
+  const credentials = extractCredentials(await identityHubFetch(base))
+  for (const credential of credentials.filter((item) => item.issuer === issuerDid)) {
+    await identityHubFetch(base + '/' + encodeURIComponent(credential.id), { method: 'DELETE' })
   }
 }
 

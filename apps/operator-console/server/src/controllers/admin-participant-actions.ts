@@ -17,20 +17,39 @@ import type { ParticipantLifecycleService } from "@tx-bootstrap/core/server/serv
 import {
   participantOrganizationUpdateSchema,
   participantCreateInputSchema,
+  readmitSchema,
+  type ReadmitInput,
   rejectSchema,
+  revokeSchema,
   technicalMetadataUpdateSchema,
 } from "../../../src/shared/api/index.js";
 import type { EmailService } from "@tx-bootstrap/core/server/services/email-service.js";
 import { emailTemplates } from "@tx-bootstrap/core/server/services/email-templates.js";
+import type {
+  createParticipantApprovalService,
+  SetupCheck,
+} from "../services/participant-approval-service.js";
+import type { ParticipantRevocationService } from "../services/participant-revocation-service.js";
+import {
+  ParticipantLeaseLostError,
+  type ParticipantAccessLease,
+} from "@tx-bootstrap/core/server/db/participant-access-lease.js";
 
 type ParsedBody = unknown;
 
 export function createAdminParticipantActions({
+  approvalService,
+  revocation,
   businessPartners,
   lifecycle,
   onboardingCases,
   emailService,
 }: {
+  approvalService: Pick<
+    ReturnType<typeof createParticipantApprovalService>,
+    "runReadmission" | "buildCredentialRequest"
+  >;
+  revocation: Pick<ParticipantRevocationService, "runChecks">;
   businessPartners: Repositories["businessPartners"];
   lifecycle: ParticipantLifecycleService;
   onboardingCases: Repositories["onboardingCases"];
@@ -122,6 +141,195 @@ export function createAdminParticipantActions({
     }
 
     sendJson(response, 200, await getParticipantDto(id));
+  }
+
+  // Permanent removal from the dataspace. Marks the participant REVOKED
+  // first, so no other action or setup run treats it as active, then runs the
+  // idempotent revocation steps. Calling it again retries failed steps.
+  async function revokeParticipant(request, response, id, body?: ParsedBody) {
+    const partner = await loadBusinessPartner(id);
+    const latest = await onboardingCases.getLatestForBusinessPartner(id);
+    const data =
+      body !== undefined
+        ? revokeSchema.parse(body)
+        : await readJson(request, revokeSchema);
+    const bpn = partner.assigned_bpn;
+    if (!bpn) {
+      throw new ConflictError(
+        "Only participants with an assigned BPN can be revoked",
+      );
+    }
+    if (data.confirmBpn.trim() !== bpn) {
+      throw new BadRequestError(
+        "The confirmation does not match the participant's BPN",
+      );
+    }
+    const retry = partner.verification_status === "REVOKED";
+
+    const checks = await withAccessLease(id, async (lease) => {
+      if (!(await businessPartners.revoke(id, data.reason.trim(), lease))) {
+        throw new ConflictError(
+          "Automatic connector setup is running; revoke once it has finished",
+        );
+      }
+      const checks = await revocation.runChecks(
+        await loadBusinessPartner(id),
+        lease,
+      );
+      await businessPartners.setRevocationChecks(id, checks, lease);
+      return checks;
+    });
+    const failed = checks.filter((check) => check.status === "failed");
+    await recordParticipantEvent({
+      request,
+      businessPartnerId: id,
+      onboardingCaseId: latest?.id,
+      action: "participant.revoked",
+      message: failed.length
+        ? `Revocation ${retry ? "retried" : "started"}; ${failed.length} step(s) failed.`
+        : retry
+          ? "Revocation completed on retry."
+          : `Participant revoked: ${data.reason.trim()}`,
+      payload: { checks },
+    });
+    sendJson(response, 200, await getParticipantDto(id));
+  }
+
+  // Lets a revoked participant back in. Its revoked credentials stay revoked;
+  // it requests new ones under a new holder request id (its Identity Hub
+  // ignores a request id it has already used).
+  async function readmitParticipant(request, response, id, body?: ParsedBody) {
+    const data =
+      body !== undefined
+        ? readmitSchema.parse(body)
+        : await readJson(request, readmitSchema);
+    await loadBusinessPartner(id);
+    await withAccessLease(id, (lease) =>
+      readmitLocked(request, id, data, lease),
+    );
+    sendJson(response, 200, await getParticipantDto(id));
+  }
+
+  async function withAccessLease<T>(
+    id: string,
+    fn: (lease: ParticipantAccessLease) => Promise<T>,
+  ): Promise<T> {
+    try {
+      const result = await businessPartners.withParticipantLock(
+        id,
+        async (lease) => ({
+          value: await fn(lease),
+        }),
+      );
+      if (!result) {
+        throw new ConflictError(
+          "Another revocation or readmission is running for this participant; try again shortly",
+        );
+      }
+      return result.value;
+    } catch (error) {
+      if (error instanceof ParticipantLeaseLostError) {
+        throw new ConflictError(error.message);
+      }
+      throw error;
+    }
+  }
+
+  async function readmitLocked(
+    request,
+    id: string,
+    data: ReadmitInput,
+    lease: ParticipantAccessLease,
+  ) {
+    const partner = await loadBusinessPartner(id);
+    const latest = await onboardingCases.getLatestForBusinessPartner(id);
+    const bpn = partner.assigned_bpn;
+    if (partner.verification_status !== "REVOKED") {
+      throw new ConflictError("Only revoked participants can be readmitted");
+    }
+    if (data.confirmBpn.trim() !== bpn) {
+      throw new BadRequestError(
+        "The confirmation does not match the participant's BPN",
+      );
+    }
+    if (!latest?.did) {
+      throw new ConflictError(
+        "The participant has no connector metadata to restore",
+      );
+    }
+
+    // Recorded before any remote write: if readmission does not finish (a
+    // failed step, a lost response or a crash), the revocation stays
+    // incomplete and the steps re-block the participant, here or in the
+    // revocation reconciler once the lease expires.
+    await businessPartners.setRevocationChecks(
+      id,
+      [
+        {
+          name: "readmission",
+          status: "pending",
+          message:
+            "Readmission started; access is blocked again unless it completes",
+        },
+      ],
+      lease,
+    );
+    let checks: SetupCheck[];
+    try {
+      checks = await approvalService.runReadmission({
+        bpn,
+        did: latest.did,
+        organizationName: partner.legal_name,
+        lease,
+      });
+    } catch (error) {
+      lease.assertActive();
+      checks = [
+        {
+          name: "readmission",
+          status: "failed",
+          message: error instanceof Error ? error.message : String(error),
+        },
+      ];
+    }
+    lease.assertActive();
+    const failed = checks.filter((check) => check.status !== "ok");
+    if (failed.length) {
+      const reblock = await revocation.runChecks(partner, lease);
+      await businessPartners.setRevocationChecks(id, reblock, lease);
+      await recordParticipantEvent({
+        request,
+        businessPartnerId: id,
+        onboardingCaseId: latest.id,
+        action: "participant.readmission_failed",
+        message: `Readmission failed; the participant stays revoked.`,
+        payload: { checks, revocationChecks: reblock },
+      });
+      // 409, not 5xx: server errors are masked, and the operator needs the
+      // failed step to fix it.
+      throw new ConflictError(
+        `Readmission failed; the participant stays revoked. ${failed
+          .map((check) => `${check.name}: ${check.message}`)
+          .join("; ")}`,
+      );
+    }
+
+    await businessPartners.completeReadmission(
+      id,
+      latest.id,
+      approvalService.buildCredentialRequest(
+        `${bpn}-${Date.now().toString(36)}`,
+      ),
+      lease,
+    );
+    await recordParticipantEvent({
+      request,
+      businessPartnerId: id,
+      onboardingCaseId: latest.id,
+      action: "participant.readmitted",
+      message: `Participant readmitted: ${data.reason.trim()}`,
+      payload: { checks },
+    });
   }
 
   async function retryTechnicalSetup(request, response, id) {
@@ -271,6 +479,8 @@ export function createAdminParticipantActions({
       "PATCH organization": () =>
         updateOrganization(request, response, id, body),
       "POST reject": () => rejectParticipant(request, response, id, body),
+      "POST revoke": () => revokeParticipant(request, response, id, body),
+      "POST readmit": () => readmitParticipant(request, response, id, body),
       "POST retry-technical-setup": () =>
         retryTechnicalSetup(request, response, id),
       "PATCH technical-metadata": () =>
@@ -293,6 +503,9 @@ const connectorMetadataMutableStates = new Set([
 ]);
 
 function assertCanRejectParticipant(partner, latestCase) {
+  if (partner.verification_status === "REVOKED") {
+    throw new ConflictError("Participant is revoked");
+  }
   if (
     partner.verification_status === "REJECTED" ||
     latestCase.state === "REJECTED"

@@ -24,6 +24,7 @@ export const deCopy = {
   dspEndpoint: 'DSP-Endpunkt',
   heroAttachingInvite: 'Betreiber-Invite wird verbunden',
   heroFailed: 'Einrichtung braucht Aufmerksamkeit',
+  heroRevoked: 'Datenraum-Zugang widerrufen',
   heroNeedsInvite: 'Betreiber-Invite erforderlich',
   heroSettingUpCredentials: 'Credentials werden eingerichtet',
   heroWaitingForOperator: 'Teilnehmerzugang wird eingerichtet',
@@ -52,6 +53,8 @@ export const deCopy = {
   participantAccess: 'Teilnehmerzugang',
   automation: 'Automatisierung',
   connectorMetadata: 'Connector-Metadaten',
+  revokedStatus:
+    'Der Betreiber hat diesen Teilnehmer widerrufen. Seine Credentials werden nicht mehr akzeptiert. Lässt der Betreiber ihn wieder zu, entfernt das Gateway die widerrufenen Credentials und fordert automatisch neue an.',
   failedStatus:
     'Die automatische Einrichtung konnte nicht abgeschlossen werden. Wiederhole die Credential-Einrichtung, falls angeboten; andernfalls prüft der Betreiber die fehlgeschlagenen Connector-Checks.',
   operatorInvite: 'Betreiber-Invite',

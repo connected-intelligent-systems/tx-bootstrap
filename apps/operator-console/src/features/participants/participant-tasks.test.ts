@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   canEditConnectorMetadata,
+  canRevokeParticipant,
   deriveParticipantTask,
   isParticipantActive,
 } from "./participant-tasks";
@@ -105,6 +106,38 @@ describe("deriveParticipantTask", () => {
       taskKind: null,
       isAdminAction: false,
     });
+  });
+
+  it("lists an incomplete revocation as needing admin action", () => {
+    const revoked = (complete: boolean, failed = !complete) =>
+      makeParticipant({
+        stage: "REVOKED",
+        bpn: { ...verifiedBpn(), verificationStatus: "REVOKED" },
+        revocation: {
+          revokedAt: "2026-11-09T12:00:00.000Z",
+          reason: "Left the project",
+          checks: [],
+          complete,
+          failed,
+        },
+      });
+
+    expect(deriveParticipantTask(revoked(false))).toMatchObject({
+      queue: "admin",
+      title: "Revocation incomplete",
+    });
+    expect(deriveParticipantTask(revoked(false, false))).toMatchObject({
+      queue: "waiting",
+      title: "Revocation in progress",
+    });
+    expect(deriveParticipantTask(revoked(true))).toMatchObject({
+      queue: "done",
+      description: "Left the project",
+    });
+    expect(canRevokeParticipant(revoked(true))).toBe(false);
+    expect(canRevokeParticipant(makeParticipant({ bpn: verifiedBpn() }))).toBe(
+      true,
+    );
   });
 
   it("treats registration as a non-executable status", () => {

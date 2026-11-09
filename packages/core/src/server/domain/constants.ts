@@ -7,6 +7,7 @@ export const VerificationStatus = {
   IN_REVIEW: "IN_REVIEW",
   VERIFIED: "VERIFIED",
   REJECTED: "REJECTED",
+  REVOKED: "REVOKED",
 } as const;
 
 export type VerificationStatusType =
@@ -26,6 +27,7 @@ export const OnboardingCaseState = {
   READY_FOR_PARTICIPANT: "READY_FOR_PARTICIPANT",
   CREDENTIALS_REQUESTED: "CREDENTIALS_REQUESTED",
   REJECTED: "REJECTED",
+  REVOKED: "REVOKED",
   FAILED: "FAILED",
 } as const;
 
@@ -39,6 +41,7 @@ export const ParticipantStage = {
   CREDENTIALS: "CREDENTIALS",
   FAILED: "FAILED",
   REJECTED: "REJECTED",
+  REVOKED: "REVOKED",
 } as const;
 
 export type ParticipantStageType =
@@ -50,6 +53,7 @@ export const CredentialState = {
   REQUESTED: "REQUESTED",
   ISSUED: "ISSUED",
   FAILED: "FAILED",
+  REVOKED: "REVOKED",
 } as const;
 
 export type CredentialStateType =
@@ -61,6 +65,10 @@ export const ParticipantAction = {
   BPN_ASSIGNED: "participant.bpn_assigned",
   BPN_ACCEPTED: "participant.bpn_accepted",
   REJECTED: "participant.rejected",
+  REVOKED: "participant.revoked",
+  REVOCATION_COMPLETED: "participant.revocation_completed",
+  READMITTED: "participant.readmitted",
+  READMISSION_FAILED: "participant.readmission_failed",
   TECHNICAL_SETUP_STARTED: "participant.technical_setup_started",
   TECHNICAL_SETUP_RETRY_SCHEDULED:
     "participant.technical_setup_retry_scheduled",

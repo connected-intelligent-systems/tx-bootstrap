@@ -22,6 +22,8 @@ import {
   getParticipant,
   listParticipants,
   retryTechnicalSetup,
+  readmitParticipant,
+  revokeParticipant,
   updateParticipantOrganization,
   updateTechnicalMetadata,
   type ParticipantFilters,
@@ -31,6 +33,7 @@ import type {
   Participant,
   ParticipantCreateInput,
   ParticipantOrganizationUpdate,
+  RevokeInput,
   TechnicalMetadataUpdate,
 } from "../types";
 import {
@@ -160,6 +163,16 @@ export function ParticipantsPage() {
   });
   const retryTechnicalMutation = useMutation({
     mutationFn: retryTechnicalSetup,
+    onSuccess: syncParticipant,
+  });
+  const revokeMutation = useMutation({
+    mutationFn: ({ id, body }: { id: string; body: RevokeInput }) =>
+      revokeParticipant(id, body),
+    onSuccess: syncParticipant,
+  });
+  const readmitMutation = useMutation({
+    mutationFn: ({ id, body }: { id: string; body: RevokeInput }) =>
+      readmitParticipant(id, body),
     onSuccess: syncParticipant,
   });
   const updateTechnicalMutation = useMutation({
@@ -435,7 +448,10 @@ export function ParticipantsPage() {
         participant={selectedParticipant}
         saving={detailSaving || selectedQuery.isFetching}
         tab={drawerTab}
+        revoking={revokeMutation.isPending}
         onClose={() => setDetailId("")}
+        onRevoke={(id, body) => revokeMutation.mutateAsync({ id, body })}
+        onReadmit={(id, body) => readmitMutation.mutateAsync({ id, body })}
         onSaveOrganization={async (id, body) => {
           await updateOrganizationMutation.mutateAsync({ id, body });
         }}

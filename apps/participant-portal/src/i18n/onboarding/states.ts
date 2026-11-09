@@ -9,6 +9,7 @@ export const localizedStates: Record<Language, Record<string, string>> = {
     ONBOARDED: 'Onboarded',
     READY_FOR_PARTICIPANT: 'Ready for participant',
     REQUESTED: 'Requested',
+    REVOKED: 'Revoked by the operator',
   },
   de: {
     CREDENTIALS_REQUESTED: 'Credentials angefragt',
@@ -18,5 +19,6 @@ export const localizedStates: Record<Language, Record<string, string>> = {
     ONBOARDED: 'Onboarded',
     READY_FOR_PARTICIPANT: 'Bereit für Teilnehmer',
     REQUESTED: 'Angefragt',
+    REVOKED: 'Vom Betreiber widerrufen',
   },
 } satisfies Record<Language, Record<string, string>>

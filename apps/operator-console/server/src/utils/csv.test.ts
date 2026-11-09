@@ -19,6 +19,11 @@ const participant = {
   verification_status: "VERIFIED",
   verification_notes: 'normal, "quoted"\r\nline',
   verified_at: new Date("2026-01-01T00:00:00Z"),
+  revoked_at: null,
+  revocation_reason: "",
+  revocation_checks: [],
+  access_lease_token: null,
+  access_lease_until: null,
   created_at: new Date("2026-01-01T00:00:00Z"),
   updated_at: new Date("2026-01-02T00:00:00Z"),
 } satisfies BusinessPartnerRow;

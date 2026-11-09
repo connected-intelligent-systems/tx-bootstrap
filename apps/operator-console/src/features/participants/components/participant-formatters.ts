@@ -26,7 +26,8 @@ export function sourceLabel(source: string) {
 
 export function stageColor(stage: ParticipantStage): ChipColor {
   if (stage === "CREDENTIALS") return "success";
-  if (stage === "FAILED" || stage === "REJECTED") return "error";
+  if (stage === "FAILED" || stage === "REJECTED" || stage === "REVOKED")
+    return "error";
   if (stage === "CONNECTOR_SETUP") return "info";
   return "warning";
 }

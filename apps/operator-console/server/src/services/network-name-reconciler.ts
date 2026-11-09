@@ -5,7 +5,7 @@ type Logger = {
 
 /**
  * Periodically reconciles Headscale with the console: revokes enrollments of
- * rejected participants, retries unfinished revocations and enforces
+ * rejected or revoked participants, retries unfinished revocations and enforces
  * operator-assigned tunnel hostnames. A failed run is logged and retried on
  * the next interval.
  */

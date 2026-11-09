@@ -216,6 +216,7 @@ export function createOnboardingCaseRepository(db: Kysely<Database>) {
         | "READY_FOR_PARTICIPANT"
         | "CREDENTIALS_REQUESTED"
         | "REJECTED"
+        | "REVOKED"
         | "FAILED",
       additionalFields?: Partial<OnboardingCaseInsert>,
     ) {
@@ -335,6 +336,7 @@ export function createOnboardingCaseRepository(db: Kysely<Database>) {
             .count("id")
             .filterWhere("state", "=", "REJECTED")
             .as("rejected"),
+          eb.fn.count("id").filterWhere("state", "=", "REVOKED").as("revoked"),
           eb.fn.count("id").filterWhere("state", "=", "FAILED").as("failed"),
         ])
         .executeTakeFirst();
@@ -357,6 +359,7 @@ export function createOnboardingCaseRepository(db: Kysely<Database>) {
           readyForParticipant: Number(result?.ready_for_participant ?? 0),
           credentialsRequested: Number(result?.credentials_requested ?? 0),
           rejected: Number(result?.rejected ?? 0),
+          revoked: Number(result?.revoked ?? 0),
           failed: Number(result?.failed ?? 0),
         },
         recentActivity: Number(recentCases?.count ?? 0),

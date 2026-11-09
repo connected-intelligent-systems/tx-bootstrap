@@ -337,11 +337,15 @@ export function toParticipantDto(partner, cases, audit) {
       setupChecks: latestCase?.setupChecks ?? [],
     },
     credentials: {
-      state: deriveCredentialState(latestCase, credentialReceipts),
+      state:
+        stage === ParticipantStage.REVOKED
+          ? CredentialState.REVOKED
+          : deriveCredentialState(latestCase, credentialReceipts),
       request: latestCase?.credentialRequest ?? {},
       receipts: credentialReceipts,
     },
     onboarding: latestCase,
+    revocation: toRevocationDto(partner),
     cases: cases.map((item) => ({
       id: item.id,
       state: item.state,
@@ -359,6 +363,8 @@ export function deriveParticipantStage(
   partner: BusinessPartnerRow,
   latestCase: OnboardingCaseRow | undefined,
 ): ParticipantStageType {
+  if (partner.verification_status === VerificationStatus.REVOKED)
+    return ParticipantStage.REVOKED;
   if (
     partner.verification_status === VerificationStatus.REJECTED ||
     latestCase?.state === OnboardingCaseState.REJECTED
@@ -424,6 +430,13 @@ export function nextParticipantAction(
     return "Participant can request credentials and is ready for dataspace operations.";
   if (stage === ParticipantStage.FAILED)
     return "Review setup checks and retry connector setup.";
+  if (stage === ParticipantStage.REVOKED) {
+    if (revocationComplete(partner))
+      return `Revoked: ${partner.revocation_reason || "no reason recorded"}`;
+    return revocationFailed(partner)
+      ? "Revocation incomplete: review the failed steps and retry the revocation."
+      : "Revocation in progress: the remaining steps are checked automatically.";
+  }
   if (stage === ParticipantStage.REJECTED)
     return (
       partner.verification_notes ||
@@ -431,6 +444,38 @@ export function nextParticipantAction(
       "Participant was rejected."
     );
   return "Review participant.";
+}
+
+function revocationChecks(partner: BusinessPartnerRow) {
+  const checks = partner.revocation_checks;
+  return Array.isArray(checks)
+    ? (checks as Array<{ name: string; status: string; message: string }>)
+    : [];
+}
+
+// Every step is done ("ok") or does not apply here ("skipped"). Steps still
+// "pending" are re-run by the console's revocation reconciler.
+function revocationComplete(partner: BusinessPartnerRow) {
+  const checks = revocationChecks(partner);
+  return (
+    checks.length > 0 &&
+    checks.every((check) => check.status === "ok" || check.status === "skipped")
+  );
+}
+
+function revocationFailed(partner: BusinessPartnerRow) {
+  return revocationChecks(partner).some((check) => check.status === "failed");
+}
+
+export function toRevocationDto(partner: BusinessPartnerRow) {
+  if (partner.verification_status !== VerificationStatus.REVOKED) return null;
+  return {
+    revokedAt: new Date(partner.revoked_at ?? partner.updated_at).toISOString(),
+    reason: partner.revocation_reason ?? "",
+    checks: revocationChecks(partner),
+    complete: revocationComplete(partner),
+    failed: revocationFailed(partner),
+  };
 }
 
 export function toParticipantEventDto(row) {

@@ -2,6 +2,10 @@ import { Readable } from "node:stream";
 import type { IncomingMessage } from "node:http";
 import { describe, expect, it, vi } from "vitest";
 import { createAdminParticipantActions } from "./admin-participant-actions.js";
+import {
+  ParticipantLeaseLostError,
+  type ParticipantAccessLease,
+} from "@tx-bootstrap/core/server/db/participant-access-lease.js";
 import type { EmailService } from "@tx-bootstrap/core/server/services/email-service.js";
 
 const existingPartner = {
@@ -21,6 +25,11 @@ const existingPartner = {
   verification_status: "VERIFIED",
   verification_notes: "Keep these notes",
   verified_at: new Date("2026-01-01T00:00:00Z"),
+  revoked_at: null,
+  revocation_reason: "",
+  revocation_checks: [],
+  access_lease_token: null,
+  access_lease_until: null,
   created_at: new Date("2026-01-01T00:00:00Z"),
   updated_at: new Date("2026-01-02T00:00:00Z"),
 };
@@ -36,6 +45,12 @@ const latestCase = {
     "https://participant.example/api/credentials",
   setup_started_at: null as Date | null,
 };
+
+const revocationChecks = [
+  { name: "issuer-holder-block", status: "ok", message: "Holder blocked" },
+  { name: "issuer-credential-revocation", status: "ok", message: "3 revoked" },
+  { name: "bdrs-removal", status: "ok", message: "removed" },
+];
 
 type ActionDependencies = Parameters<typeof createAdminParticipantActions>[0];
 
@@ -74,18 +89,56 @@ function createActions({
   });
 
   const insertBusinessPartner = vi.fn().mockResolvedValue(undefined);
+  const revoke = vi.fn().mockResolvedValue(true);
+  const setRevocationChecks = vi.fn().mockResolvedValue(undefined);
+  const runChecks = vi.fn().mockResolvedValue(revocationChecks);
+  const locked: string[] = [];
+  const controller = new AbortController();
+  const lease: ParticipantAccessLease = {
+    token: "lease-1",
+    signal: controller.signal,
+    assertActive: () => controller.signal.throwIfAborted(),
+  };
+  const withParticipantLock = vi.fn(
+    async (
+      id: string,
+      fn: (lease: ParticipantAccessLease) => Promise<unknown>,
+    ) => {
+      locked.push(id);
+      try {
+        return await fn(lease);
+      } finally {
+        locked.pop();
+      }
+    },
+  );
+  const runReadmission = vi.fn().mockResolvedValue([
+    { name: "issuer-holder-restore", status: "ok", message: "restored" },
+    { name: "bdrs-registration", status: "ok", message: "mapped" },
+  ]);
+  const completeReadmission = vi.fn().mockResolvedValue(undefined);
+  const buildCredentialRequest = vi.fn((holderPid: string) => ({
+    issuerDid: "did:web:issuer",
+    holderPid,
+    credentials: [],
+  }));
   const businessPartners = {
     list: vi.fn(),
     load: vi.fn(),
     insert: insertBusinessPartner,
     updateOrganization,
     reject: vi.fn(),
+    revoke,
+    completeReadmission,
+    setRevocationChecks,
+    withParticipantLock,
     nextLocalBpnValue: vi.fn(),
   } as unknown as ActionDependencies["businessPartners"];
 
   const updateState = vi.fn().mockResolvedValue({ id: "case-1" });
   const onboardingCases = {
     rejectForBusinessPartner: vi.fn().mockResolvedValue(undefined),
+    getLatestForBusinessPartner: vi.fn().mockResolvedValue(caseRow),
     updateState,
   } as unknown as ActionDependencies["onboardingCases"];
 
@@ -107,6 +160,11 @@ function createActions({
 
   return {
     actions: createAdminParticipantActions({
+      approvalService: {
+        runReadmission,
+        buildCredentialRequest,
+      } as unknown as ActionDependencies["approvalService"],
+      revocation: { runChecks } as unknown as ActionDependencies["revocation"],
       businessPartners,
       lifecycle,
       onboardingCases,
@@ -116,7 +174,16 @@ function createActions({
     generateLocalBpn,
     insertBusinessPartner,
     loadLatestCaseForPartner,
+    locked,
+    lease,
+    leaseController: controller,
+    completeReadmission,
     recordParticipantEvent,
+    revoke,
+    runChecks,
+    runReadmission,
+    setRevocationChecks,
+    withParticipantLock,
     syncUnverifiedOnboardingMetadata,
     updateCaseTechnicalMetadata,
     updateOrganization,
@@ -426,5 +493,351 @@ describe("createAdminParticipantActions", () => {
       }),
     );
     expect(response.writeHead).toHaveBeenCalledWith(202, expect.any(Object));
+  });
+
+  describe("revoke", () => {
+    const issuedCase = { ...latestCase, state: "CREDENTIALS_REQUESTED" };
+
+    it("marks the participant revoked before running the revocation steps", async () => {
+      const {
+        actions,
+        locked,
+        recordParticipantEvent,
+        revoke,
+        runChecks,
+        setRevocationChecks,
+      } = createActions({ caseRow: issuedCase });
+      runChecks.mockImplementationOnce(async () => {
+        expect(locked).toEqual(["partner-1"]);
+        return revocationChecks;
+      });
+      const response = jsonResponse();
+
+      await actions.handleAdminParticipant(
+        jsonRequest({}, "POST"),
+        response,
+        "partner-1",
+        "revoke",
+        { confirmBpn: "BPNLASSIGNED0001", reason: "Left the project" },
+      );
+
+      expect(revoke).toHaveBeenCalledWith(
+        "partner-1",
+        "Left the project",
+        expect.objectContaining({ token: "lease-1" }),
+      );
+      expect(revoke.mock.invocationCallOrder[0]).toBeLessThan(
+        runChecks.mock.invocationCallOrder[0],
+      );
+      expect(runChecks).toHaveBeenCalledWith(
+        existingPartner,
+        expect.objectContaining({ token: "lease-1" }),
+      );
+      expect(setRevocationChecks).toHaveBeenCalledWith(
+        "partner-1",
+        revocationChecks,
+        expect.objectContaining({ token: "lease-1" }),
+      );
+      expect(recordParticipantEvent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: "participant.revoked",
+          message: "Participant revoked: Left the project",
+        }),
+      );
+      expect(response.writeHead).toHaveBeenCalledWith(200, expect.any(Object));
+    });
+
+    it("requires the BPN as confirmation", async () => {
+      const { actions, revoke, runChecks } = createActions({
+        caseRow: issuedCase,
+      });
+
+      await expect(
+        actions.handleAdminParticipant(
+          jsonRequest({}, "POST"),
+          jsonResponse(),
+          "partner-1",
+          "revoke",
+          { confirmBpn: "BPNLOTHER0000001", reason: "Left the project" },
+        ),
+      ).rejects.toMatchObject({ status: 400 });
+      expect(revoke).not.toHaveBeenCalled();
+      expect(runChecks).not.toHaveBeenCalled();
+    });
+
+    it("refuses while automatic setup is running", async () => {
+      const { actions, revoke, runChecks } = createActions();
+      revoke.mockResolvedValueOnce(false);
+
+      await expect(
+        actions.handleAdminParticipant(
+          jsonRequest({}, "POST"),
+          jsonResponse(),
+          "partner-1",
+          "revoke",
+          { confirmBpn: "BPNLASSIGNED0001", reason: "Left the project" },
+        ),
+      ).rejects.toMatchObject({ status: 409 });
+      expect(runChecks).not.toHaveBeenCalled();
+    });
+
+    it("retries the steps of an already revoked participant", async () => {
+      const failed = [
+        { ...revocationChecks[0] },
+        { name: "bdrs-removal", status: "failed", message: "HTTP 503" },
+      ];
+      const { actions, recordParticipantEvent, runChecks, updateState } =
+        createActions({
+          partner: { ...existingPartner, verification_status: "REVOKED" },
+          caseRow: { ...latestCase, state: "REVOKED" },
+        });
+      runChecks.mockResolvedValueOnce(failed);
+
+      await actions.handleAdminParticipant(
+        jsonRequest({}, "POST"),
+        jsonResponse(),
+        "partner-1",
+        "revoke",
+        { confirmBpn: "BPNLASSIGNED0001", reason: "Left the project" },
+      );
+
+      expect(updateState).not.toHaveBeenCalled();
+      expect(recordParticipantEvent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: "Revocation retried; 1 step(s) failed.",
+        }),
+      );
+    });
+
+    it("cannot reject a revoked participant", async () => {
+      const { actions } = createActions({
+        partner: { ...existingPartner, verification_status: "REVOKED" },
+        caseRow: { ...latestCase, state: "REVOKED" },
+      });
+
+      await expect(
+        actions.handleAdminParticipant(
+          jsonRequest({}, "POST"),
+          jsonResponse(),
+          "partner-1",
+          "reject",
+          { reason: "x" },
+        ),
+      ).rejects.toMatchObject({ status: 409 });
+    });
+  });
+
+  describe("readmit", () => {
+    const revokedPartner = {
+      ...existingPartner,
+      verification_status: "REVOKED",
+    };
+    const revokedCase = { ...latestCase, state: "REVOKED" };
+    const body = { confirmBpn: "BPNLASSIGNED0001", reason: "Rejoined" };
+
+    it("restores access and asks for credentials under a new request id", async () => {
+      const {
+        actions,
+        locked,
+        completeReadmission,
+        recordParticipantEvent,
+        runReadmission,
+        updateState,
+      } = createActions({ partner: revokedPartner, caseRow: revokedCase });
+      runReadmission.mockImplementationOnce(async () => {
+        expect(locked).toEqual(["partner-1"]);
+        return [];
+      });
+
+      await actions.handleAdminParticipant(
+        jsonRequest({}, "POST"),
+        jsonResponse(),
+        "partner-1",
+        "readmit",
+        body,
+      );
+
+      expect(runReadmission).toHaveBeenCalledWith({
+        bpn: "BPNLASSIGNED0001",
+        did: "did:web:participant.example:BPNLASSIGNED0001",
+        organizationName: "Old Org GmbH",
+        lease: expect.objectContaining({ token: "lease-1" }),
+      });
+      expect(completeReadmission).toHaveBeenCalledWith(
+        "partner-1",
+        "case-1",
+        expect.objectContaining({
+          holderPid: expect.stringMatching(/^BPNLASSIGNED0001-[0-9a-z]+$/),
+        }),
+        expect.objectContaining({ token: "lease-1" }),
+      );
+      expect(updateState).not.toHaveBeenCalled();
+      expect(recordParticipantEvent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: "participant.readmitted",
+          message: "Participant readmitted: Rejoined",
+        }),
+      );
+    });
+
+    it("keeps the participant revoked when a step fails", async () => {
+      const { actions, completeReadmission, runReadmission, updateState } =
+        createActions({ partner: revokedPartner, caseRow: revokedCase });
+      runReadmission.mockResolvedValueOnce([
+        {
+          name: "issuer-holder-restore",
+          status: "failed",
+          message: "HTTP 503",
+        },
+      ]);
+
+      await expect(
+        actions.handleAdminParticipant(
+          jsonRequest({}, "POST"),
+          jsonResponse(),
+          "partner-1",
+          "readmit",
+          body,
+        ),
+      ).rejects.toMatchObject({
+        status: 409,
+        message: expect.stringContaining("issuer-holder-restore: HTTP 503"),
+      });
+      expect(completeReadmission).not.toHaveBeenCalled();
+      expect(updateState).not.toHaveBeenCalled();
+    });
+
+    it("records the readmission before any remote write", async () => {
+      const { actions, runReadmission, setRevocationChecks } = createActions({
+        partner: revokedPartner,
+        caseRow: revokedCase,
+      });
+
+      await actions.handleAdminParticipant(
+        jsonRequest({}, "POST"),
+        jsonResponse(),
+        "partner-1",
+        "readmit",
+        body,
+      );
+
+      expect(setRevocationChecks).toHaveBeenCalledWith(
+        "partner-1",
+        [expect.objectContaining({ name: "readmission", status: "pending" })],
+        expect.objectContaining({ token: "lease-1" }),
+      );
+      expect(setRevocationChecks.mock.invocationCallOrder[0]).toBeLessThan(
+        runReadmission.mock.invocationCallOrder[0],
+      );
+    });
+
+    it.each([
+      [
+        "a step fails",
+        (mock: ReturnType<typeof vi.fn>) =>
+          mock.mockResolvedValueOnce([
+            { name: "bdrs-registration", status: "ok", message: "" },
+            { name: "issuer-holder-restore", status: "failed", message: "" },
+          ]),
+      ],
+      [
+        "the issuer response is lost",
+        (mock: ReturnType<typeof vi.fn>) =>
+          mock.mockRejectedValueOnce(new Error("The operation timed out")),
+      ],
+    ])("blocks access again when %s", async (_label, fail) => {
+      const blocked = [
+        { name: "issuer-holder-block", status: "ok", message: "" },
+      ];
+      const { actions, runChecks, runReadmission, setRevocationChecks } =
+        createActions({ partner: revokedPartner, caseRow: revokedCase });
+      fail(runReadmission);
+      runChecks.mockResolvedValueOnce(blocked);
+
+      await expect(
+        actions.handleAdminParticipant(
+          jsonRequest({}, "POST"),
+          jsonResponse(),
+          "partner-1",
+          "readmit",
+          body,
+        ),
+      ).rejects.toMatchObject({ status: 409 });
+      expect(runChecks).toHaveBeenCalledWith(
+        revokedPartner,
+        expect.objectContaining({ token: "lease-1" }),
+      );
+      expect(setRevocationChecks).toHaveBeenLastCalledWith(
+        "partner-1",
+        blocked,
+        expect.objectContaining({ token: "lease-1" }),
+      );
+    });
+
+    it("stops readmission without re-blocking after losing the lease", async () => {
+      const {
+        actions,
+        leaseController,
+        completeReadmission,
+        runReadmission,
+        runChecks,
+        setRevocationChecks,
+      } = createActions({ partner: revokedPartner, caseRow: revokedCase });
+      runReadmission.mockImplementationOnce(async () => {
+        const error = new ParticipantLeaseLostError();
+        leaseController.abort(error);
+        throw error;
+      });
+
+      await expect(
+        actions.handleAdminParticipant(
+          jsonRequest({}, "POST"),
+          jsonResponse(),
+          "partner-1",
+          "readmit",
+          body,
+        ),
+      ).rejects.toMatchObject({
+        status: 409,
+        message: expect.stringContaining("lease was lost"),
+      });
+      expect(completeReadmission).not.toHaveBeenCalled();
+      expect(runChecks).not.toHaveBeenCalled();
+      expect(setRevocationChecks).toHaveBeenCalledTimes(1);
+    });
+
+    it("refuses while another revocation or readmission holds the lease", async () => {
+      const { actions, runReadmission, withParticipantLock } = createActions({
+        partner: revokedPartner,
+        caseRow: revokedCase,
+      });
+      withParticipantLock.mockResolvedValueOnce(undefined);
+
+      await expect(
+        actions.handleAdminParticipant(
+          jsonRequest({}, "POST"),
+          jsonResponse(),
+          "partner-1",
+          "readmit",
+          body,
+        ),
+      ).rejects.toMatchObject({ status: 409 });
+      expect(runReadmission).not.toHaveBeenCalled();
+    });
+
+    it("only readmits revoked participants", async () => {
+      const { actions, runReadmission } = createActions();
+
+      await expect(
+        actions.handleAdminParticipant(
+          jsonRequest({}, "POST"),
+          jsonResponse(),
+          "partner-1",
+          "readmit",
+          body,
+        ),
+      ).rejects.toMatchObject({ status: 409 });
+      expect(runReadmission).not.toHaveBeenCalled();
+    });
   });
 });

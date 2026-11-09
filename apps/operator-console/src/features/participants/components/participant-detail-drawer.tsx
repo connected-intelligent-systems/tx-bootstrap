@@ -1,7 +1,9 @@
 import { useState } from "react";
+import BlockIcon from "@mui/icons-material/Block";
 import CloseIcon from "@mui/icons-material/Close";
 import {
   Box,
+  Button,
   Drawer,
   IconButton,
   Stack,
@@ -10,10 +12,14 @@ import {
   Tooltip,
   Typography,
 } from "@mui/material";
-import { canEditConnectorMetadata } from "../participant-tasks";
+import {
+  canEditConnectorMetadata,
+  canRevokeParticipant,
+} from "../participant-tasks";
 import type {
   Participant,
   ParticipantOrganizationUpdate,
+  RevokeInput,
   TechnicalMetadataUpdate,
 } from "../types";
 import {
@@ -28,16 +34,23 @@ import {
   OrganizationEditDialog,
 } from "./participant-edit-dialogs";
 import { TunnelTab } from "./participant-tunnel";
+import {
+  ParticipantAccessDialog,
+  RevocationBanner,
+} from "./participant-revocation";
 
 export type DrawerTab = 0 | 1 | 2 | 3 | 4 | 5;
-type EditDialog = "organization" | "connector" | null;
+type EditDialog = "organization" | "connector" | "revoke" | "readmit" | null;
 
 export function ParticipantDrawer({
   open,
   participant,
   saving,
   tab,
+  revoking,
   onClose,
+  onReadmit,
+  onRevoke,
   onSaveOrganization,
   onSaveTechnical,
   onTabChange,
@@ -46,7 +59,10 @@ export function ParticipantDrawer({
   participant: Participant | null;
   saving: boolean;
   tab: DrawerTab;
+  revoking: boolean;
   onClose: () => void;
+  onRevoke: (id: string, body: RevokeInput) => Promise<unknown>;
+  onReadmit: (id: string, body: RevokeInput) => Promise<unknown>;
   onSaveOrganization: (
     id: string,
     body: ParticipantOrganizationUpdate,
@@ -96,6 +112,18 @@ export function ParticipantDrawer({
                 {participant.id}
               </Typography>
             </Box>
+            {canRevokeParticipant(participant) ? (
+              <Button
+                color="error"
+                variant="outlined"
+                size="small"
+                startIcon={<BlockIcon />}
+                onClick={() => setEditDialog("revoke")}
+                sx={{ flexShrink: 0, mt: 0.5 }}
+              >
+                Revoke
+              </Button>
+            ) : null}
             <Tooltip title="Close">
               <IconButton
                 aria-label="Close participant drawer"
@@ -105,6 +133,21 @@ export function ParticipantDrawer({
               </IconButton>
             </Tooltip>
           </Stack>
+          {participant.revocation ? (
+            <Box sx={{ px: 2, pb: 1 }}>
+              <RevocationBanner
+                participant={participant}
+                retrying={revoking}
+                onReadmit={() => setEditDialog("readmit")}
+                onRetry={() =>
+                  void onRevoke(participant.id, {
+                    reason: participant.revocation?.reason || "Retry",
+                    confirmBpn: participant.bpn.assignedBpn,
+                  }).catch(() => undefined)
+                }
+              />
+            </Box>
+          ) : null}
           <Tabs
             value={tab}
             onChange={(_, value: DrawerTab) => onTabChange(value)}
@@ -149,6 +192,19 @@ export function ParticipantDrawer({
               saving={saving}
               onClose={() => setEditDialog(null)}
               onSave={(body) => onSaveOrganization(participant.id, body)}
+            />
+          ) : null}
+          {editDialog === "revoke" || editDialog === "readmit" ? (
+            <ParticipantAccessDialog
+              key={`${participant.id}-${editDialog}`}
+              mode={editDialog}
+              participant={participant}
+              onClose={() => setEditDialog(null)}
+              onConfirm={(body) =>
+                editDialog === "revoke"
+                  ? onRevoke(participant.id, body)
+                  : onReadmit(participant.id, body)
+              }
             />
           ) : null}
           {editDialog === "connector" ? (
