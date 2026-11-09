@@ -1,262 +1,129 @@
-# tx-bootstrap participant chart
+# Participant chart
 
-This chart deploys one participant without PostgreSQL or Vault. Infrastructure,
-database provisioning, Vault bootstrap, DNS/TLS, ingress, backups, and
-monitoring remain environment responsibilities.
+Deploy one participant's wallet, EDC control and data planes, portal,
+federated catalog, gateways, and initialization jobs. PostgreSQL and Vault
+must be provisioned separately. See the
+[shared Helm prerequisites](../README.md#before-installation).
 
-## What it installs
+## Configure
 
-- participant Identity Hub
-- Tractus-X EDC control plane and data plane
-- participant portal backend
-- participant-local federated catalog StatefulSet with one PVC per replica
-- public DID/DSP/data-plane gateway
-- separate internal portal/management gateway
-- a pre-install/pre-upgrade portal database migration Job
-- a tracked, convergent participant initialization Job
-- internal Services, ConfigMaps, optional Ingresses, and a ServiceAccount with
-  Kubernetes API-token automounting disabled
-- optionally, a tunnel node that publishes the public gateway through the
-  operator's tunnel instead of an Ingress
+Use [values.yaml](values.yaml) as the full settings reference. Set at least:
 
-The chart sets startup, readiness, and liveness probes, resource requests and
-limits, a runtime-default seccomp profile, numeric non-root identities,
-`allowPrivilegeEscalation: false`, and a drop of all Linux capabilities. These
-defaults satisfy the container security-context requirements of the Kubernetes
-Restricted Pod Security Standard. A read-only root filesystem is not forced
-because not every upstream component has been verified with it.
+- participant BPN, base64 encoding, stable context ID, and public hostnames
+- operator issuer, directory, and onboarding endpoints
+- Vault URL, an isolated KV mount, and an AES key under
+  `identityHub.encryptionKeyAlias`
+- existing Secret name and key mappings
+- portal authentication, ingress, TLS, storage, and image settings
 
-The numeric identities under each component's `securityContext` match the
-default images. When replacing an image, also set `runAsUser` and `runAsGroup`
-to the non-root IDs provided by that image. Both gateways use the official
-unprivileged NGINX image and listen on container port 8080; their Services
-continue to expose port 80.
+Each participant needs a separate Vault KV mount or Vault instance so wallet
+and connector keys cannot overwrite another participant's credentials.
+See [Vault setup](../../README.md#vault-setup).
 
-The optional S3 HTTP-pull image is selected through `dataPlane.image`. See
-[S3 HTTP-pull configuration](../../../docs/s3-http-pull.md) for image values,
-source addresses and provider-side secret formatting.
+The optional S3 data-plane image is selected through `dataPlane.image`;
+see [S3 HTTP-pull](../../../docs/s3-http-pull.md).
 
-## Database and initialization lifecycle
-
-Run [`deploy/database/participant/provision.sh`](../../database/participant/provision.sh)
-before Helm. It creates three databases and their restricted roles; the
-PostgreSQL administrator credential is not used by this chart.
-
-Installation is ordered as follows:
-
-1. The portal migrator pre-hook migrates only the participant portal database.
-   Failure stops the release.
-2. Identity Hub and EDC perform their packaged startup migrations using the
-   owners of their dedicated databases.
-3. The participant-init Job waits for Identity Hub, creates the participant
-   context idempotently, prepares the STS/token-signer aliases in Vault, and
-   writes a configuration-specific completion marker.
-4. The control plane init container waits for that Vault marker without using
-   the Kubernetes API.
-5. The data plane waits for control-plane readiness. The federated catalog
-   starts crawling through the control plane and the portal routes scoped
-   catalog access to it. Gateway readiness checks also include their upstreams.
-
-The participant-init Job name contains a configuration hash. A chart or
-identity/endpoints change therefore creates a fresh Job instead of trying to
-patch an immutable completed Job. `--wait-for-jobs` keeps the release from
-succeeding until initialization completes.
-
-## Vault isolation
-
-Each participant needs an isolated Vault KV mount or a separate Vault instance.
-Participant initialization writes generic runtime aliases such as
-`sts-oauth-client-secret` and `token-signer-key`; sharing the same KV path
-between participants would overwrite those aliases.
-
-Before installation, provision:
-
-- the token referenced by `existingSecret.keys.vaultToken`
-- an AES key under `identityHub.encryptionKeyAlias`
-
-The participant-init Job receives the required Identity Hub superuser key from
-the existing Kubernetes Secret. The optional `identityHubApiKey` mapping is for
-the portal; if omitted, the portal reads its participant-context key from Vault.
-
-Use narrowly scoped Vault policies and TLS in non-local environments.
-
-## Required Kubernetes Secret
+## Required Secret
 
 Create the namespace and the Secret named by `existingSecret.name` before
-running Helm. The chart only references it and never renders secret values.
-The portal migration pre-hook uses the pre-existing ServiceAccount selected by
-`jobs.portalMigrator.serviceAccountName` (`default` unless overridden), with API
-token automounting disabled; normal workloads use the chart-managed account.
+installation. Map alternative key names through `existingSecret.keys`.
 
-| Default key                     | Purpose and expected login                  |
-| ------------------------------- | ------------------------------------------- |
-| `vault-token`                   | participant-scoped Vault token              |
-| `identityhub-superuser-api-key` | Identity Hub bootstrap superuser key        |
-| `identityhub-jdbc-url`          | Identity Hub JDBC URL                       |
-| `identityhub-db-user`           | Identity Hub database owner/runtime user    |
-| `identityhub-db-password`       | Identity Hub database password              |
-| `edc-jdbc-url`                  | shared control/data-plane JDBC URL          |
-| `edc-db-user`                   | participant EDC database owner/runtime user |
-| `edc-db-password`               | participant EDC database password           |
-| `portal-migrator-database-url`  | portal migration login URL                  |
-| `portal-database-url`           | restricted portal runtime URL               |
-| `edc-api-key`                   | EDC management API key                      |
-| `federated-catalog-api-key`     | private portal-to-catalog service key       |
+| Default key                                      | Purpose                         |
+| ------------------------------------------------ | ------------------------------- |
+| `vault-token`                                    | Participant-scoped Vault token  |
+| `identityhub-superuser-api-key`                  | Wallet initialization key       |
+| `identityhub-jdbc-url`                           | Wallet database URL             |
+| `identityhub-db-user`, `identityhub-db-password` | Wallet database login           |
+| `edc-jdbc-url`                                   | Connector database URL          |
+| `edc-db-user`, `edc-db-password`                 | Connector database login        |
+| `portal-migrator-database-url`                   | Portal migration login          |
+| `portal-database-url`                            | Restricted portal runtime login |
+| `edc-api-key`                                    | EDC management key              |
+| `federated-catalog-api-key`                      | Private portal-to-catalog key   |
 
-`identityhub-api-key` and `onboarding-registration-token` are optional. Leave
-their key mappings empty to render explicit empty values and use the existing
-Vault/onboarding behavior. Key names can be changed under `existingSecret.keys`.
+`identityHubApiKey` and `onboardingRegistrationToken` mappings are optional.
+Leaving the wallet key mapping empty lets the portal read it from Vault. An
+invitation must be configured or attached before onboarding can proceed.
 
-Use TLS-enabled PostgreSQL URLs and source the Secret from the platform's secret
-manager. Never provide a PostgreSQL administrator credential to the chart.
+Use TLS-enabled database URLs and keep cluster-administrator credentials out
+of this Secret. The [participant provisioner](../../database/participant/provision.sh)
+creates the required databases and roles.
 
 ## Public and internal exposure
 
-`ingress.public` routes the DID document, DSP API, public data-plane API,
-credential service, and version endpoint. When the DID and public hostnames
-differ, include both in `ingress.public.hosts` and its TLS certificate.
+`ingress.public` publishes the DID, protocol, credential, and data-plane
+routes. Include both DID and public hostnames in the ingress and certificate
+if they differ.
 
-`ingress.internal` exposes the portal's participant-facing API and the
-unrelated Identity Hub identity routes. EDC management/catalog are not
-forwarded directly. The portal exposes only explicitly mapped EDC operations
-and the federated-catalog REST/SPARQL routes.
+`ingress.internal` serves the portal, participant-facing API, and wallet
+identity routes. Keep it private and authenticated.
 
 Portal authentication defaults to `portal.auth.mode: forwarded-header`.
-Ingress must authenticate callers, overwrite the header configured by
-`portal.auth.header`, and prevent direct access that could spoof it. An OAuth2
-Proxy can provide that boundary but is not installed by the chart.
+Configure an authentication proxy that overwrites `portal.auth.header` and
+prevents callers from bypassing it. The chart does not install that proxy.
+Unauthenticated mode grants administrator access and is restricted to isolated
+development with `portal.auth.allowInsecure: true`.
 
-For isolated development only, `portal.auth.mode: none` can be enabled together
-with `portal.auth.allowInsecure: true`. In that mode callers can omit an API
-client token and become the local portal administrator, so scopes do not
-provide isolation. The explicit acknowledgement prevents this mode from being
-selected accidentally in a production values file.
-
-Helmet security headers and global request limiting are enabled by default.
-Use `portal.httpsHeaders: false` only for an intentionally HTTP-only local
-environment. Tune `portal.rateLimit.max` and `portal.rateLimit.window` for the
-expected ingress traffic; health probes are not counted.
-
-## Operator tunnel
-
-Instead of `ingress.public`, a participant can be published through the
-operator's tunnel (see [Participant tunnel](../../../docs/participant-tunnel.md)).
-The participant then needs no public endpoint or DNS record of its own; it
-still terminates TLS itself, with a certificate it obtains through the tunnel. Map the operator's tunnel settings to values:
-
-| Tunnel setting            | Chart value                                                  |
-| ------------------------- | ------------------------------------------------------------ |
-| `HEADSCALE_URL`           | `tunnel.headscaleUrl`                                        |
-| `TAILNET_HOSTNAME`        | `tunnel.hostname`                                            |
-| `PARTICIPANT_PUBLIC_HOST` | `identity.participantPublicHost`                             |
-| `PARTICIPANT_DID_HOST`    | `identity.participantDidHost`                                |
-| `TAILNET_AUTHKEY`         | key `tunnel.authKeySecretKey` in the `existingSecret` Secret |
-
-```sh
-kubectl -n tx-participant patch secret tx-bootstrap-participant-secrets \
-  --type merge -p '{"stringData":{"tailnet-authkey":"<TAILNET_AUTHKEY>"}}'
-helm upgrade --install participant deploy/helm/participant \
-  --namespace tx-participant --values participant-values.yaml \
-  --set tunnel.enabled=true \
-  --set tunnel.headscaleUrl=https://headscale.example.org \
-  --set tunnel.hostname=bpnl000000000002
-```
-
-With `tunnel.enabled`, the chart runs a single-replica Tailscale node in
-userspace mode: no capabilities, no TUN device, a read-only root filesystem and
-no Kubernetes API access. It forwards only tailnet TCP 18443 to a Traefik
-container in the same pod, which terminates TLS for
-`identity.participantPublicHost` and proxies to the public gateway Service.
-Traefik obtains its certificate with ACME TLS-ALPN-01 through the tunnel
-(`tunnel.tls.acmeCaServer`, default Let's Encrypt; optional
-`tunnel.tls.acmeEmail`) and stores it on the node's volume, so the private key
-never leaves the pod. `tunnel.tls.rateLimit` and
-`tunnel.tls.maxConcurrentRequests` limit requests per participant, since the
-operator's ingress cannot see them. The node's outbound connections go to
-`tunnel.headscaleUrl`, Tailscale relay (DERP) servers and the ACME server, so
-allow them in egress policies.
-
-The key is single-use and needed only for the first start. The node identity
-then lives in a PersistentVolumeClaim (`tunnel.persistence`, kept on
-`helm uninstall`), and the key may be removed from the Secret afterwards. Keep
-the claim across upgrades; deleting it requires a new key from the operator.
-
-The federated catalog defaults to one replica. Increasing
-`federatedCatalog.replicaCount` creates one PVC per pod; replicas crawl
-independently without leader election or shared RDF storage. Do not point two
-processes at the same Oxigraph directory. Short-lived differences between
-replicas and multiplied catalog traffic are expected.
-
-## Participant-facing API
-
-The portal and machine clients use the same internal-ingress routes. Portal
-administrators satisfy all scopes; API clients use `Authorization: Bearer
-txb_...` tokens created under **Settings / API clients**. Complete tokens are
-returned only at creation or rotation. `GET /api/openapi.json` serves the
-machine-readable participant API contract without credentials. It contains
-only gateway-allowlisted operations and identifies each operation's scope in
-`x-required-scope`.
-
-| Scope                                                           | Exposed capability                              |
-| --------------------------------------------------------------- | ----------------------------------------------- |
-| `federated-catalog:read`                                        | cached dataset search, detail, and crawl state  |
-| `federated-catalog:sparql`                                      | bounded read-only SPARQL                        |
-| `catalog:read`                                                  | live EDC catalog/dataset requests               |
-| `assets:read`, `assets:write`                                   | asset query/get and mutations                   |
-| `policies:read`, `policies:write`                               | policy query/get and mutations                  |
-| `business-partner-groups:read`, `business-partner-groups:write` | partner-group reads and mutations               |
-| `contract-definitions:read`, `contract-definitions:write`       | offer-definition reads and mutations            |
-| `contract-negotiations:read`, `contract-negotiations:write`     | negotiation query/get and initiate/terminate    |
-| `contract-agreements:read`, `contract-agreements:retire`        | agreement reads and retirement/reactivation     |
-| `transfers:read`, `transfers:write`                             | transfer query/get and start/terminate          |
-| `data:proxy`                                                    | authenticated HTTP access through consumer EDRs |
-| `edr:data-address:read`                                         | EDR data-address credentials                    |
-
-QuerySpec `POST .../request` operations count as reads. Generic agreement
-mutations, generic negotiation/transfer CRUD, DSP proxying, and unmapped EDC
-routes are rejected before an upstream request is made. EDR and one-time token
-responses use `Cache-Control: no-store`.
+The [participant guide](../../../docs/participant.md#api-access) covers API
+clients, scopes, and the OpenAPI contract. Keep HTTPS headers enabled outside
+HTTP-only local environments.
 
 ## Install
 
-Prepare environment-owned values with real identity, endpoints, Secret key
-mappings, immutable image tags or digests, resources, ingress, and scheduling:
+From the repository root, validate your settings:
 
 ```sh
-helm lint --strict deploy/helm/participant
+helm lint --strict deploy/helm/participant --values /path/to/participant-values.yaml
 helm template participant deploy/helm/participant \
-  --namespace tx-participant \
-  --values /path/to/participant-values.yaml
+  --namespace tx-participant --values /path/to/participant-values.yaml
 ```
 
-After PostgreSQL, Vault, the namespace, Secret, DNS, and TLS are ready:
+Once databases, Vault, namespace, Secret, and ingress are ready:
 
 ```sh
 helm upgrade --install participant deploy/helm/participant \
   --namespace tx-participant \
   --values /path/to/participant-values.yaml \
-  --rollback-on-failure \
-  --wait=legacy \
-  --wait-for-jobs \
-  --timeout 15m
+  --rollback-on-failure --wait=legacy --wait-for-jobs --timeout 15m
 ```
 
-To install the published chart instead, replace `deploy/helm/participant` with
-`oci://ghcr.io/connected-intelligent-systems/tx-bootstrap-charts/tx-bootstrap-participant` and
-add `--version 0.1.2`.
+For a published package, replace the chart path with
+`oci://ghcr.io/connected-intelligent-systems/tx-bootstrap-charts/tx-bootstrap-participant`
+and add an explicit `--version`. See
+[chart versions and Helm compatibility](../README.md#versions).
 
-The command above targets Helm 4. The legacy wait strategy avoids its watcher
-edge case when completed hook Jobs are deleted. With Helm 3, replace
-`--rollback-on-failure --wait=legacy` with `--atomic --wait`.
+Portal migrations must complete before the portal starts. Participant
+initialization prepares the wallet and connector keys before the control
+plane starts. Failed migration jobs are retained for inspection:
 
-Failed portal migration hooks are retained under revision-specific names, so a
-retained failure does not block a retry. The tracked participant-init Job is
-also retained as deployment evidence and removed with the release or replaced
-when its configuration hash changes.
+```sh
+kubectl -n tx-participant get jobs,pods
+```
 
-## Deliberately deferred
+The federated catalog uses one persistent volume per replica. Start with the
+default single replica. Additional replicas crawl independently, increasing
+outbound requests and potentially returning different snapshots. Never share
+one catalog storage directory between processes.
 
-NetworkPolicies require the target cluster CNI and its actual PostgreSQL,
-Vault, DNS, issuer, BDRS, and onboarding destinations. PodDisruptionBudgets and
-replica scaling require verification of the upstream components'
-multi-replica behavior. Those policies therefore remain environment-specific.
+## Operator tunnel
+
+Use the [operator tunnel](../../../docs/participant-tunnel.md) when the
+participant cannot accept public inbound connections. Enable `tunnel.enabled`
+and disable `ingress.public`. Map the operator's settings as follows:
+
+| Tunnel setting            | Chart value                                     |
+| ------------------------- | ----------------------------------------------- |
+| `HEADSCALE_URL`           | `tunnel.headscaleUrl`                           |
+| `TAILNET_HOSTNAME`        | `tunnel.hostname`                               |
+| `PARTICIPANT_PUBLIC_HOST` | `identity.participantPublicHost`                |
+| `PARTICIPANT_DID_HOST`    | `identity.participantDidHost`                   |
+| Single-use enrollment key | Secret entry named by `tunnel.authKeySecretKey` |
+
+Deliver the key through your secret manager into the existing Secret. The
+tunnel terminates TLS at the participant and obtains its own certificate.
+`tunnel.tls` controls certificate and request-limit settings; allow outbound
+access to Headscale, relay servers, and the certificate authority.
+
+Keep the tunnel's persistent volume across upgrades. It stores the node
+identity and certificate and is retained on uninstall. Removing it requires
+a new enrollment key.

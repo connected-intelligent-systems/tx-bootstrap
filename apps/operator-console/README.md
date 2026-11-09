@@ -1,25 +1,30 @@
-# Operator Console
+# Operator console
 
-Internal UI and backend for operator-owned participant management, automatic connector provisioning, BDRS writes, issuer setup, failed-attempt retries, and credential request preparation.
+The internal operator UI and API manage participants, invitations, connector
+setup, and optional tunnel enrollment. The public onboarding API is a separate
+service. Keep this console on an authenticated administrative network.
 
-The public operator onboarding service lives in `../operator-onboarding-service`; do not expose this operator service directly to the internet.
+See [Operator services](../../docs/operator.md) for deployment and day-to-day
+use. The [local stack](../../docs/local-deployment.md) provides the required
+databases, Vault, and upstream services.
 
 ## Development
 
-From the repository root:
+After the [repository setup](../../docs/development.md#set-up), run from the
+repository root:
 
-```bash
-npm install
+```sh
 npm run build --workspace @tx-bootstrap/operator-console
 npm run test --workspace @tx-bootstrap/operator-console
 ```
 
-To run the built server and Vite UI manually:
+To run the built backend and Vite UI, use separate terminals with the required
+backend environment configured:
 
-```bash
-npm run build:server --workspace @tx-bootstrap/operator-console
+```sh
 npm run start --workspace @tx-bootstrap/operator-console
-npm run dev --workspace @tx-bootstrap/operator-console
 ```
 
-The app uses Vite, React, MUI, TanStack Query, Fastify, Kysely, and explicit SQL migrations run by the root `db-migrator` service.
+```sh
+npm run dev --workspace @tx-bootstrap/operator-console
+```

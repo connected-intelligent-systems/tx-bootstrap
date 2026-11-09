@@ -1,19 +1,23 @@
-# Participant API OpenAPI
+# Participant API specification
 
-`gateway-operations.json` is the shared allowlist for gateway authorization and
-API documentation. `participant-api.openapi.json` is generated from that
-allowlist and the versioned Tractus-X EDC 0.12.1 control-plane OpenAPI artifact.
-It adds the participant-local federated-catalog operations, bearer-token
-authentication, and `x-required-scope` metadata.
+The participant backend serves the generated API contract at
+`/api/openapi.json`. It describes the allowed connector and catalog operations,
+data proxy, bearer-token authentication, and required scopes. See
+[Participant API access](../../../../../docs/participant.md#api-access).
 
-Do not edit the generated specification manually. After changing the allowlist
-or upgrading Tractus-X EDC, update the pinned source and version checks in the
-generator, then run:
+## Regenerate
+
+Edit `gateway-operations.json` when changing the allowed API operations.
+When upgrading EDC, update the pinned upstream version in the generator too;
+it currently uses the Tractus-X EDC `0.12.1` control-plane specification.
+
+From the repository root:
 
 ```sh
-npm run openapi:generate --workspace apps/participant-portal
+npm run openapi:generate --workspace @tx-bootstrap/participant-portal
+npm run test --workspace @tx-bootstrap/participant-portal
 ```
 
-The portal backend serves the generated contract at `/api/openapi.json`. Tests
-verify that it documents exactly the allowlisted gateway operations and that all
-local component references resolve.
+Commit the regenerated `participant-api.openapi.json`. Edit the allowlist and
+generator rather than the generated contract. Tests check operation coverage
+and schema references.

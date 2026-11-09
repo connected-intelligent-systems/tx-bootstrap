@@ -1,78 +1,64 @@
 # Local Kubernetes deployment
 
-This environment deploys the reusable tx-bootstrap Helm charts to the Rancher
-Desktop Kubernetes cluster. It is the Kubernetes counterpart to
-`deploy/local_compose` and is intended for integration and production-readiness
-validation, not as a highly available production platform.
-
-The environment uses:
-
-- the existing Rancher Desktop K3s cluster and Traefik ingress controller
-- one single-instance CloudNativePG cluster with isolated databases and roles
-- one persistent standalone Vault with isolated KV mounts and tokens
-- separate namespaces for infrastructure, operator, provider, and consumer
-- the reusable charts under `deploy/helm`
-
-The three application namespaces enforce the Kubernetes Restricted Pod
-Security Standard. `tx-infra` enforces Baseline and audits/warns against
-Restricted because the local upstream Vault and CloudNativePG installations
-own their security contexts independently of the tx-bootstrap charts.
-
-PostgreSQL and Vault remain outside the operator and participant charts. The
-single-node topology and `local-path` storage are local-test limitations. A
-production environment must choose its own availability, backup, storage,
-auto-unseal, TLS, and secret-delivery design.
-
-For convenience, the local Vault pod has an `auto-unseal` sidecar that reads
-the unseal key from the `vault-bootstrap` Secret in `tx-infra` and unseals
-Vault after a pod, k3s or Rancher Desktop restart. Keeping the unseal key next
-to Vault defeats sealing; this is acceptable only for local tests.
+Run an operator, a provider, and a consumer on Rancher Desktop using the
+reusable Helm charts. The scripts also install one PostgreSQL cluster and
+one persistent Vault with isolated databases, credentials, and secret mounts.
+This environment is intended for local integration testing.
 
 ## Prerequisites
 
-- Rancher Desktop Kubernetes context named `rancher-desktop`
-- `kubectl`, Helm, Docker, `jq`, and `openssl`
-- enough Rancher Desktop memory for the operator and two participants
-- network access to the configured image and Helm repositories
+- Rancher Desktop with Kubernetes and its Traefik ingress controller enabled
+- current Kubernetes context set to `rancher-desktop`
+- Docker, `kubectl`, Helm 4.2.1, `jq`, and `openssl`
+- enough memory for the operator and both participants
+- access to the configured image and chart repositories
 
-The committed `local.env.example` contains local-only credentials. Override it
-with `TX_BOOTSTRAP_K8S_ENV_FILE` if required; never reuse these credentials
-outside this local cluster.
+The scripts use [local.env.example](local.env.example). To use a custom copy,
+export `TX_BOOTSTRAP_K8S_ENV_FILE` with its absolute path. The committed
+credentials are for this local cluster only.
 
-## Lifecycle
+## Start and inspect
 
-Install infrastructure and applications:
+Run from the repository root:
 
 ```sh
 deploy/local_k8s/scripts/up.sh
 ```
 
-Inspect the deployment:
+The script provisions infrastructure, builds local images, installs the
+applications, and runs verification. Inspect or repeat the checks with:
 
 ```sh
 deploy/local_k8s/scripts/status.sh
 deploy/local_k8s/scripts/verify.sh
 ```
 
-Remove the application releases while retaining PostgreSQL and Vault data:
+## Access and configuration
+
+Default hostnames use `nip.io` with `LOCAL_K8S_INGRESS_IP`. Set that value in
+your custom environment file if the Rancher Desktop address differs.
+Host-side checks connect through `LOCAL_K8S_INGRESS_CONNECT_IP`, which defaults
+to `127.0.0.1` for Rancher Desktop's port forwarding.
+
+Generated values and credentials are stored under the ignored `.generated/`
+directory. TLS is disabled locally; configure real DNS and TLS for other
+clusters.
+
+## Stop or reset
+
+Remove application releases while keeping PostgreSQL and Vault data:
 
 ```sh
 deploy/local_k8s/scripts/down.sh
 ```
 
-Pass `--volumes` to also remove the local infrastructure releases, namespaces,
-and persistent volumes. This permanently deletes the local Kubernetes state.
+To delete local infrastructure and persistent state too:
 
-## Local endpoints
+```sh
+deploy/local_k8s/scripts/down.sh --volumes
+```
 
-The default hostnames use the Rancher Desktop load-balancer IP through
-`nip.io`. Override `LOCAL_K8S_INGRESS_IP` before running the scripts when that
-address changes. Host-side verification connects through
-`LOCAL_K8S_INGRESS_CONNECT_IP`, which defaults to Rancher Desktop's loopback
-port forward so a VPN route cannot capture the VM subnet. `up.sh` renders
-environment-owned values from the templates under `values/`; generated values
-and credentials are written only below the ignored `.generated/` directory.
-
-TLS is deliberately disabled for this local cluster. The reusable charts keep
-HTTPS defaults, and a non-local environment must configure real DNS names and
-TLS Secrets.
+Vault automatically unseals using a key stored in the same cluster. This
+convenience, single-instance infrastructure, and local storage are for local
+tests. A deployed environment needs its own backup, availability, TLS, secret
+management, and Vault unsealing arrangements.

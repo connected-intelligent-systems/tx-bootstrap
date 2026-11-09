@@ -1,159 +1,82 @@
-# tx-bootstrap operator chart
+# Operator chart
 
-This chart deploys the operator application services without PostgreSQL or
-Vault. It is intended for Kubernetes environments where infrastructure,
-secrets, ingress, backups, and monitoring are managed separately.
+Deploy the operator console, public onboarding API, issuer services, BDRS,
+and issuer DID gateway. PostgreSQL and Vault must be provisioned separately.
+See the [shared Helm prerequisites](../README.md#before-installation).
 
-## What it installs
+## Configure
 
-- Issuer Identity Hub, Issuer Service, and BDRS
-- the public issuer DID gateway
-- the operator console and onboarding service
-- one pre-install/pre-upgrade Job for the `dataspace_admin` migrations
-- one post-install/post-upgrade Job for the restricted issuer-claims grant
-- internal Services, optional Ingress resources, ConfigMaps, and an unprivileged
-  ServiceAccount that does not mount a Kubernetes API token
+Use [values.yaml](values.yaml) as the settings reference. Prepare your own
+values file with:
 
-The chart sets startup, readiness, and liveness probes; resource requests and
-limits; a runtime-default seccomp profile; numeric non-root identities;
-`allowPrivilegeEscalation: false`; and a drop of all Linux capabilities. These
-defaults satisfy the container security-context requirements of the Kubernetes
-Restricted Pod Security Standard. A read-only root filesystem is not forced
-because not every upstream component has been verified with it.
+- issuer BPN, its base64 encoding, and public DID hostname
+- Vault URL and pre-provisioned AES keys matching
+  `issuerIdentityHub.encryptionKeyAlias` and `issuerService.encryptionKeyAlias`
+- the existing Secret name and key mappings
+- console authentication and allowed onboarding origins
+- ingress hosts, TLS, image versions, resources, and storage requirements
 
-The numeric identities under each component's `securityContext` match the
-default images. When replacing an image, also set `runAsUser` and `runAsGroup`
-to the non-root IDs provided by that image. The issuer DID gateway uses the
-official unprivileged NGINX image and listens on container port 8080; its
-Service continues to expose port 80.
+Keep the console ingress administrative. Publish the onboarding API and issuer
+gateway as described in [Operator services](../../../docs/operator.md).
 
-## Database lifecycle
-
-Database provisioning is outside the chart. Run
-[`deploy/database/operator/provision.sh`](../../database/operator/provision.sh)
-with a PostgreSQL administrator before installation. The administrator
-credential is never placed in the application Secret.
-
-Lifecycle ordering is:
-
-1. The external provisioner creates the four databases and restricted roles.
-2. The chart's pre-install/pre-upgrade `db-migrator` hook migrates only the
-   `dataspace_admin` database. A failure stops the Helm release.
-3. Identity Hub, Issuer Service, and BDRS run their packaged schema migrations
-   during application startup, each using the owner of its dedicated database.
-4. Once the application resources are ready, the post-install/post-upgrade
-   grant hook gives `issuer_claims_writer` only `SELECT`, `INSERT`, and `UPDATE`
-   on `custom_attestation_claims`.
-5. The console and onboarding service use restricted runtime logins.
-
-The issuer grant Job connects to the Issuer Service database as its owner. It
-does not receive PostgreSQL cluster-administrator rights and cannot access the
-other databases. See the [database role matrix](../../database/README.md) for
-the complete privilege model.
+Console authentication supports `api-key` or `forwarded-header`. Header mode
+requires a trusted authentication proxy that overwrites caller identity headers.
 
 ## Required Secret
 
-Create the Secret named by `existingSecret.name` in the release namespace
-before installation. The migration hook runs before normal chart resources, so
-the chart deliberately cannot create this Secret itself. A platform secret
-controller may own it; the chart only uses `secretKeyRef` references.
+Create the namespace and the Secret named by `existingSecret.name` before
+installation. The chart reads the Secret; it does not create it. Map alternative
+key names through `existingSecret.keys`.
 
-The namespace must therefore exist before Helm runs. The pre-install Job uses
-the pre-existing ServiceAccount selected by `jobs.migrator.serviceAccountName`
-(`default` unless overridden) with API-token automounting disabled. All normal
-workloads use the chart-managed ServiceAccount.
+| Default key                                            | Purpose                                              |
+| ------------------------------------------------------ | ---------------------------------------------------- |
+| `vault-token`                                          | Scoped Vault token                                   |
+| `identityhub-jdbc-url`                                 | Issuer Identity Hub database URL                     |
+| `identityhub-db-user`, `identityhub-db-password`       | Identity Hub database login                          |
+| `issuer-service-jdbc-url`                              | Issuer Service database URL                          |
+| `issuer-service-db-user`, `issuer-service-db-password` | Issuer Service database login                        |
+| `bdrs-jdbc-url`                                        | BDRS database URL                                    |
+| `bdrs-db-user`, `bdrs-db-password`                     | BDRS database login                                  |
+| `operator-migrator-database-url`                       | Operator application migration login                 |
+| `operator-console-database-url`                        | Console runtime login                                |
+| `onboarding-database-url`                              | Onboarding runtime login                             |
+| `issuer-migrator-database-url`                         | Issuer database owner login for the claims grant job |
+| `issuer-claims-database-url`                           | Restricted issuer claims login                       |
+| `bdrs-api-key`                                         | BDRS management API key                              |
+| `operator-console-api-key`                             | Required for `api-key` console authentication        |
 
-| Default key                      | Purpose and expected login                           |
-| -------------------------------- | ---------------------------------------------------- |
-| `vault-token`                    | runtime Vault token                                  |
-| `identityhub-jdbc-url`           | Identity Hub JDBC URL                                |
-| `identityhub-db-user`            | Identity Hub database owner/runtime user             |
-| `identityhub-db-password`        | Identity Hub database password                       |
-| `issuer-service-jdbc-url`        | Issuer Service JDBC URL                              |
-| `issuer-service-db-user`         | Issuer Service database owner/runtime user           |
-| `issuer-service-db-password`     | Issuer Service database password                     |
-| `bdrs-jdbc-url`                  | BDRS JDBC URL                                        |
-| `bdrs-db-user`                   | BDRS database owner/runtime user                     |
-| `bdrs-db-password`               | BDRS database password                               |
-| `operator-migrator-database-url` | `operator_migrator` URL for `dataspace_admin`        |
-| `operator-console-database-url`  | `operator_console_login` URL for `dataspace_admin`   |
-| `onboarding-database-url`        | `registration_svc_login` URL for `dataspace_admin`   |
-| `issuer-migrator-database-url`   | Issuer Service owner URL, used only by the grant Job |
-| `issuer-claims-database-url`     | `issuer_claims_writer` runtime URL                   |
-| `bdrs-api-key`                   | BDRS management API key                              |
-| `operator-console-api-key`       | console key when `auth.mode=api-key`                 |
-
-`issuer-api-key` is optional. Leave its key mapping empty to let the console
-retrieve that key from Vault. All key names can be changed under
-`existingSecret.keys`.
-
-Headscale enrollment is optional and uses an existing external server. To
-enable it, set `operatorConsole.headscale.enabled=true`,
-`operatorConsole.headscale.url=https://headscale.example.org`,
-`operatorConsole.headscale.participantDomain` to the public tunnel DNS zone, and
-`existingSecret.keys.headscaleApiKey` to the key holding the administrative
-Headscale token in the same pre-existing Secret. Only the console receives
-this token. Configure `operatorConsole.headscale.participantTag` in Headscale's
-policy first; the chart does not deploy Headscale or manage its policy. The
-default enrollment lifetime is 900 seconds. See the
-[operator enrollment API](../../../docs/operator.md#optional-headscale-enrollment-api)
-for API behavior and [Participant tunnel](../../../docs/participant-tunnel.md)
-for the participant and ingress side. Disabled releases
-do not require a Headscale Secret key.
-
-`operatorConsole.auth.mode` supports `api-key` and `forwarded-header`. API-key
-mode requires the Secret key above. Forwarded-header mode trusts the configured
-`operatorConsole.auth.header` and must only be used behind an authenticating
-reverse proxy that removes untrusted copies of that header before setting it.
-Use `operatorConsole.auth.allowedUsers` to restrict the accepted identities.
-
-Use TLS-enabled PostgreSQL connections (`sslmode=verify-full` for libpq URLs and
-the equivalent JDBC parameters) and source values from a secret manager. Do not
-commit a production Secret manifest or pass database administrator credentials
-to this chart.
+`issuerApiKey` is optional; an empty mapping lets the console read it from
+Vault. Use TLS-enabled database connections and keep cluster-administrator
+credentials out of this Secret. The
+[database provisioner](../../database/operator/provision.sh) creates the
+required roles.
 
 ## Install
 
-Copy `values.yaml` to an environment-owned file and set at least:
-
-- issuer BPN, base64 path identifier, and public DID hostname
-- Vault URL and pre-provisioned token Secret key
-- the existing Secret name/key mappings
-- public origin and authentication settings
-- ingress hosts, class, annotations, and TLS Secrets where Ingress is used
-- immutable image tags or, preferably, `sha256:` image digests
-- environment-specific resources and scheduling rules
-
-Validate without a cluster:
+From the repository root, validate your settings:
 
 ```sh
-helm lint --strict deploy/helm/operator
+helm lint --strict deploy/helm/operator --values /path/to/operator-values.yaml
 helm template operator deploy/helm/operator \
-  --namespace tx-operator \
-  --values /path/to/operator-values.yaml
+  --namespace tx-operator --values /path/to/operator-values.yaml
 ```
 
-Install once PostgreSQL, Vault, the Secret, DNS/TLS, and ingress routing exist:
+Once databases, Vault, namespace, Secret, and ingress are ready:
 
 ```sh
 helm upgrade --install operator deploy/helm/operator \
   --namespace tx-operator \
   --values /path/to/operator-values.yaml \
-  --rollback-on-failure \
-  --wait=legacy \
-  --wait-for-jobs \
-  --timeout 15m
+  --rollback-on-failure --wait=legacy --wait-for-jobs --timeout 15m
 ```
 
-To install the published chart instead, replace `deploy/helm/operator` with
-`oci://ghcr.io/connected-intelligent-systems/tx-bootstrap-charts/tx-bootstrap-operator` and add
-`--version 0.1.2`.
+For a published package, replace the chart path with
+`oci://ghcr.io/connected-intelligent-systems/tx-bootstrap-charts/tx-bootstrap-operator`
+and add an explicit `--version`. See
+[chart versions and Helm compatibility](../README.md#versions).
 
-The command above targets Helm 4. The legacy wait strategy avoids its watcher
-edge case when completed hook Jobs are deleted. With Helm 3, replace
-`--rollback-on-failure --wait=legacy` with `--atomic --wait`.
-
-If a hook fails, inspect it before retrying:
+Migration jobs run during installation and upgrades. Failed jobs are retained
+for inspection; successful hook jobs are removed. To investigate a failure:
 
 ```sh
 kubectl -n tx-operator get jobs,pods
@@ -161,14 +84,15 @@ kubectl -n tx-operator logs -l app.kubernetes.io/component=db-migrator
 kubectl -n tx-operator logs -l app.kubernetes.io/component=issuer-claims-grant
 ```
 
-Failed hook Jobs are retained; successful ones are deleted. Rerunning the Helm
-operation uses a revision-specific Job name, so a retained failure does not
-block the retry. The application migrations and grant operation are convergent
-and advisory-lock protected.
+## Optional tunnel enrollment
 
-## Deliberately deferred
+To manage participant tunnel keys, configure:
 
-NetworkPolicy rules depend on the target cluster CNI and its reachable
-PostgreSQL, Vault, DNS, and public DID endpoints. PodDisruptionBudgets and
-horizontal scaling also need a decision about component replica safety. These
-remain environment-specific instead of being enabled with unsafe defaults.
+- `operatorConsole.headscale.enabled: true`
+- `operatorConsole.headscale.url`: the external Headscale HTTPS URL
+- `operatorConsole.headscale.participantDomain`: the public participant DNS zone
+- `existingSecret.keys.headscaleApiKey`: the Secret key containing the
+  administrative Headscale API token
+
+Only the console receives this token. Configure the Headscale server and
+policy separately; see [Participant tunnel](../../../docs/participant-tunnel.md#operator).

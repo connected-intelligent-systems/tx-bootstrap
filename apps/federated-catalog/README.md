@@ -1,35 +1,37 @@
-# Participant-local federated catalog
+# Federated catalog
 
-This service builds a participant-owned catalog snapshot. It obtains the
-participant list from the operator directory and requests every remote catalog
-through the local EDC, so catalog authentication remains the responsibility of
-the participant connector.
+The service maintains a participant-owned catalog snapshot. It discovers
+participants through the operator directory and requests their catalogs through
+the local connector. A failed crawl keeps the last successful snapshot.
 
-The primary interface is REST:
+Clients normally use the participant portal API under
+`/api/federated-catalog/v1` with a scoped bearer token. See
+[Participant API access](../../docs/participant.md#api-access).
 
-- `GET /v1/datasets` supports `q`, `participantBpn`, `theme`, `contentType`,
-  `offset`, and `limit`.
-- `GET /v1/datasets/{entryId}` returns one cached dataset and its negotiation
-  metadata.
-- `GET /v1/participants` reports crawl state and staleness.
-- `GET|POST /v1/sparql` provides bounded, read-only SPARQL for trusted clients.
+## Internal API
 
-All `/v1` routes require `X-Api-Key`. In normal deployments clients do not call
-the service directly: the participant portal gateway authenticates them,
-checks scopes, strips caller credentials, and injects the internal service key.
-There is intentionally no SPARQL UI in the participant portal.
+The private service requires `X-Api-Key` on all `/v1` routes:
 
-PyOxigraph persists RDF data under `FEDERATED_CATALOG_STORE_PATH`. A failed
-crawl keeps the last successful participant snapshot. Compose uses one named
-volume and must not scale this service because multiple processes cannot share
-an Oxigraph directory. The Helm StatefulSet creates a separate PVC for every
-replica; replicas crawl independently and are eventually consistent.
+| Route                        | Purpose                         |
+| ---------------------------- | ------------------------------- |
+| `GET /v1/datasets`           | Search and filter datasets      |
+| `GET /v1/datasets/{entryId}` | Dataset and negotiation details |
+| `GET /v1/participants`       | Crawl state and freshness       |
+| `GET` or `POST /v1/sparql`   | Bounded, read-only SPARQL       |
 
-Run the local checks with:
+Persist `FEDERATED_CATALOG_STORE_PATH`. Compose must use one replica; multiple
+processes cannot share the same storage directory. Helm gives each replica its
+own volume and independent snapshot.
+
+## Development
+
+From the repository root:
 
 ```sh
-uv sync --frozen
-.venv/bin/ruff check src tests
-.venv/bin/mypy src
-.venv/bin/pytest -q
+uv sync --locked --project apps/federated-catalog
+uv run --locked --project apps/federated-catalog ruff check apps/federated-catalog/src apps/federated-catalog/tests
+uv run --locked --project apps/federated-catalog mypy apps/federated-catalog/src
+uv run --locked --project apps/federated-catalog pytest -q apps/federated-catalog/tests
 ```
+
+[config.py](src/federated_catalog/config.py) lists crawl and query settings.
