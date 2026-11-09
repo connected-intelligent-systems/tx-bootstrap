@@ -106,6 +106,19 @@ jobs:
             echo "A Job rendered while lifecycle Jobs were disabled." >&2
             exit 1
           fi
+          helm template headscale deploy/helm/operator \
+            --set operatorConsole.headscale.enabled=true \
+            --set operatorConsole.headscale.url=https://headscale.example.invalid \
+            --set operatorConsole.headscale.participantDomain=tunnel.example.invalid \
+            --set existingSecret.keys.headscaleApiKey=headscale-admin-token \
+            --set existingSecret.keys.headscaleRoutingApiKey=tunnel-routing-token \
+            > /tmp/operator-headscale.yaml
+          grep -q 'name: HEADSCALE_ROUTING_API_KEY' /tmp/operator-headscale.yaml
+          grep -q 'key: tunnel-routing-token' /tmp/operator-headscale.yaml
+          if grep -q 'HEADSCALE_ROUTING_API_KEY' /tmp/operator-default.yaml; then
+            echo "A routing credential rendered while Headscale was disabled."
+            exit 1
+          fi
 
       - name: Check participant variants
         if: matrix.chart == 'participant'

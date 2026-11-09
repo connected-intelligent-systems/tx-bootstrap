@@ -95,6 +95,12 @@ To manage participant tunnel keys, configure:
 - `operatorConsole.headscale.participantDomain`: the public participant DNS zone
 - `existingSecret.keys.headscaleApiKey`: the Secret key containing the
   administrative Headscale API token
+- `existingSecret.keys.headscaleRoutingApiKey`: a separate random token of at
+  least 32 characters for the ingress to read approved routes
 
-Only the console receives this token. Configure the Headscale server and
+Set the ingress's `TUNNEL_ROUTING_API_URL` to the console's
+`/api/network/tunnel-routes` endpoint and inject that separate token as
+`TUNNEL_ROUTING_API_KEY`. See [tunnel routing](../../../docs/participant-tunnel.md#deploy).
+
+Only the console receives the administrative Headscale token. Configure the server and
 policy separately; see [Participant tunnel](../../../docs/participant-tunnel.md#operator).

@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import secrets
 from collections.abc import AsyncIterator
-from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from typing import Any
 from urllib.parse import parse_qs
@@ -13,7 +13,10 @@ from fastapi.responses import JSONResponse
 
 from .config import Settings
 from .crawler import CatalogCrawler
+from .query_worker import QueryExecutionError, QueryTimeoutError
 from .store import CatalogStore, validate_query
+
+LOGGER = logging.getLogger(__name__)
 
 
 def create_app(
@@ -22,9 +25,10 @@ def create_app(
     crawler: CatalogCrawler | None = None,
 ) -> FastAPI:
     configured = settings or Settings()
-    catalog_store = store or CatalogStore(configured.store_path, configured.crawl_interval_seconds * 2)
+    catalog_store = store or CatalogStore(
+        configured.store_path, configured.crawl_interval_seconds * 2, configured.snapshot_path or None
+    )
     catalog_crawler = crawler or CatalogCrawler(configured, catalog_store)
-    executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="sparql")
     query_busy = asyncio.Lock()
     crawler_task: asyncio.Task[None] | None = None
 
@@ -36,7 +40,6 @@ def create_app(
         await catalog_crawler.close()
         if crawler_task:
             await crawler_task
-        executor.shutdown(wait=False, cancel_futures=True)
 
     app = FastAPI(title="tx-bootstrap Federated Catalog", version="1.0.0", lifespan=lifespan)
     app.state.settings = configured
@@ -50,14 +53,15 @@ def create_app(
     @app.get("/health/live")
     async def live() -> JSONResponse:
         try:
-            catalog_store.check_health()
+            # Store access takes the store lock; never block the event loop on it.
+            await asyncio.to_thread(catalog_store.check_health)
             return JSONResponse({"status": "ok"})
         except Exception:
             return JSONResponse({"status": "unhealthy"}, status_code=503)
 
     @app.get("/health/ready")
     async def ready() -> JSONResponse:
-        is_ready = catalog_store.has_snapshot() or catalog_crawler.ready.is_set()
+        is_ready = catalog_crawler.ready.is_set() or await asyncio.to_thread(catalog_store.has_snapshot)
         return JSONResponse({"status": "ready" if is_ready else "starting"}, status_code=200 if is_ready else 503)
 
     @app.get("/v1/datasets", dependencies=[Depends(require_api_key)])
@@ -113,29 +117,26 @@ def create_app(
             raise HTTPException(status_code=400, detail=str(error)) from error
         if query_busy.locked():
             raise HTTPException(status_code=503, detail="Another SPARQL query is still running")
-        await query_busy.acquire()
-        loop = asyncio.get_running_loop()
-        future = loop.run_in_executor(
-            executor,
-            catalog_store.query,
-            query,
-            request.headers.get("accept", "application/sparql-results+json"),
-            configured.sparql_max_results,
-            configured.sparql_max_response_bytes,
-        )
-
-        def release(_future: object) -> None:
-            loop.call_soon_threadsafe(query_busy.release)
-
-        future.add_done_callback(release)
-        try:
-            payload, media_type = await asyncio.wait_for(
-                asyncio.shield(future), timeout=configured.sparql_timeout_seconds
-            )
-        except TimeoutError as error:
-            raise HTTPException(status_code=504, detail="SPARQL query timed out") from error
-        except (SyntaxError, ValueError, OSError) as error:
-            raise HTTPException(status_code=400, detail=str(error)) from error
+        async with query_busy:
+            try:
+                # The query process is killed at the deadline, so this thread
+                # (and the busy lock) is always released shortly after it.
+                payload, media_type = await asyncio.to_thread(
+                    catalog_store.query,
+                    query,
+                    request.headers.get("accept", "application/sparql-results+json"),
+                    configured.sparql_max_results,
+                    configured.sparql_max_response_bytes,
+                    timeout_seconds=configured.sparql_timeout_seconds,
+                    sandbox=configured.sparql_sandbox,
+                )
+            except QueryTimeoutError as error:
+                raise HTTPException(status_code=504, detail="SPARQL query timed out") from error
+            except QueryExecutionError as error:
+                if error.client_error:
+                    raise HTTPException(status_code=400, detail=str(error)) from error
+                LOGGER.error("SPARQL query failed: %s", error)
+                raise HTTPException(status_code=500, detail="SPARQL query could not be evaluated") from error
         return Response(payload, media_type=media_type)
 
     return app

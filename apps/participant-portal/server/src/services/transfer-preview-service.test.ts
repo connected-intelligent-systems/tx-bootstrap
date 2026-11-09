@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { config } from '../config/index.js'
 import { fetchPublicHttpDownload, fetchPublicHttpPreview } from './public-http-preview.js'
 import { downloadHttpPullTransfer, previewHttpPullTransfer } from './transfer-preview-service.js'
+import { UNTRUSTED_CONTENT_HEADERS } from './untrusted-content.js'
 
 vi.mock('./public-http-preview.js', () => ({
   fetchPublicHttpDownload: vi.fn(),
@@ -91,6 +92,24 @@ describe('transfer preview service', () => {
 
     expect(reply.header).toHaveBeenCalledWith('Content-Disposition', 'attachment; filename="report.csv"')
   })
+
+  it('never renders a provider error body as a document on the portal origin', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify({ endpoint: 'https://data.test/missing' })),
+    )
+    const download = Object.assign(Readable.from(['<script>parent.steal()</script>']), {
+      statusCode: 404,
+      headers: { 'content-type': 'text/html', 'content-security-policy': "script-src 'unsafe-inline'" },
+    }) as unknown as IncomingMessage
+    fetchPublicHttpDownloadMock.mockResolvedValue(download)
+    const reply = replyStub()
+
+    await downloadHttpPullTransfer({ params: { transferId: 'transfer-1' } } as never, reply as never)
+
+    expect(reply.status).toBe(404)
+    expect(reply.header).toHaveBeenCalledWith('Content-Disposition', 'attachment; filename="transfer-1"')
+    expect(reply.headers).toHaveBeenCalledWith(UNTRUSTED_CONTENT_HEADERS)
+  })
 })
 
 const replyStub = () => {
@@ -98,6 +117,7 @@ const replyStub = () => {
     payload: undefined as unknown,
     status: 200,
     header: vi.fn(() => reply),
+    headers: vi.fn(() => reply),
     code: vi.fn((status: number) => {
       reply.status = status
       return reply

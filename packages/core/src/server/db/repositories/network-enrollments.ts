@@ -9,6 +9,47 @@ import { ConflictError, NotFoundError } from "../../http/errors.js";
 
 export function createNetworkEnrollmentRepository(db: Kysely<Database>) {
   return {
+    /** Reclaim abandoned reservations without interrupting an active issuer. */
+    async recoverAbandoned(controlUrl: string, staleBefore: Date) {
+      return db.transaction().execute(async (trx) => {
+        const rows = await trx
+          .selectFrom("network_enrollments")
+          .select(["id", "business_partner_id"])
+          .where("control_url", "=", controlUrl)
+          .where("state", "=", "CREATING")
+          .where("updated_at", "<=", staleBefore)
+          // Key creation holds this row lock until its result is committed.
+          .forUpdate()
+          .skipLocked()
+          .execute();
+        if (rows.length === 0) return 0;
+        await trx
+          .updateTable("network_enrollments")
+          .set({ state: "FAILED", updated_at: new Date() })
+          .where(
+            "id",
+            "in",
+            rows.map((row) => row.id),
+          )
+          .execute();
+        await trx
+          .insertInto("participant_events")
+          .values(
+            rows.map((row) => ({
+              id: randomUUID(),
+              business_partner_id: row.business_partner_id,
+              onboarding_case_id: null,
+              actor: "system:network-reconciler",
+              action: "participant.network_enrollment_abandoned",
+              message:
+                "Enrollment creation was interrupted; issue a new key with a new deployment ID.",
+              payload: { deploymentId: row.id, provider: "headscale" },
+            })),
+          )
+          .execute();
+        return rows.length;
+      });
+    },
     async reserve(row: {
       id: string;
       participantId: string;
@@ -53,6 +94,7 @@ export function createNetworkEnrollmentRepository(db: Kysely<Database>) {
         .select(["e.id", "e.pre_auth_key_id", "p.assigned_bpn"])
         .where("e.control_url", "=", controlUrl)
         .where("e.state", "=", "ISSUED")
+        .where("p.verification_status", "=", "VERIFIED")
         .execute();
     },
     /**

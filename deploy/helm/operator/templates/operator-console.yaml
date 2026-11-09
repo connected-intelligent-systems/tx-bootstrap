@@ -67,6 +67,10 @@ spec:
               value: {{ .Values.operatorConsole.headscale.url | quote }}
             - name: HEADSCALE_API_KEY
               {{- include "tx-bootstrap-operator.secretValue" (dict "root" . "key" "headscaleApiKey") | nindent 14 }}
+            {{- if .Values.existingSecret.keys.headscaleRoutingApiKey }}
+            - name: HEADSCALE_ROUTING_API_KEY
+              {{- include "tx-bootstrap-operator.secretValue" (dict "root" . "key" "headscaleRoutingApiKey") | nindent 14 }}
+            {{- end }}
             - name: HEADSCALE_PARTICIPANT_TAG
               value: {{ .Values.operatorConsole.headscale.participantTag | quote }}
             - name: HEADSCALE_PARTICIPANT_DOMAIN

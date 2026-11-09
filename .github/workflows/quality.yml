@@ -18,6 +18,18 @@ jobs:
   verify:
     name: Verify repository
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: integration-test-only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 3s --health-retries 10
+    env:
+      TXB_TEST_DATABASE_URL: postgresql://postgres:integration-test-only@127.0.0.1:5432/postgres
 
     steps:
       - name: Check out repository

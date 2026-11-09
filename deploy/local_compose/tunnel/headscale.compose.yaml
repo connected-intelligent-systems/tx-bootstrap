@@ -103,7 +103,7 @@ configs:
           path: /var/lib/headscale/db.sqlite
           write_ahead_log: true
       dns:
-        # The ingress resolves <name>.<base_domain> through MagicDNS.
+        # Useful for diagnostics; public routing uses verified node addresses.
         magic_dns: true
         base_domain: ${TUNNEL_MAGICDNS_DOMAIN:-tailnet.internal}
         override_local_dns: false

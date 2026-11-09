@@ -8,6 +8,72 @@ import { createApiRoutes } from "./api-routes.js";
 import { createAuth } from "../http/auth.js";
 
 describe("operator console routes", () => {
+  it("uses a separate routing token without granting administrative access", async () => {
+    const { createNetworkEnrollmentService } =
+      await import("../services/network-enrollment-service.js");
+    const { readHeadscaleConfig } = await import("../config/headscale.js");
+    const routingKey = "routing-token-0000000000000000000000";
+    const listIssued = vi.fn().mockResolvedValue([]);
+    const network = createNetworkEnrollmentService({
+      config: readHeadscaleConfig({
+        HEADSCALE_ENABLED: "true",
+        HEADSCALE_URL: "https://headscale.example.org",
+        HEADSCALE_API_KEY: "headscale-admin",
+        HEADSCALE_ROUTING_API_KEY: routingKey,
+        HEADSCALE_PARTICIPANT_DOMAIN: "tunnel.example.org",
+      }),
+      repositories: {
+        networkEnrollments: { listIssued },
+      } as unknown as Parameters<
+        typeof createNetworkEnrollmentService
+      >[0]["repositories"],
+    });
+    const app = fastify({ logger: false });
+    await app.register(createApiRoutes, {
+      prefix: "/api",
+      controller: network as unknown as OperatorController,
+      auth: createAuth({
+        adminAuth: {
+          mode: "api-key",
+          apiKey: "console-admin",
+          header: "x-forwarded-user",
+          allowedUsers: new Set(),
+        },
+      }),
+      healthService: fakeHealthService(),
+    });
+    try {
+      for (const headers of [
+        {},
+        { "x-api-key": "console-admin" },
+        { authorization: "Bearer console-admin" },
+      ]) {
+        expect(
+          (await app.inject({ url: "/api/network/tunnel-routes", headers }))
+            .statusCode,
+        ).toBe(401);
+      }
+      expect(listIssued).not.toHaveBeenCalled();
+      const accepted = await app.inject({
+        url: "/api/network/tunnel-routes",
+        headers: { authorization: `Bearer ${routingKey}` },
+      });
+      expect(accepted.statusCode).toBe(200);
+      expect(accepted.headers["cache-control"]).toBe("no-store");
+      expect(accepted.headers["content-type"]).toContain("text/plain");
+      expect(accepted.body).toBe("");
+      expect(
+        (
+          await app.inject({
+            url: "/api/admin/network",
+            headers: { authorization: `Bearer ${routingKey}` },
+          })
+        ).statusCode,
+      ).toBe(401);
+    } finally {
+      await app.close();
+    }
+  });
   it("protects every network administration route and marks enrollment responses non-cacheable", async () => {
     const controller = {
       getNetworkStatus: vi.fn().mockResolvedValue({ enabled: true }),

@@ -138,7 +138,8 @@
             "bdrsApiKey": { "$ref": "#/definitions/secretKey" },
             "operatorConsoleApiKey": { "type": "string" },
             "issuerApiKey": { "type": "string" },
-            "headscaleApiKey": { "type": "string" }
+            "headscaleApiKey": { "type": "string" },
+            "headscaleRoutingApiKey": { "type": "string" }
           }
         }
       }

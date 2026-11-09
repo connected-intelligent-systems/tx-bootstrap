@@ -108,7 +108,7 @@ def test_directory_metadata_change_is_used_with_last_known_good_snapshot(tmp_pat
     assert store.get_dataset(item.entry_id)["counterPartyId"] == changed.did  # type: ignore[index]
 
 
-def test_stale_and_sparql_graph_visibility(tmp_path) -> None:
+def test_stale_and_sparql_graph_visibility(tmp_path, sparql_sandbox: str) -> None:
     provider = participant()
     store = CatalogStore(str(tmp_path / "store"), stale_after_seconds=60)
     store.replace_catalog(
@@ -131,6 +131,7 @@ def test_stale_and_sparql_graph_visibility(tmp_path) -> None:
         "application/sparql-results+json",
         1000,
         10_000,
+        sandbox=sparql_sandbox,
     )
     assert media_type == "application/sparql-results+json"
     assert b"urn:dataset-1" in payload
@@ -139,6 +140,7 @@ def test_stale_and_sparql_graph_visibility(tmp_path) -> None:
         "application/sparql-results+json",
         1000,
         10_000,
+        sandbox=sparql_sandbox,
     )
     assert b'"bindings": []' in hidden
     public_query = (
@@ -150,6 +152,7 @@ def test_stale_and_sparql_graph_visibility(tmp_path) -> None:
         "application/sparql-results+json",
         1000,
         10_000,
+        sandbox=sparql_sandbox,
     )
     assert provider.bpn.encode() in public
 

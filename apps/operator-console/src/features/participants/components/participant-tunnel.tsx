@@ -274,7 +274,7 @@ function EnrollmentCard({
           <StatusChip label={label} color={color} />
           {node ? (
             <StatusChip
-              label={node.routable ? "ROUTABLE" : "NAME PENDING"}
+              label={node.routable ? "ROUTABLE" : "ROUTE PENDING"}
               color={node.routable ? "success" : "warning"}
             />
           ) : null}

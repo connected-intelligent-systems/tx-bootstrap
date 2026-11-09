@@ -63,6 +63,12 @@ test -s "$work/authkey"
 chmod 600 "$work/authkey"
 participant up -d --wait --wait-timeout 180
 
+# A client-chosen hostname alone must never publish the node.
+[ "$(request "$host")" != 200 ] || { echo "An unapproved node was publicly routed" >&2; exit 1; }
+participant_ip="$(participant exec -T tailnet tailscale ip -4 | tr -d "\r")"
+printf '"%s" "%s";\n' "$host" "$participant_ip" |
+  tunnel exec -T routing-authority sh -c 'cat > /tmp/routes.map.next && mv /tmp/routes.map.next /tmp/routes.map'
+
 # TLS ends at the participant: the certificate clients see is the one the
 # participant obtained through the tunnel, never one held by the ingress.
 for attempt in $(seq 1 60); do
@@ -86,10 +92,30 @@ throttled="$(seq 1 30 | xargs -P 15 -I{} curl -sk --max-time 15 \
 [ "$throttled" -gt 0 ] || { echo "Rate limit did not apply" >&2; exit 1; }
 echo "Rate limit applied ($throttled of 30 burst requests throttled)"
 
-participant_ip="$(participant exec -T tailnet tailscale ip -4 | tr -d "\r")"
 tunnel exec -T tunnel-node wget -q -T 5 -O /dev/null "http://$participant_ip:18080/"
 if tunnel exec -T tunnel-node wget -q -T 5 -O /dev/null "http://$participant_ip:18081/" 2>/dev/null; then
   echo "Policy allowed a non-tunnel participant port" >&2
   exit 1
 fi
+
+# Renaming an enrolled node cannot publish another participant's hostname.
+# Query the participant's immutable node ID through its local client instead
+# of depending on the untrusted hostname in the Headscale response.
+node_id="$(participant exec -T tailnet tailscale status --json | sed -n '/"Self": {/,/^  },/s/.*"ID": *"\([0-9]*\)".*/\1/p')"
+test -n "$node_id"
+tunnel exec -T headscale headscale nodes rename --identifier "$node_id" bpnl000000000099 >/dev/null
+sleep 2
+[ "$(request "$host")" = 200 ] || { echo "Renaming the node broke its approved route" >&2; exit 1; }
+spoofed="$(curl -sk --max-time 10 --resolve bpnl000000000099.tunnel.test:28443:127.0.0.1 \
+  -H "Host: $host" -o /dev/null -w '%{http_code}' https://bpnl000000000099.tunnel.test:28443/ || true)"
+[ "$spoofed" != 200 ] || { echo "A client-selected name published another participant" >&2; exit 1; }
+
+# Removing approval blocks new connections even while the node stays joined.
+tunnel exec -T routing-authority sh -c ': > /tmp/routes.map'
+for attempt in $(seq 1 10); do
+  [ "$(request "$host")" != 200 ] && break
+  sleep 2
+done
+[ "$(request "$host")" != 200 ] || { echo "A withdrawn route stayed public" >&2; exit 1; }
+echo "Unapproved and spoofed names blocked; approved route withdrawn successfully"
 echo "Tunnel smoke test passed"

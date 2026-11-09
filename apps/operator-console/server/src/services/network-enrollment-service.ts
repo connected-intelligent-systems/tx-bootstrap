@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { timingSafeEqual } from "node:crypto";
+import { isIPv4 } from "node:net";
 import type { Repositories } from "@tx-bootstrap/core/server/db/repositories/index.js";
 import type { NetworkEnrollmentRow } from "@tx-bootstrap/core/server/db/database.js";
 import {
@@ -6,6 +8,7 @@ import {
   ConflictError,
   NotFoundError,
   httpError,
+  unauthorized,
 } from "@tx-bootstrap/core/server/http/errors.js";
 import type { HeadscaleConfig } from "../config/headscale.js";
 import {
@@ -66,6 +69,39 @@ export function createNetworkEnrollmentService({
   }
 
   const service = {
+    /** Routing authority: never derive a destination from a client hostname. */
+    async getTunnelRoutes(authorization?: string) {
+      requireEnabled();
+      const expected = Buffer.from(`Bearer ${config.routingApiKey}`);
+      const supplied = Buffer.from(authorization ?? "");
+      if (
+        !config.routingApiKey ||
+        supplied.length !== expected.length ||
+        !timingSafeEqual(supplied, expected)
+      )
+        throw unauthorized();
+      const issued = await networkEnrollments.listIssued(config.url);
+      if (issued.length === 0) return "";
+      const nodes = await client.listNodes();
+      const routes: string[] = [];
+      for (const row of issued) {
+        if (
+          !row.pre_auth_key_id ||
+          !/^BPNL[A-Z0-9]{12}$/.test(row.assigned_bpn)
+        )
+          continue;
+        const matches = nodes.filter(
+          (node) => node.preAuthKey?.id === row.pre_auth_key_id,
+        );
+        const address =
+          matches.length === 1 ? tunnelAddress(matches[0]) : undefined;
+        if (address)
+          routes.push(
+            `"${tunnelHostname(row.assigned_bpn)}.${config.participantDomain}" "${address}";`,
+          );
+      }
+      return routes.sort().join("\n") + (routes.length ? "\n" : "");
+    },
     async getNetworkStatus() {
       if (!config.enabled) return { enabled: false };
       await client.listNodes();
@@ -208,9 +244,9 @@ export function createNetworkEnrollmentService({
             ? {
                 id: node.id,
                 name: node.givenName || node.name,
-                // Ingress routes only once the operator has assigned the name.
                 routable:
-                  node.givenName === tunnelHostname(partner.assigned_bpn),
+                  partner.verification_status === "VERIFIED" &&
+                  !!tunnelAddress(node),
                 ipAddresses: node.ipAddresses,
                 online: node.online,
                 lastSeen: node.lastSeen ?? null,
@@ -227,6 +263,12 @@ export function createNetworkEnrollmentService({
      */
     async reconcileNetwork() {
       if (!config.enabled) return { renamed: 0, revoked: 0, failed: 0 };
+      // An unknown remote result is never retried. Only release abandoned
+      // reservations; a replacement needs a new explicit enrollment request.
+      await networkEnrollments.recoverAbandoned(
+        config.url,
+        new Date(Date.now() - Math.max(60_000, config.timeoutMs * 2)),
+      );
       const pending = await networkEnrollments.listPendingRevocations(
         config.url,
       );
@@ -248,9 +290,8 @@ export function createNetworkEnrollmentService({
       return { renamed, revoked, failed };
     },
     /**
-     * Assign each enrolled node its canonical MagicDNS name and move squatters
-     * off reserved names. Participants choose their own hostname at join time;
-     * the ingress must never route a participant's public host to another node.
+     * Keep canonical MagicDNS names recognizable for operators. Public routing
+     * uses enrollment key IDs and addresses and does not trust these names.
      */
     async reconcileNodeNames() {
       if (!config.enabled) return { renamed: 0 };
@@ -342,4 +383,16 @@ export function createNetworkEnrollmentService({
     },
   };
   return service;
+}
+
+function tunnelAddress(
+  node: Awaited<ReturnType<HeadscaleClient["listNodes"]>>[number],
+) {
+  if (node.expiry && Date.parse(node.expiry) <= Date.now()) return undefined;
+  const addresses = node.ipAddresses.filter((address) => {
+    if (!isIPv4(address)) return false;
+    const [first, second] = address.split(".").map(Number);
+    return first === 100 && second >= 64 && second <= 127;
+  });
+  return addresses.length === 1 ? addresses[0] : undefined;
 }

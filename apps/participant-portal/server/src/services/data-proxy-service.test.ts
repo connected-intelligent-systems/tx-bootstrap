@@ -265,6 +265,59 @@ describe('participant transfer data proxy', () => {
     }
   })
 
+  it('keeps provider content from controlling browser security on the portal origin', async () => {
+    let providerRequests = 0
+    const provider = await startServer(async (_request, reply) => {
+      providerRequests += 1
+      reply.writeHead(200, {
+        'content-type': 'text/html',
+        'content-security-policy': "script-src 'unsafe-inline'",
+        'access-control-allow-origin': '*',
+        'access-control-allow-credentials': 'true',
+        'x-content-type-options': 'none',
+        'service-worker-allowed': '/',
+        'x-provider': 'kept',
+      })
+      reply.end('<script>fetch("/api/portal/api-clients")</script>')
+    })
+    const edc = await startEdrServer(() => ({ endpoint: `${provider.url}/public`, authorization: 'Bearer token' }))
+    config.edc.managementApiUrl = `${edc.url}/management/`
+
+    try {
+      const app = createApp()
+      const page = await app.inject({
+        method: 'GET',
+        url: '/api/data/transfer-1/page.html',
+        headers: { 'sec-fetch-dest': 'document' },
+      })
+      const script = await app.inject({
+        method: 'GET',
+        url: '/api/data/transfer-1/evil.js',
+        headers: { 'sec-fetch-dest': 'script' },
+      })
+      const worker = await app.inject({
+        method: 'GET',
+        url: '/api/data/transfer-1/sw.js',
+        headers: { 'sec-fetch-dest': 'serviceworker' },
+      })
+      await app.close()
+
+      expect(page.statusCode).toBe(200)
+      expect(page.headers['content-security-policy']).toBe("sandbox; default-src 'none'; frame-ancestors 'none'")
+      expect(page.headers['x-content-type-options']).toBe('nosniff')
+      expect(page.headers['access-control-allow-origin']).toBeUndefined()
+      expect(page.headers['access-control-allow-credentials']).toBeUndefined()
+      expect(page.headers['service-worker-allowed']).toBeUndefined()
+      expect(page.headers['x-provider']).toBe('kept')
+      expect(script.statusCode).toBe(403)
+      expect(worker.statusCode).toBe(403)
+      expect(providerRequests).toBe(1)
+    } finally {
+      await closeServer(edc.server)
+      await closeServer(provider.server)
+    }
+  })
+
   it('prevents path escape and rewrites only redirects inside the EDR base path', () => {
     const endpoint = new URL('https://provider.example/api/public')
 

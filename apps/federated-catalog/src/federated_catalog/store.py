@@ -1,33 +1,23 @@
 from __future__ import annotations
 
 import base64
-import csv
 import hashlib
-import io
+import itertools
 import json
 import re
+import shutil
 import threading
-from collections.abc import Iterable
+import time
+from collections.abc import Iterable, Iterator
+from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from pyoxigraph import (
-    BlankNode,
-    DefaultGraph,
-    Literal,
-    NamedNode,
-    Quad,
-    QueryBoolean,
-    QuerySolutions,
-    QueryTriples,
-    RdfFormat,
-    Store,
-    parse,
-    serialize,
-)
+from pyoxigraph import Literal, NamedNode, Quad, RdfFormat, Store, parse
 
 from .models import CrawlStatus, DatasetRecord, parse_time, utc_now
+from .query_worker import SANDBOX_REQUIRED, run_query
 
 BASE = "urn:tx-bootstrap:federated-catalog:"
 CONTROL_GRAPH = NamedNode(BASE + "control")
@@ -58,17 +48,31 @@ def entry_node(entry_id: str) -> NamedNode:
     return NamedNode(BASE + "entry:" + entry_id)
 
 
+def is_valid_endpoint(value: str) -> bool:
+    """True when the value is an absolute HTTP(S) IRI that RDF can represent."""
+    if not value.startswith(("http://", "https://")):
+        return False
+    try:
+        NamedNode(value)
+    except ValueError:
+        return False
+    return True
+
+
 def stable_entry_id(bpn: str, dataset_id: str) -> str:
     return hashlib.sha256(f"{bpn}\0{dataset_id}".encode()).hexdigest()
 
 
 class CatalogStore:
-    def __init__(self, path: str, stale_after_seconds: int) -> None:
+    def __init__(self, path: str, stale_after_seconds: int, snapshot_path: str | None = None) -> None:
         Path(path).mkdir(parents=True, exist_ok=True)
         self.store = Store(path)
         self.stale_after_seconds = stale_after_seconds
         self.lock = threading.RLock()
+        self.snapshots = QuerySnapshots(snapshot_path or path.rstrip("/") + "-query-snapshots")
         self.cleanup_staging_graphs()
+        with self.lock:
+            self._publish_snapshot()
 
     def cleanup_staging_graphs(self) -> None:
         with self.lock:
@@ -100,21 +104,34 @@ class CatalogStore:
         return None
 
     def put_status(self, status: CrawlStatus) -> None:
+        with self.lock:
+            self._put_status(status)
+            self._publish_snapshot()
+
+    def _put_status(self, status: CrawlStatus) -> None:
         subject = status_node(status.participant.bpn)
         payload = Literal(json.dumps(status.to_dict(), separators=(",", ":"), ensure_ascii=False))
-        with self.lock:
-            existing = list(self.store.quads_for_pattern(subject, None, None, CONTROL_GRAPH))
-            for quad in existing:
-                self.store.remove(quad)
-            self.store.add(Quad(subject, STATE_PREDICATE, payload, CONTROL_GRAPH))
-            self._replace_public_participant(status)
-
-    def _replace_public_participant(self, status: CrawlStatus) -> None:
+        # Validate everything derived from directory data before mutating, so a
+        # malformed entry cannot leave a half-written status behind.
+        public_quads = self._public_participant_quads(status)
+        existing = list(self.store.quads_for_pattern(subject, None, None, CONTROL_GRAPH))
+        for quad in existing:
+            self.store.remove(quad)
+        self.store.add(Quad(subject, STATE_PREDICATE, payload, CONTROL_GRAPH))
         graph = live_graph(status.participant.bpn)
         for quad in list(self.store.quads_for_pattern(graph, None, None, PUBLIC_GRAPH)):
             self.store.remove(quad)
+        self.store.extend(public_quads)
+
+    def _publish_snapshot(self) -> None:
+        self.store.flush()
+        self.snapshots.publish(self.store)
+
+    @staticmethod
+    def _public_participant_quads(status: CrawlStatus) -> list[Quad]:
+        graph = live_graph(status.participant.bpn)
         if not status.active:
-            return
+            return []
         participant = status.participant
         values: dict[NamedNode, NamedNode | Literal] = {
             TYPE_PREDICATE: CATALOG_TYPE,
@@ -125,8 +142,7 @@ class CatalogStore:
         }
         if status.last_success_at:
             values[NamedNode("http://www.w3.org/ns/prov#generatedAtTime")] = Literal(status.last_success_at)
-        for predicate, value in values.items():
-            self.store.add(Quad(graph, predicate, value, PUBLIC_GRAPH))
+        return [Quad(graph, predicate, value, PUBLIC_GRAPH) for predicate, value in values.items()]
 
     def replace_catalog(
         self,
@@ -137,6 +153,8 @@ class CatalogStore:
         suffix = hashlib.sha256(f"{status.participant.bpn}:{utc_now().timestamp()}".encode()).hexdigest()[:16]
         staging_data = NamedNode(BASE + f"staging:data:{suffix}")
         staging_meta = NamedNode(BASE + f"staging:metadata:{suffix}")
+        # Fails before any graph is touched if the directory entry is unusable.
+        self._public_participant_quads(status)
         with self.lock:
             self.store.add_graph(staging_data)
             self.store.add_graph(staging_meta)
@@ -164,8 +182,8 @@ class CatalogStore:
                     f"DROP SILENT GRAPH {current_meta}; "
                     f"MOVE SILENT GRAPH {staging_meta} TO GRAPH {current_meta}"
                 )
-                self.put_status(status)
-                self.store.flush()
+                self._put_status(status)
+                self._publish_snapshot()
             except Exception:
                 self.store.remove_graph(staging_data)
                 self.store.remove_graph(staging_meta)
@@ -183,6 +201,7 @@ class CatalogStore:
                 self.store.remove(quad)
             for quad in list(self.store.quads_for_pattern(live_graph(bpn), None, None, PUBLIC_GRAPH)):
                 self.store.remove(quad)
+            self._publish_snapshot()
 
     def is_stale(self, status: CrawlStatus, now: datetime | None = None) -> bool:
         success = parse_time(status.last_success_at)
@@ -246,116 +265,107 @@ class CatalogStore:
                         )
         return None
 
-    def query(self, query: str, accept: str, max_results: int, max_bytes: int) -> tuple[bytes, str]:
-        data_graphs: list[NamedNode | BlankNode | DefaultGraph] = [
-            live_graph(status.participant.bpn) for status in self.statuses() if status.active
-        ]
-        named_graphs: list[NamedNode | BlankNode] = [
-            live_graph(status.participant.bpn) for status in self.statuses() if status.active
-        ]
-        named_graphs.append(PUBLIC_GRAPH)
+    def query(
+        self,
+        query: str,
+        accept: str,
+        max_results: int,
+        max_bytes: int,
+        *,
+        timeout_seconds: float = 30,
+        sandbox: str = SANDBOX_REQUIRED,
+    ) -> tuple[bytes, str]:
+        """Evaluate user SPARQL in a killable, network-sandboxed child process."""
         with self.lock:
-            result = self.store.query(
-                query,
-                default_graph=data_graphs,
-                named_graphs=named_graphs,
+            active = [live_graph(status.participant.bpn).value for status in self.statuses() if status.active]
+        with self.snapshots.acquire() as snapshot:
+            return run_query(
+                snapshot_path=str(snapshot),
+                query=query,
+                default_graphs=active,
+                named_graphs=[*active, PUBLIC_GRAPH.value],
+                accept=accept,
+                max_results=max_results,
+                max_bytes=max_bytes,
+                timeout_seconds=timeout_seconds,
+                sandbox=sandbox,
             )
-            if isinstance(result, QueryBoolean):
-                payload, content_type = self._boolean_result(bool(result), accept)
-            elif isinstance(result, QuerySolutions):
-                payload, content_type = self._solution_result(result, accept, max_results)
-            elif isinstance(result, QueryTriples):
-                triples = []
-                for index, triple in enumerate(result):
-                    if index >= max_results:
-                        break
-                    triples.append(triple)
-                rdf_format, content_type = _rdf_format(accept)
-                graph_payload = serialize(triples, format=rdf_format)
-                if graph_payload is None:
-                    raise ValueError("SPARQL graph serialization did not produce a response")
-                payload = graph_payload
-            else:
-                raise ValueError("Unsupported SPARQL result type")
-        if len(payload) > max_bytes:
-            raise ValueError("SPARQL result exceeds configured response limit")
-        return payload, content_type
+
+
+_SNAPSHOT_NAME = re.compile(r"\d+-\d+")
+
+
+class QuerySnapshots:
+    """Frozen checkpoints of the store that query processes may open read-only.
+
+    Oxigraph forbids opening a database read-only while another process writes
+    it, so each published state is a separate RocksDB checkpoint (hard links,
+    cheap). A checkpoint is removed once it is neither current nor in use.
+    """
+
+    def __init__(self, root: str) -> None:
+        self.root = Path(root)
+        self.root.mkdir(parents=True, exist_ok=True)
+        # Checkpoints from a previous process are never reused.
+        self._remove([path for path in self.root.iterdir() if _SNAPSHOT_NAME.fullmatch(path.name)])
+        self.lock = threading.Lock()
+        self.counter = itertools.count()
+        self.current: Path | None = None
+        self.references: dict[Path, int] = {}
+
+    def publish(self, store: Store) -> None:
+        target = self.root / f"{time.time_ns()}-{next(self.counter)}"
+        store.backup(str(target))
+        with self.lock:
+            self.current = target
+            self.references.setdefault(target, 0)
+            stale = self._unused()
+        self._remove(stale)
+
+    @contextmanager
+    def acquire(self) -> Iterator[Path]:
+        with self.lock:
+            if self.current is None:
+                raise RuntimeError("No query snapshot has been published")
+            snapshot = self.current
+            self.references[snapshot] += 1
+        try:
+            yield snapshot
+        finally:
+            with self.lock:
+                self.references[snapshot] -= 1
+                stale = self._unused()
+            self._remove(stale)
+
+    def _unused(self) -> list[Path]:
+        stale = [path for path, count in self.references.items() if count == 0 and path != self.current]
+        for path in stale:
+            del self.references[path]
+        return stale
 
     @staticmethod
-    def _boolean_result(value: bool, accept: str) -> tuple[bytes, str]:
-        if "text/csv" in accept:
-            return (b"boolean\r\ntrue\r\n" if value else b"boolean\r\nfalse\r\n"), "text/csv"
-        if "text/tab-separated-values" in accept:
-            return (b"?boolean\ntrue\n" if value else b"?boolean\nfalse\n"), "text/tab-separated-values"
-        return json.dumps({"head": {}, "boolean": value}).encode(), "application/sparql-results+json"
-
-    @staticmethod
-    def _solution_result(result: QuerySolutions, accept: str, max_results: int) -> tuple[bytes, str]:
-        variable_names = [variable.value for variable in result.variables]
-        rows = []
-        for index, solution in enumerate(result):
-            if index >= max_results:
-                break
-            rows.append(solution)
-        if "text/csv" in accept:
-            buffer = io.StringIO()
-            writer = csv.writer(buffer)
-            writer.writerow(variable_names)
-            writer.writerows([[_term_value(solution[name]) for name in variable_names] for solution in rows])
-            return buffer.getvalue().encode(), "text/csv"
-        if "text/tab-separated-values" in accept:
-            lines = ["\t".join("?" + name for name in variable_names)]
-            lines.extend(
-                "\t".join(str(solution[name]) if solution[name] is not None else "" for name in variable_names)
-                for solution in rows
-            )
-            return ("\n".join(lines) + "\n").encode(), "text/tab-separated-values"
-        bindings = []
-        for solution in rows:
-            binding = {}
-            for name in variable_names:
-                term = solution[name]
-                if term is not None:
-                    binding[name] = _term_json(term)
-            bindings.append(binding)
-        return (
-            json.dumps({"head": {"vars": variable_names}, "results": {"bindings": bindings}}).encode(),
-            "application/sparql-results+json",
-        )
+    def _remove(paths: list[Path]) -> None:
+        for path in paths:
+            shutil.rmtree(path, ignore_errors=True)
 
 
-def _term_value(term: Any) -> str:
-    return getattr(term, "value", str(term)) if term is not None else ""
-
-
-def _term_json(term: Any) -> dict[str, str]:
-    class_name = type(term).__name__
-    if class_name == "NamedNode":
-        return {"type": "uri", "value": term.value}
-    if class_name == "BlankNode":
-        return {"type": "bnode", "value": term.value}
-    result = {"type": "literal", "value": term.value}
-    if getattr(term, "language", None):
-        result["xml:lang"] = term.language
-    elif getattr(term, "datatype", None):
-        result["datatype"] = term.datatype.value
-    return result
-
-
-def _rdf_format(accept: str) -> tuple[RdfFormat, str]:
-    if "application/ld+json" in accept:
-        return RdfFormat.JSON_LD, "application/ld+json"
-    if "application/n-triples" in accept:
-        return RdfFormat.N_TRIPLES, "application/n-triples"
-    return RdfFormat.TURTLE, "text/turtle"
-
-
-_DANGEROUS = re.compile(r"\b(SERVICE|INSERT|DELETE|LOAD|CLEAR|CREATE|DROP|COPY|MOVE|ADD|WITH)\b", re.I)
-_FORM = re.compile(r"\b(SELECT|ASK|CONSTRUCT|DESCRIBE)\b", re.I)
-_LIMIT = re.compile(r"\bLIMIT\s+(\d+)\b", re.I)
+# SPARQL keywords that must not appear outside literals, IRIs, and comments.
+# Variables such as ?add or $with are not keywords.
+_DANGEROUS = re.compile(r"(?<![?$\w])(SERVICE|INSERT|DELETE|LOAD|CLEAR|CREATE|DROP|COPY|MOVE|ADD|WITH)\b", re.I)
+_FORM = re.compile(r"(?<![?$\w])(SELECT|ASK|CONSTRUCT|DESCRIBE)\b", re.I)
+_LIMIT = re.compile(r"(?<![?$\w])LIMIT\s+(\d+)\b", re.I)
+# SPARQL 1.1 IRIREF terminal. A "<" that does not start one is the less-than operator.
+_IRIREF = re.compile(r'<[^<>"{}|^`\\\x00-\x20]*>')
 
 
 def validate_query(query: str, max_results: int) -> str:
+    """Reject obviously unsupported queries early with a helpful message.
+
+    This is a usability filter, not the security boundary: SPARQL's "<" is
+    ambiguous between an IRI and less-than, so text inspection cannot exactly
+    mirror Oxigraph's parser. SERVICE is contained by the query process
+    sandbox and runaway queries by its kill-on-timeout (see query_worker).
+    """
     scrubbed = _scrub_literals_iris_comments(query)
     if _DANGEROUS.search(scrubbed):
         raise ValueError("SPARQL updates and SERVICE clauses are not allowed")
@@ -373,51 +383,53 @@ def validate_query(query: str, max_results: int) -> str:
 
 
 def _scrub_literals_iris_comments(value: str) -> str:
-    result = list(value)
+    """Blank out comments, string literals, and IRIs following SPARQL's lexical rules."""
+    result: list[str] = []
     index = 0
-    while index < len(result):
-        char = result[index]
+    length = len(value)
+    while index < length:
+        char = value[index]
         if char == "#":
-            while index < len(result) and result[index] not in "\r\n":
-                result[index] = " "
-                index += 1
+            end = index
+            while end < length and value[end] not in "\r\n":
+                end += 1
+            result.append(" " * (end - index))
+            index = end
             continue
         if char == "<":
-            result[index] = " "
-            index += 1
-            while index < len(result):
-                next_char = result[index]
-                result[index] = " "
+            match = _IRIREF.match(value, index)
+            if match:
+                result.append(" " * (match.end() - index))
+                index = match.end()
+            else:
+                result.append(char)
                 index += 1
-                if next_char == ">":
-                    break
             continue
         if char in {'"', "'"}:
-            quote = char
-            triple = "".join(result[index : index + 3]) == quote * 3
-            count = 3 if triple else 1
-            for _ in range(count):
-                result[index] = " "
-                index += 1
-            while index < len(result):
-                if result[index] == "\\":
-                    result[index] = " "
-                    index += 1
-                    if index < len(result):
-                        result[index] = " "
-                        index += 1
-                    continue
-                if triple and "".join(result[index : index + 3]) == quote * 3:
-                    for _ in range(3):
-                        result[index] = " "
-                        index += 1
-                    break
-                if not triple and result[index] == quote:
-                    result[index] = " "
-                    index += 1
-                    break
-                result[index] = " "
-                index += 1
+            end = _string_end(value, index)
+            result.append(" " * (end - index))
+            index = end
             continue
+        result.append(char)
         index += 1
     return "".join(result)
+
+
+def _string_end(value: str, start: int) -> int:
+    quote = value[start]
+    long_string = value.startswith(quote * 3, start)
+    index = start + (3 if long_string else 1)
+    while index < len(value):
+        char = value[index]
+        if char == "\\":
+            index += 2
+            continue
+        if long_string and value.startswith(quote * 3, index):
+            return index + 3
+        if not long_string:
+            if char == quote:
+                return index + 1
+            if char in "\r\n":
+                raise ValueError("Unterminated SPARQL string literal")
+        index += 1
+    raise ValueError("Unterminated SPARQL string literal")
