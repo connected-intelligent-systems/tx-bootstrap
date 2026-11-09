@@ -140,6 +140,9 @@ build_local_images
 
 compose infrastructure up -d --remove-orphans --wait
 if tunnel_enabled; then
+    HEADSCALE_ROUTING_API_KEY="$(openssl rand -hex 32)"
+    export HEADSCALE_ROUTING_API_KEY
+    export TUNNEL_ROUTING_API_KEY="$HEADSCALE_ROUTING_API_KEY"
     compose tunnel up -d --remove-orphans --wait
     # A fresh key per start keeps the console valid after a Headscale reset.
     HEADSCALE_API_KEY="$(compose tunnel exec -T headscale headscale apikeys create --expiration 90d | tail -n 1)"

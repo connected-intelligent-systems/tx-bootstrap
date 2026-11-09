@@ -4,6 +4,8 @@ export type HeadscaleConfig = {
   enabled: boolean;
   url: string;
   apiKey: string;
+  /** Read-only token used by the tunnel ingress to fetch approved routes. */
+  routingApiKey: string;
   participantTag: string;
   /** Public DNS zone served by the tunnel ingress, e.g. tunnel.example.org. */
   participantDomain: string;
@@ -21,6 +23,7 @@ export function readHeadscaleConfig(
     enabled: false,
     url: "",
     apiKey: "",
+    routingApiKey: "",
     participantTag: "tag:txb-participant",
     participantDomain: "",
     enrollmentTtlSeconds: 900,
@@ -73,6 +76,32 @@ export function readHeadscaleConfig(
       "A nonempty Headscale API key is required when Headscale is enabled",
     );
   }
+  if (env.HEADSCALE_ROUTING_API_KEY && env.HEADSCALE_ROUTING_API_KEY_FILE)
+    throw new Error(
+      "Set only one of HEADSCALE_ROUTING_API_KEY and HEADSCALE_ROUTING_API_KEY_FILE",
+    );
+  let routingApiKey = env.HEADSCALE_ROUTING_API_KEY?.trim() ?? "";
+  if (env.HEADSCALE_ROUTING_API_KEY_FILE) {
+    try {
+      routingApiKey = readFileSync(
+        env.HEADSCALE_ROUTING_API_KEY_FILE,
+        "utf8",
+      ).trim();
+    } catch {
+      throw new Error("Cannot read HEADSCALE_ROUTING_API_KEY_FILE");
+    }
+  }
+  if (
+    (env.HEADSCALE_ROUTING_API_KEY_FILE && !routingApiKey) ||
+    (routingApiKey &&
+      (routingApiKey.length < 32 ||
+        /\s/.test(routingApiKey) ||
+        routingApiKey === apiKey ||
+        routingApiKey === env.OPERATOR_CONSOLE_API_KEY))
+  )
+    throw new Error(
+      "HEADSCALE_ROUTING_API_KEY must be a separate token of at least 32 non-whitespace characters",
+    );
   const participantTag =
     env.HEADSCALE_PARTICIPANT_TAG ?? defaults.participantTag;
   if (!/^tag:[a-z][a-z0-9-]*$/.test(participantTag)) {
@@ -102,6 +131,7 @@ export function readHeadscaleConfig(
     enabled: true,
     url: url.origin,
     apiKey,
+    routingApiKey,
     participantTag,
     participantDomain,
     enrollmentTtlSeconds: integer(

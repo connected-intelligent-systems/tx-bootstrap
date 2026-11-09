@@ -3,6 +3,9 @@
 services:
   tunnel-node:
     ports: !reset []
+    networks:
+      tunnel: {}
+      internet: {}
 
   traefik:
     command: !override

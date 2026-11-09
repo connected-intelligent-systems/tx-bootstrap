@@ -12,6 +12,67 @@ const enabled = {
 };
 
 describe("Headscale configuration", () => {
+  it("accepts a separate read-only routing token and rejects weak or shared tokens", () => {
+    const routing = "routing-token-0000000000000000000000";
+    expect(
+      readHeadscaleConfig({ ...enabled, HEADSCALE_ROUTING_API_KEY: routing })
+        .routingApiKey,
+    ).toBe(routing);
+    for (const token of [
+      "short",
+      "has whitespace 00000000000000000000000000",
+      routing,
+    ]) {
+      expect(() =>
+        readHeadscaleConfig({
+          ...enabled,
+          HEADSCALE_ROUTING_API_KEY: token,
+          HEADSCALE_API_KEY:
+            token === routing ? routing : enabled.HEADSCALE_API_KEY,
+        }),
+      ).toThrow("HEADSCALE_ROUTING_API_KEY");
+    }
+    expect(() =>
+      readHeadscaleConfig({
+        ...enabled,
+        HEADSCALE_ROUTING_API_KEY: routing,
+        OPERATOR_CONSOLE_API_KEY: routing,
+      }),
+    ).toThrow("HEADSCALE_ROUTING_API_KEY");
+    const dir = mkdtempSync(join(tmpdir(), "txb-routing-config-"));
+    try {
+      const path = join(dir, "token");
+      writeFileSync(path, routing, { mode: 0o600 });
+      expect(
+        readHeadscaleConfig({
+          ...enabled,
+          HEADSCALE_ROUTING_API_KEY_FILE: path,
+        }).routingApiKey,
+      ).toBe(routing);
+      expect(() =>
+        readHeadscaleConfig({
+          ...enabled,
+          HEADSCALE_ROUTING_API_KEY: routing,
+          HEADSCALE_ROUTING_API_KEY_FILE: path,
+        }),
+      ).toThrow("only one");
+      writeFileSync(path, "");
+      expect(() =>
+        readHeadscaleConfig({
+          ...enabled,
+          HEADSCALE_ROUTING_API_KEY_FILE: path,
+        }),
+      ).toThrow("HEADSCALE_ROUTING_API_KEY");
+      expect(() =>
+        readHeadscaleConfig({
+          ...enabled,
+          HEADSCALE_ROUTING_API_KEY_FILE: "/missing/private-path",
+        }),
+      ).toThrow(/^Cannot read HEADSCALE_ROUTING_API_KEY_FILE$/);
+    } finally {
+      rmSync(dir, { recursive: true });
+    }
+  });
   it("stays disabled without reading credentials or requiring a server", () => {
     expect(
       readHeadscaleConfig({ HEADSCALE_API_KEY_FILE: "/missing" }),

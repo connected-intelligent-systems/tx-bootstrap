@@ -15,6 +15,7 @@ const config = readHeadscaleConfig({
   HEADSCALE_ENABLED: "true",
   HEADSCALE_URL: "https://headscale.example.org",
   HEADSCALE_API_KEY: "admin-secret",
+  HEADSCALE_ROUTING_API_KEY: "routing-secret-00000000000000000000",
   HEADSCALE_PARTICIPANT_DOMAIN: "tunnel.example.org",
 });
 
@@ -39,8 +40,30 @@ function fixture() {
       .mockResolvedValue(undefined),
   };
   const networkEnrollments: NetworkEnrollmentRepository = {
+    async recoverAbandoned(controlUrl, staleBefore) {
+      let count = 0;
+      for (const row of rows.values()) {
+        if (
+          row.control_url === controlUrl &&
+          row.state === "CREATING" &&
+          row.updated_at <= staleBefore
+        ) {
+          row.state = "FAILED";
+          count++;
+        }
+      }
+      return count;
+    },
     async reserve(input) {
       if (rows.has(input.id)) return undefined;
+      if (
+        [...rows.values()].some(
+          (row) =>
+            row.business_partner_id === input.participantId &&
+            ["CREATING", "ISSUED", "REVOKING"].includes(row.state),
+        )
+      )
+        throw Object.assign(new Error("active"), { status: 409 });
       const row: NetworkEnrollmentRow = {
         id: input.id,
         business_partner_id: input.participantId,
@@ -60,6 +83,7 @@ function fixture() {
         .filter(
           (row) => row.state === "ISSUED" && row.control_url === controlUrl,
         )
+        .filter((row) => !rejected.has(row.business_partner_id))
         .map((row) => ({
           id: row.id,
           pre_auth_key_id: row.pre_auth_key_id,
@@ -133,6 +157,169 @@ function fixture() {
 }
 
 describe("deployment network enrollment", () => {
+  it("releases an abandoned reservation without minting or retrying a key", async () => {
+    const f = fixture();
+    await f.repositories.networkEnrollments.reserve({
+      id: deploymentId,
+      participantId,
+      controlUrl: config.url,
+      participantTag: config.participantTag,
+      expiresAt: new Date(Date.now() + 900_000),
+    });
+    f.rows.get(deploymentId)!.updated_at = new Date(Date.now() - 120_000);
+    await f.service.reconcileNetwork();
+    expect(f.rows.get(deploymentId)!.state).toBe("FAILED");
+    expect(f.client.createEnrollmentKey).not.toHaveBeenCalled();
+    await expect(
+      f.service.createNetworkEnrollment(
+        participantId,
+        { deploymentId },
+        "admin",
+      ),
+    ).rejects.toMatchObject({ status: 409 });
+    await expect(
+      f.service.createNetworkEnrollment(
+        participantId,
+        { deploymentId: crypto.randomUUID() },
+        "admin",
+      ),
+    ).resolves.toMatchObject({ state: "ISSUED" });
+    expect(f.client.createEnrollmentKey).toHaveBeenCalledTimes(1);
+  });
+
+  it("leaves recent reservations and reservations on another server alone", async () => {
+    const f = fixture();
+    await f.repositories.networkEnrollments.reserve({
+      id: deploymentId,
+      participantId,
+      controlUrl: config.url,
+      participantTag: config.participantTag,
+      expiresAt: new Date(Date.now() + 900_000),
+    });
+    await f.service.reconcileNetwork();
+    expect(f.rows.get(deploymentId)!.state).toBe("CREATING");
+    f.rows.get(deploymentId)!.updated_at = new Date(0);
+    f.rows.get(deploymentId)!.control_url = "https://other.example.org";
+    await f.service.reconcileNetwork();
+    expect(f.rows.get(deploymentId)!.state).toBe("CREATING");
+  });
+
+  it("exports only the verified node address, regardless of claimed hostnames", async () => {
+    const f = fixture();
+    await f.service.createNetworkEnrollment(
+      participantId,
+      { deploymentId },
+      "admin",
+    );
+    f.client.listNodes.mockResolvedValue([
+      {
+        id: "9",
+        name: "bpnl000000000001",
+        givenName: "bpnl000000000001",
+        online: true,
+        ipAddresses: ["100.64.0.99"],
+        preAuthKey: { id: "99" },
+      },
+      {
+        id: "2",
+        name: "some-other-participant",
+        givenName: "some-other-participant",
+        online: true,
+        ipAddresses: ["100.64.0.2"],
+        preAuthKey: { id: "7" },
+      },
+    ]);
+    expect(
+      await f.service.getTunnelRoutes(`Bearer ${config.routingApiKey}`),
+    ).toBe('"bpnl000000000001.tunnel.example.org" "100.64.0.2";\n');
+    f.rejected.add(participantId);
+    f.client.listNodes.mockRejectedValue(new Error("Headscale is unavailable"));
+    expect(
+      await f.service.getTunnelRoutes(`Bearer ${config.routingApiKey}`),
+    ).toBe("");
+  });
+
+  it("never publishes an ambiguous or expired node", async () => {
+    const f = fixture();
+    await f.service.createNetworkEnrollment(
+      participantId,
+      { deploymentId },
+      "admin",
+    );
+    const node = {
+      id: "2",
+      name: "a",
+      givenName: "a",
+      online: true,
+      ipAddresses: ["100.64.0.2"],
+      preAuthKey: { id: "7" },
+    };
+    f.client.listNodes.mockResolvedValue([
+      node,
+      { ...node, id: "3", ipAddresses: ["100.64.0.3"] },
+    ]);
+    expect(
+      await f.service.getTunnelRoutes(`Bearer ${config.routingApiKey}`),
+    ).toBe("");
+    f.client.listNodes.mockResolvedValue([
+      { ...node, expiry: new Date(0).toISOString() },
+    ]);
+    expect(
+      await f.service.getTunnelRoutes(`Bearer ${config.routingApiKey}`),
+    ).toBe("");
+    f.rows.get(deploymentId)!.state = "REVOKING";
+    f.client.listNodes.mockRejectedValue(new Error("Headscale is unavailable"));
+    expect(
+      await f.service.getTunnelRoutes(`Bearer ${config.routingApiKey}`),
+    ).toBe("");
+  });
+
+  it.each([
+    "127.0.0.1",
+    "10.0.0.2",
+    "192.0.2.1",
+    "100.63.255.255",
+    "100.128.0.1",
+    "100.64.0.2;include x",
+    "::1",
+  ])("does not export an unsafe destination: %s", async (address) => {
+    const f = fixture();
+    await f.service.createNetworkEnrollment(
+      participantId,
+      { deploymentId },
+      "admin",
+    );
+    f.client.listNodes.mockResolvedValue([
+      {
+        id: "2",
+        name: "a",
+        givenName: "a",
+        online: true,
+        ipAddresses: [address],
+        preAuthKey: { id: "7" },
+      },
+    ]);
+    expect(
+      await f.service.getTunnelRoutes(`Bearer ${config.routingApiKey}`),
+    ).toBe("");
+  });
+
+  it("requires the separate read-only token before accessing routing state", async () => {
+    const f = fixture();
+    for (const authorization of [
+      undefined,
+      "",
+      `Bearer ${config.apiKey}`,
+      "Bearer wrong",
+      config.routingApiKey,
+    ]) {
+      await expect(
+        f.service.getTunnelRoutes(authorization),
+      ).rejects.toMatchObject({ status: 401 });
+    }
+    expect(f.client.listNodes).not.toHaveBeenCalled();
+  });
+
   it("returns the key once and keeps database, audit and status free of secrets", async () => {
     const f = fixture();
     const result = await f.service.createNetworkEnrollment(
@@ -470,7 +657,7 @@ describe("deployment network enrollment", () => {
     expect(f.client.createEnrollmentKey).not.toHaveBeenCalled();
   });
 
-  it("reports a joined node as routable only once it carries the canonical name", async () => {
+  it("routes the bound node independently of its client-selected name", async () => {
     const f = fixture();
     await f.service.createNetworkEnrollment(
       participantId,
@@ -488,7 +675,7 @@ describe("deployment network enrollment", () => {
     f.client.listNodes.mockResolvedValue([node]);
     expect(
       (await f.service.listNetworkEnrollments(participantId))[0].node,
-    ).toMatchObject({ routable: false });
+    ).toMatchObject({ routable: true });
     f.client.listNodes.mockResolvedValue([
       { ...node, givenName: "bpnl000000000001" },
     ]);

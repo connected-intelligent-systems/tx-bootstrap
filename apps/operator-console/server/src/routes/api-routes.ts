@@ -11,5 +11,15 @@ export const createApiRoutes: FastifyPluginAsync<{
   healthService: HealthService;
 }> = async (app, { controller, auth, healthService }) => {
   await app.register(createHealthRoutes, { healthService });
+  app.get(
+    "/network/tunnel-routes",
+    { schema: { hide: true } },
+    async (request, reply) => {
+      reply
+        .header("Cache-Control", "no-store")
+        .type("text/plain; charset=utf-8");
+      return controller.getTunnelRoutes(request.headers.authorization);
+    },
+  );
   await app.register(createAdminRoutes, { controller, auth });
 };

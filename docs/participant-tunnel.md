@@ -56,14 +56,15 @@ The portal, management APIs, Vault, and PostgreSQL remain private.
 
 ## Operator
 
-The tunnel needs an externally managed Headscale server and a public ingress
-host. The operator console's integration targets Headscale 0.29.7.
+The tunnel needs an externally managed Headscale server, a public ingress
+host, and the console's authenticated routing endpoint. The operator console's
+integration targets Headscale 0.29.7.
 
 ### Headscale requirements
 
 - An HTTPS endpoint reachable by the console, ingress, and participants.
 - Relay connectivity for participants that cannot connect directly.
-- MagicDNS enabled; its base domain must match `TUNNEL_MAGICDNS_DOMAIN`.
+- Participant IPv4 addresses within Headscale's `100.64.0.0/10` range.
 - An API key for the console and a tagged ingress enrollment key.
 - A policy that permits only ingress-to-participant traffic on TCP 18443.
 
@@ -95,7 +96,7 @@ zone and its wildcard DNS record at the host. Set `TUNNEL_PUBLIC_ENDPOINT` to
 its public IPv4 address and UDP port so peers can connect directly.
 
 Copy [tunnel.env.example](../deploy/compose/tunnel.env.example) to `.env` in a
-deployment directory and set the Headscale URL, MagicDNS domain, tunnel domain,
+deployment directory and set the Headscale URL, tunnel domain,
 and public endpoint. Store the ingress enrollment key at
 `secrets/ingress-authkey` with file mode 600. From that directory, run:
 
@@ -118,6 +119,25 @@ HEADSCALE_PARTICIPANT_DOMAIN=tunnel.example.org
 ```
 
 Inject `HEADSCALE_API_KEY` from your secret manager into the console backend.
+Generate a separate random token of at least 32 characters. Set it as
+`HEADSCALE_ROUTING_API_KEY` on the console and `TUNNEL_ROUTING_API_KEY` on the
+ingress. The console also accepts `HEADSCALE_ROUTING_API_KEY_FILE`. Set
+`TUNNEL_ROUTING_API_URL` to
+`https://<console-host>/api/network/tunnel-routes`. This token only reads
+approved routes; never reuse an administrative API key.
+
+The ingress refreshes routes every five seconds. Routes bind public hostnames
+to the addresses of nodes matched to verified enrollment keys; client-selected
+MagicDNS names cannot publish endpoints. Missing, ambiguous, expired, or
+revoked enrollments have no route. If the routing endpoint is unavailable or
+returns invalid configuration, the ingress blocks new connections until a
+valid response arrives. Existing TCP connections may finish during a router
+reload. Keep the console routing endpoint reachable independently of the
+participant tunnel. Plain HTTP requires `TUNNEL_ROUTING_ALLOW_INSECURE_HTTP=true`
+and is only intended for isolated local tests.
+
+When upgrading an existing ingress, configure these routing settings before
+starting the new deployment. An ingress without a routing token cannot start.
 For Kubernetes, use the [operator chart settings](../deploy/helm/operator/README.md#optional-tunnel-enrollment).
 Keep the operator's issuer and onboarding endpoints publicly reachable through
 its own HTTPS ingress.
@@ -134,6 +154,12 @@ enrollment and issue a new one. Rejecting or
 [revoking](operator.md#revoke-a-participant) a participant also triggers
 tunnel revocation. Offline nodes are flagged as stale after 7 days by default; they
 are not automatically deleted just for being offline.
+
+If console startup or key creation is interrupted, reconciliation releases an
+abandoned `CREATING` reservation after at least one minute. It skips rows locked
+by an active creation and records an audit event. Issue a replacement using a
+new deployment ID; reconciliation never mints or retrieves a key. An unknown
+remote key may remain until its original expiry, but it has no approved route.
 
 ### Trust and certificates
 

@@ -95,8 +95,8 @@ export function createHeadscaleClient(
       await request("DELETE", `/node/${id.parse(nodeId)}`, undefined, true);
     },
     async renameNode(nodeId: string, name: string) {
-      // The ingress routes <name>.<participant domain> by this MagicDNS name,
-      // so only the operator may assign it.
+      // Keep names recognizable for operators. Public routes are bound to
+      // enrollment key IDs and addresses, independently of this display name.
       const safeName = nodeName.parse(name);
       await request(
         "POST",

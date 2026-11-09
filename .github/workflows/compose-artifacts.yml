@@ -103,6 +103,8 @@ jobs:
       TAILNET_HOSTNAME: bpnl000000000002
       TUNNEL_HEADSCALE_URL: https://headscale.example.invalid
       TUNNEL_DOMAIN: tunnel.example.invalid
+      TUNNEL_ROUTING_API_URL: https://console.example.invalid/api/network/tunnel-routes
+      TUNNEL_ROUTING_API_KEY: compose-validation-routing-key-00000000
       # Compose scans referenced secret files before publishing; their
       # contents and these paths are not part of the artifact.
       TUNNEL_INGRESS_AUTHKEY_FILE: /tmp/compose-validation/ingress-authkey
