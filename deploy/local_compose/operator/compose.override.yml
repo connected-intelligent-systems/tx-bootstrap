@@ -9,9 +9,16 @@ services:
       VAULT_TOKEN: ${VAULT_TOKEN:?VAULT_TOKEN must be set}
       VAULT_LOCAL_CONFIG: >-
         {"storage":{"file":{"path":"/vault/file"}},"listener":[{"tcp":{"address":"0.0.0.0:8200","tls_disable":true}}],"disable_mlock":true,"ui":false}
-    command: server
+    restart: unless-stopped
+    entrypoint: ["/bin/sh", "/usr/local/bin/local-vault-server"]
+    command: []
+    configs:
+      - source: local-vault-server
+        target: /usr/local/bin/local-vault-server
+        mode: 0555
     volumes:
       - operator-vault-data:/vault/file
+      - operator-vault-bootstrap:/vault/bootstrap:ro
     healthcheck:
       test: ["CMD", "vault", "status"]
       interval: 5s

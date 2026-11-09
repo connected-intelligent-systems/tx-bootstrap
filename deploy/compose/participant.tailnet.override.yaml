@@ -1,0 +1,86 @@
+# Optional participant override: expose the public gateway through a
+# Headscale/Tailscale reverse tunnel instead of a self-managed public proxy.
+#
+# Inbound only. The shared ingress terminates TLS for
+# https://${PARTICIPANT_PUBLIC_HOST} and forwards to this node on TCP 18080.
+# Outbound protocol traffic (DIDs, DSP, issuer) uses the normal internet, so
+# tunnelled and directly hosted participants share one public dataspace.
+#
+# Usage (see docs/participant-tunnel.md):
+#   docker compose -f oci://ghcr.io/<owner>/tx-bootstrap-participant:<version> \
+#     -f participant.tailnet.override.yaml up -d --wait
+#
+# The operator's enrollment response provides HEADSCALE_URL, TAILNET_HOSTNAME,
+# PARTICIPANT_PUBLIC_HOST and PARTICIPANT_DID_HOST, plus a single-use key to
+# store in ./secrets/tailnet-authkey (or TAILNET_AUTHKEY_FILE). The key is only
+# needed for the first start; the node identity persists in tailnet-state.
+
+services:
+  tailnet:
+    image: tailscale/tailscale:v1.104.4@sha256:ed6480b33c6eb67c9cbd203ed42b9fb57e361986725b6856def71b7a3d9e276c
+    hostname: ${TAILNET_HOSTNAME:?TAILNET_HOSTNAME must be set}
+    restart: "${RESTART_POLICY:-unless-stopped}"
+    init: true
+    stop_grace_period: 30s
+    logging:
+      driver: "${LOG_DRIVER:-json-file}"
+      options:
+        max-size: "${LOG_MAX_SIZE:-10m}"
+        max-file: "${LOG_MAX_FILES:-3}"
+    # Userspace networking: no NET_ADMIN, no /dev/net/tun, no routing changes.
+    environment:
+      TS_AUTHKEY: file:/run/secrets/tailnet-authkey
+      TS_AUTH_ONCE: "true"
+      TS_HOSTNAME: ${TAILNET_HOSTNAME:?TAILNET_HOSTNAME must be set}
+      TS_STATE_DIR: /var/lib/tailscale
+      TS_USERSPACE: "true"
+      TS_ACCEPT_DNS: "false"
+      TS_EXTRA_ARGS: --login-server=${HEADSCALE_URL:?HEADSCALE_URL must be set} --accept-routes=false --ssh=false
+      TS_SERVE_CONFIG: /config/serve.json
+      TS_ENABLE_HEALTH_CHECK: "true"
+      TS_LOCAL_ADDR_PORT: 127.0.0.1:9002
+    configs:
+      - source: tailnet-serve
+        target: /config/serve.json
+    secrets:
+      - tailnet-authkey
+    volumes:
+      - tailnet-state:/var/lib/tailscale
+    networks:
+      - public # reaches public-gateway by alias; has internet egress for Headscale/DERP
+    depends_on:
+      public-gateway:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "-q",
+          "-O",
+          "/dev/null",
+          "http://127.0.0.1:9002/healthz",
+        ]
+      interval: 10s
+      timeout: 3s
+      retries: 30
+      start_period: 15s
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 256m
+    cpus: 0.5
+    pids_limit: 256
+
+configs:
+  tailnet-serve:
+    # Raw TCP forward keeps the Host header the ingress sent. TAILNET_FORWARD_HOST
+    # overrides the target when the public host name is ambiguous on a network.
+    content: |
+      {"TCP": {"18080": {"TCPForward": "${TAILNET_FORWARD_HOST:-${PARTICIPANT_PUBLIC_HOST}}:80"}}}
+
+secrets:
+  tailnet-authkey:
+    file: ${TAILNET_AUTHKEY_FILE:-./secrets/tailnet-authkey}
+
+volumes:
+  tailnet-state:

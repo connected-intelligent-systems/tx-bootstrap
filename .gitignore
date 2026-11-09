@@ -4,4 +4,6 @@ dist-server/
 coverage/
 .venv/
 .env
+deploy/local_compose/tunnel/secrets/
+deploy/local_compose/consumer/secrets/
 .DS_Store

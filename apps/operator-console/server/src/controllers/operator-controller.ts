@@ -6,6 +6,7 @@ import { createParticipantLifecycleService } from "@tx-bootstrap/core/server/ser
 import { createAdminParticipantActions } from "./admin-participant-actions.js";
 import type { EmailService } from "@tx-bootstrap/core/server/services/email-service.js";
 import { participantsToCsv } from "../utils/csv.js";
+import { createNetworkEnrollmentService } from "../services/network-enrollment-service.js";
 
 type OperatorAuth = ReturnType<typeof createAuth>;
 
@@ -44,6 +45,10 @@ export function createOperatorController({
     onboardingCases,
     emailService,
   });
+  const network = createNetworkEnrollmentService({
+    config: config.headscale,
+    repositories,
+  });
 
   async function listParticipants(
     filters?: import("@tx-bootstrap/core/server/db/repositories/business-partners.js").ListPartnersFilters,
@@ -73,6 +78,7 @@ export function createOperatorController({
     getParticipantEvents,
     exportParticipantsCsv,
     ...participantActions,
+    ...network,
   };
 }
 

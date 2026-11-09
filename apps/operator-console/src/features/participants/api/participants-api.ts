@@ -81,7 +81,7 @@ export async function updateTechnicalMetadata(
   );
 }
 
-async function request<T>(
+export async function request<T>(
   url: string,
   options: { method?: string; body?: JsonBody } = {},
 ): Promise<T> {

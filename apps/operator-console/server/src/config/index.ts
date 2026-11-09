@@ -1,4 +1,5 @@
 import { join } from "node:path";
+import { readHeadscaleConfig } from "./headscale.js";
 import {
   parseBooleanEnv,
   parseCsvEnv,
@@ -34,6 +35,7 @@ const issuerApiKeyAlias =
   process.env.ISSUER_API_KEY_ALIAS ?? `${issuerContext}-apikey`;
 
 export const config = {
+  headscale: readHeadscaleConfig(),
   port: Number(process.env.PORT ?? 3000),
   appRoot,
   distRoot: join(appRoot, "dist"),

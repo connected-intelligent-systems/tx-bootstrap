@@ -23,6 +23,7 @@ PORTAL_ADMIN_AUTH=(-u "${PORTAL_ADMIN_USERNAME}:${PORTAL_ADMIN_PASSWORD}")
 
 step() { printf "\n=== %s ===\n" "$1"; }
 ok() { printf "  OK %s\n" "$1"; }
+warn() { printf "  WARN %s\n" "$1"; }
 fail() { printf "  FAIL %s\n" "$1"; exit 1; }
 
 step "Participant gateway authentication"
@@ -196,31 +197,51 @@ jq -n --slurpfile policy "$TMPDIR/negotiation_policy.json" --arg dsp "$PROVIDER_
   protocol: "dataspace-protocol-http",
   policy: $policy[0]
 }' > "$TMPDIR/negotiation_request.json"
-curl -s -X POST "$CONSUMER_MGMT/v3/contractnegotiations" \
-    -H "Content-Type: application/json" \
-    -H "X-Api-Key: $EDC_API_KEY" \
-    -d @"$TMPDIR/negotiation_request.json" > "$TMPDIR/negotiation_response.json"
-NEGOTIATION_ID="$(jq -r '.["@id"] // .id' "$TMPDIR/negotiation_response.json")"
-[ "$NEGOTIATION_ID" != "null" ] && [ -n "$NEGOTIATION_ID" ] || { jq . "$TMPDIR/negotiation_response.json"; fail "negotiation not started"; }
+# EDC can terminate a negotiation when the consumer's verification reaches the
+# provider while the provider still holds the negotiation lease ("is currently
+# leased"). That is a connector timing race, not a dataspace failure, so such a
+# negotiation is started again; any other termination fails the run.
+NEGOTIATION_ATTEMPTS="${NEGOTIATION_ATTEMPTS:-3}"
+attempt=1
+CONTRACT_AGREEMENT_ID=""
+while [ -z "$CONTRACT_AGREEMENT_ID" ]; do
+    curl -s -X POST "$CONSUMER_MGMT/v3/contractnegotiations" \
+        -H "Content-Type: application/json" \
+        -H "X-Api-Key: $EDC_API_KEY" \
+        -d @"$TMPDIR/negotiation_request.json" > "$TMPDIR/negotiation_response.json"
+    NEGOTIATION_ID="$(jq -r '.["@id"] // .id' "$TMPDIR/negotiation_response.json")"
+    [ "$NEGOTIATION_ID" != "null" ] && [ -n "$NEGOTIATION_ID" ] || { jq . "$TMPDIR/negotiation_response.json"; fail "negotiation not started"; }
 
-ELAPSED=0
-while [ "$ELAPSED" -lt "$POLL_TIMEOUT" ]; do
-    curl -s "$CONSUMER_MGMT/v3/contractnegotiations/$NEGOTIATION_ID" \
-        -H "X-Api-Key: $EDC_API_KEY" > "$TMPDIR/negotiation_status.json"
-    STATE="$(jq -r '.state // .["edc:state"]' "$TMPDIR/negotiation_status.json")"
+    ELAPSED=0
+    STATE=""
+    while [ "$ELAPSED" -lt "$POLL_TIMEOUT" ]; do
+        curl -s "$CONSUMER_MGMT/v3/contractnegotiations/$NEGOTIATION_ID" \
+            -H "X-Api-Key: $EDC_API_KEY" > "$TMPDIR/negotiation_status.json"
+        STATE="$(jq -r '.state // .["edc:state"]' "$TMPDIR/negotiation_status.json")"
+        case "$STATE" in
+            FINALIZED)
+                CONTRACT_AGREEMENT_ID="$(jq -r '.contractAgreementId // .["edc:contractAgreementId"]' "$TMPDIR/negotiation_status.json")"
+                ok "agreement ${CONTRACT_AGREEMENT_ID}"
+                break
+                ;;
+            TERMINATED|ERROR) break ;;
+        esac
+        sleep "$POLL_INTERVAL"
+        ELAPSED=$((ELAPSED + POLL_INTERVAL))
+    done
+    [ -n "$CONTRACT_AGREEMENT_ID" ] && break
     case "$STATE" in
-        FINALIZED)
-            CONTRACT_AGREEMENT_ID="$(jq -r '.contractAgreementId // .["edc:contractAgreementId"]' "$TMPDIR/negotiation_status.json")"
-            ok "agreement ${CONTRACT_AGREEMENT_ID}"
-            break
-            ;;
-        TERMINATED|ERROR)
-            jq . "$TMPDIR/negotiation_status.json"
-            fail "negotiation failed"
-            ;;
+        TERMINATED|ERROR) ;;
+        *) fail "negotiation timed out" ;;
     esac
-    sleep "$POLL_INTERVAL"
-    ELAPSED=$((ELAPSED + POLL_INTERVAL))
+    if [ "$attempt" -lt "$NEGOTIATION_ATTEMPTS" ] &&
+        jq -r '.errorDetail // .["edc:errorDetail"] // ""' "$TMPDIR/negotiation_status.json" | grep -q "is currently leased"; then
+        warn "negotiation ${NEGOTIATION_ID} hit an EDC lease conflict; retrying (attempt $((attempt + 1)) of ${NEGOTIATION_ATTEMPTS})"
+        attempt=$((attempt + 1))
+        continue
+    fi
+    jq . "$TMPDIR/negotiation_status.json"
+    fail "negotiation failed"
 done
 [ "${CONTRACT_AGREEMENT_ID:-}" ] || fail "negotiation timed out"
 

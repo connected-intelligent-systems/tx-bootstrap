@@ -28,19 +28,8 @@ export PARTICIPANT_INIT_IMAGE="${PARTICIPANT_INIT_IMAGE:-tx-bootstrap-participan
 export PARTICIPANT_PORTAL_BACKEND_IMAGE="${PARTICIPANT_PORTAL_BACKEND_IMAGE:-tx-bootstrap-participant-portal-backend:local}"
 export FEDERATED_CATALOG_IMAGE="${FEDERATED_CATALOG_IMAGE:-tx-bootstrap-federated-catalog:local}"
 
-compose() {
-    local domain="$1"
-    local compose_file
-    if [ "$domain" = "infrastructure" ]; then
-        compose_file="$LOCAL_DIR/compose.yaml"
-    else
-        compose_file="$LOCAL_DIR/$domain/compose.yaml"
-    fi
-    local compose_args=(--env-file "$ENV_FILE" -f "$compose_file")
-    shift
-
-    docker compose "${compose_args[@]}" "$@"
-}
+# shellcheck source=compose-lib.sh
+source "$(dirname "${BASH_SOURCE[0]}")/compose-lib.sh"
 
 build_local_images() {
     if [ "$OPERATOR_CONSOLE_IMAGE" = "tx-bootstrap-operator-console:local" ] && [ -d "$OPERATOR_CONSOLE_DIR" ]; then
@@ -150,7 +139,26 @@ fi
 build_local_images
 
 compose infrastructure up -d --remove-orphans --wait
+if tunnel_enabled; then
+    compose tunnel up -d --remove-orphans --wait
+    # A fresh key per start keeps the console valid after a Headscale reset.
+    HEADSCALE_API_KEY="$(compose tunnel exec -T headscale headscale apikeys create --expiration 90d | tail -n 1)"
+    [ -n "$HEADSCALE_API_KEY" ] || { echo "Headscale API key creation failed" >&2; exit 1; }
+    export HEADSCALE_API_KEY
+    export HEADSCALE_ENABLED=true
+    export HEADSCALE_URL="$TUNNEL_HEADSCALE_URL"
+    export HEADSCALE_ALLOW_INSECURE_HTTP=true
+    export HEADSCALE_PARTICIPANT_DOMAIN="$TUNNEL_DOMAIN"
+    export HEADSCALE_PARTICIPANT_TAG=tag:txb-participant
+    mkdir -p "$(dirname "$TUNNEL_CONSUMER_AUTHKEY")"
+    chmod 700 "$(dirname "$TUNNEL_CONSUMER_AUTHKEY")"
+    [ -e "$TUNNEL_CONSUMER_AUTHKEY" ] || install -m 600 /dev/null "$TUNNEL_CONSUMER_AUTHKEY"
+fi
 compose operator up -d --remove-orphans
+if tunnel_enabled; then
+    # The console reaches Headscale and checks tunnelled endpoints publicly.
+    connect_public_dns operator operator-console
+fi
 compose provider up -d --remove-orphans
 connect_public_dns provider identityhub controlplane dataplane participant-portal-backend federated-catalog
 compose consumer up -d --remove-orphans
@@ -158,5 +166,10 @@ connect_public_dns consumer identityhub controlplane dataplane participant-porta
 
 echo "tx-bootstrap local stack started."
 echo "Public network: $PUBLIC_NETWORK"
+if tunnel_enabled; then
+    echo "Tunnel mode: consumer is published only at http://$TUNNEL_CONSUMER_HOST;"
+    echo "bootstrap.sh enrolls it through the operator console."
+    echo "Switching to or from tunnel mode requires down.sh -v (the consumer DID changes)."
+fi
 print_local_urls
 echo "Run deploy/local_compose/scripts/bootstrap.sh after services become healthy."

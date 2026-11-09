@@ -27,8 +27,9 @@ import {
   ConnectorMetadataEditDialog,
   OrganizationEditDialog,
 } from "./participant-edit-dialogs";
+import { TunnelTab } from "./participant-tunnel";
 
-export type DrawerTab = 0 | 1 | 2 | 3 | 4;
+export type DrawerTab = 0 | 1 | 2 | 3 | 4 | 5;
 type EditDialog = "organization" | "connector" | null;
 
 export function ParticipantDrawer({
@@ -116,6 +117,7 @@ export function ParticipantDrawer({
             <Tab label="BPN" />
             <Tab label="Connector" />
             <Tab label="Credentials" />
+            <Tab label="Tunnel" />
             <Tab label="Audit" />
           </Tabs>
           <Box sx={{ p: 2, overflow: "auto", flex: 1 }}>
@@ -134,7 +136,10 @@ export function ParticipantDrawer({
               />
             ) : null}
             {tab === 3 ? <CredentialsTab participant={participant} /> : null}
-            {tab === 4 ? <AuditTab participant={participant} /> : null}
+            {tab === 4 ? (
+              <TunnelTab key={participant.id} participant={participant} />
+            ) : null}
+            {tab === 5 ? <AuditTab participant={participant} /> : null}
           </Box>
 
           {editDialog === "organization" ? (

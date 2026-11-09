@@ -43,6 +43,55 @@ server:
       storage "file" {
         path = "/vault/data"
       }
+  # Local testing only: the unseal key lives in the Secret vault-bootstrap
+  # (written by configure-vault.sh), so this sidecar unseals Vault again after
+  # a pod, node or Rancher Desktop restart. Never do this in production.
+  volumes:
+    - name: vault-bootstrap
+      secret:
+        secretName: vault-bootstrap
+        # Absent until configure-vault.sh initialised Vault.
+        optional: true
+        defaultMode: 0440
+        items:
+          - key: unseal-key
+            path: unseal-key
+    - name: unseal-tmp
+      emptyDir: { medium: Memory, sizeLimit: 1Mi }
+  extraContainers:
+    - name: auto-unseal
+      image: hashicorp/vault:2.0.2
+      imagePullPolicy: IfNotPresent
+      command: ["/bin/sh", "-c"]
+      args:
+        - |
+          trap 'exit 0' TERM INT
+          key=/vault/bootstrap/unseal-key
+          while :; do
+            vault status >/dev/null 2>&1
+            if [ "$?" = 2 ] && [ -s "$key" ]; then
+              vault operator unseal "$(cat "$key")" >/dev/null && echo "vault unsealed"
+            fi
+            sleep 5 & wait $!
+          done
+      env:
+        - { name: VAULT_ADDR, value: "http://127.0.0.1:8200" }
+        - { name: HOME, value: /tmp }
+        - { name: SKIP_SETCAP, value: "true" }
+      volumeMounts:
+        - { name: vault-bootstrap, mountPath: /vault/bootstrap, readOnly: true }
+        - { name: unseal-tmp, mountPath: /tmp }
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 100
+        runAsGroup: 1000
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        capabilities: { drop: [ALL] }
+        seccompProfile: { type: RuntimeDefault }
+      resources:
+        requests: { cpu: 5m, memory: 16Mi }
+        limits: { cpu: 100m, memory: 64Mi }
   ha:
     enabled: false
 

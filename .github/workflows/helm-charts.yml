@@ -46,6 +46,12 @@ jobs:
           helm template "${{ matrix.chart }}" "deploy/helm/${{ matrix.chart }}" \
             --namespace "tx-${{ matrix.chart }}" \
             > "/tmp/${{ matrix.chart }}-default.yaml"
+          # Helm reads numbers as floats; large values must be rendered with
+          # int64 or they appear as 5.24288e+07, which nginx and others reject.
+          if grep -nE '[0-9]e[+-][0-9]+' "/tmp/${{ matrix.chart }}-default.yaml"; then
+            echo "A number rendered in scientific notation." >&2
+            exit 1
+          fi
 
       - name: Check first-party image versions
         shell: bash
@@ -154,6 +160,29 @@ jobs:
           grep -q '^kind: StatefulSet$' /tmp/participant-catalog-replicas.yaml
           grep -q '^  replicas: 2$' /tmp/participant-catalog-replicas.yaml
           grep -q '^  volumeClaimTemplates:$' /tmp/participant-catalog-replicas.yaml
+          helm template tunnel deploy/helm/participant \
+            --set tunnel.enabled=true \
+            --set tunnel.headscaleUrl=https://headscale.tunnel.example.invalid \
+            --set tunnel.hostname=bpnl000000000002 \
+            > /tmp/participant-tunnel.yaml
+          grep -q 'tunnel-tx-bootstrap-participant-public-gateway:80' /tmp/participant-tunnel.yaml
+          grep -q '^kind: PersistentVolumeClaim$' /tmp/participant-tunnel.yaml
+          if grep -q 'tx-bootstrap-participant-tunnel' /tmp/participant-default.yaml; then
+            echo "The tunnel rendered while disabled." >&2
+            exit 1
+          fi
+          if helm template invalid deploy/helm/participant \
+            --set tunnel.enabled=true >/dev/null 2>&1; then
+            echo "The schema accepted a tunnel without Headscale URL and hostname." >&2
+            exit 1
+          fi
+          if helm template invalid deploy/helm/participant \
+            --set tunnel.enabled=true \
+            --set tunnel.headscaleUrl=http://headscale.tunnel.example.invalid \
+            --set tunnel.hostname=bpnl000000000002 >/dev/null 2>&1; then
+            echo "The schema accepted a plain HTTP Headscale URL." >&2
+            exit 1
+          fi
 
       - name: Package chart
         run: |

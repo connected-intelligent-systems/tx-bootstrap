@@ -25,6 +25,7 @@ It does the participant-local setup only:
 - waits for IdentityHub,
 - reads the seeded IdentityHub super-user API key from wallet Vault using `IDENTITYHUB_SUPERUSER_API_KEY_ALIAS` unless `IDENTITYHUB_API_KEY` is set,
 - creates the IdentityHub participant context as active,
+- waits until the published DID document lists the participant key. Under load IdentityHub can occasionally publish the document without it, which leaves the participant's tokens unverifiable; the context is then deleted and created again (up to 3 attempts),
 - copies the generated STS client secret and participant signing key into connector Vault.
 
 BDRS registration, demo assets, and credential issuance stay with the operator

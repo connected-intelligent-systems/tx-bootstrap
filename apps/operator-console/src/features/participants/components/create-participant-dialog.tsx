@@ -5,11 +5,14 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  FormControlLabel,
+  Checkbox,
   Stack,
   TextField,
 } from "@mui/material";
 import type { ParticipantCreateInput, ParticipantOrganization } from "../types";
 import { ErrorAlert, FieldGrid } from "./participant-ui";
+import { formatDuration, useNetworkStatus } from "../api/network-api";
 
 const emptyOrganizationDraft: ParticipantOrganization = {
   legalName: "",
@@ -41,9 +44,11 @@ export function CreateParticipantDialog({
   open: boolean;
   saving: boolean;
   onClose: () => void;
-  onCreate: (body: ParticipantCreateInput) => void;
+  onCreate: (body: ParticipantCreateInput, tunnel: boolean) => void;
 }) {
   const [draft, setDraft] = useState<ParticipantCreateInput>(emptyCreateDraft);
+  const [tunnel, setTunnel] = useState(false);
+  const network = useNetworkStatus();
 
   function update(field: keyof ParticipantCreateInput, value: string) {
     setDraft((current) => ({ ...current, [field]: value }));
@@ -124,6 +129,17 @@ export function CreateParticipantDialog({
             minRows={2}
             helperText="Optional internal notes about the participant or BPN"
           />
+          {network.data?.enabled ? (
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={tunnel}
+                  onChange={(event) => setTunnel(event.target.checked)}
+                />
+              }
+              label={`Publish through the operator tunnel: include a tunnel key valid for ${formatDuration(network.data.invitationTtlSeconds)} in the invitation`}
+            />
+          ) : null}
         </Stack>
       </DialogContent>
       <DialogActions>
@@ -131,7 +147,7 @@ export function CreateParticipantDialog({
           Cancel
         </Button>
         <Button
-          onClick={() => onCreate(draft)}
+          onClick={() => onCreate(draft, tunnel)}
           disabled={
             saving ||
             !draft.legalName ||

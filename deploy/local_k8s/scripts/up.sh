@@ -42,6 +42,18 @@ helm --kube-context "$KUBE_CONTEXT" upgrade --install vault \
     --set "server.dataStorage.size=${VAULT_STORAGE_SIZE}" \
     --timeout 10m
 
+# The chart's StatefulSet uses OnDelete: replace an outdated Vault pod so value
+# changes (such as the auto-unseal sidecar) apply. The sidecar or
+# configure-vault.sh unseals the new pod.
+vault_revision="$(kubectl --context "$KUBE_CONTEXT" --namespace tx-infra \
+    get statefulset vault -o jsonpath='{.status.updateRevision}')"
+pod_revision="$(kubectl --context "$KUBE_CONTEXT" --namespace tx-infra \
+    get pod vault-0 --ignore-not-found \
+    -o jsonpath='{.metadata.labels.controller-revision-hash}')"
+if [ -n "$pod_revision" ] && [ -n "$vault_revision" ] && [ "$pod_revision" != "$vault_revision" ]; then
+    kubectl --context "$KUBE_CONTEXT" --namespace tx-infra delete pod vault-0 --wait
+fi
+
 "$SCRIPT_DIR/create-secrets.sh"
 "$SCRIPT_DIR/configure-databases.sh"
 "$SCRIPT_DIR/configure-vault.sh"

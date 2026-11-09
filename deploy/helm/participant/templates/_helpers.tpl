@@ -103,10 +103,17 @@ valueFrom:
 {{- end }}
 
 {{- define "tx-bootstrap-participant.podDefaults" -}}
+{{- include "tx-bootstrap-participant.podDefaultsWith" (dict "root" . "securityContext" dict) -}}
+{{- end }}
+
+{{/* Pod defaults with extra pod security settings, for example an fsGroup. */}}
+{{- define "tx-bootstrap-participant.podDefaultsWith" -}}
+{{- $podSecurityContext := mergeOverwrite (deepCopy .root.Values.podSecurityContext) .securityContext -}}
+{{- with .root -}}
 serviceAccountName: {{ include "tx-bootstrap-participant.serviceAccountName" . }}
 automountServiceAccountToken: {{ .Values.serviceAccount.automountServiceAccountToken }}
 securityContext:
-  {{- toYaml .Values.podSecurityContext | nindent 2 }}
+  {{- toYaml $podSecurityContext | nindent 2 }}
 terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
 {{- with .Values.imagePullSecrets }}
 imagePullSecrets:
@@ -123,6 +130,7 @@ affinity:
 {{- with .Values.tolerations }}
 tolerations:
   {{- toYaml . | nindent 2 }}
+{{- end }}
 {{- end }}
 {{- end }}
 

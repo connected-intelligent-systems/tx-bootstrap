@@ -16,6 +16,8 @@ monitoring remain environment responsibilities.
 - a tracked, convergent participant initialization Job
 - internal Services, ConfigMaps, optional Ingresses, and a ServiceAccount with
   Kubernetes API-token automounting disabled
+- optionally, a tunnel node that publishes the public gateway through the
+  operator's tunnel instead of an Ingress
 
 The chart sets startup, readiness, and liveness probes, resource requests and
 limits, a runtime-default seccomp profile, numeric non-root identities,
@@ -134,6 +136,42 @@ Helmet security headers and global request limiting are enabled by default.
 Use `portal.httpsHeaders: false` only for an intentionally HTTP-only local
 environment. Tune `portal.rateLimit.max` and `portal.rateLimit.window` for the
 expected ingress traffic; health probes are not counted.
+
+## Operator tunnel
+
+Instead of `ingress.public`, a participant can be published through the
+operator's tunnel (see [Participant tunnel](../../../docs/participant-tunnel.md)).
+The participant then needs no public endpoint, DNS record or certificate of its
+own. Map the operator's tunnel settings to values:
+
+| Tunnel setting            | Chart value                                                  |
+| ------------------------- | ------------------------------------------------------------ |
+| `HEADSCALE_URL`           | `tunnel.headscaleUrl`                                        |
+| `TAILNET_HOSTNAME`        | `tunnel.hostname`                                            |
+| `PARTICIPANT_PUBLIC_HOST` | `identity.participantPublicHost`                             |
+| `PARTICIPANT_DID_HOST`    | `identity.participantDidHost`                                |
+| `TAILNET_AUTHKEY`         | key `tunnel.authKeySecretKey` in the `existingSecret` Secret |
+
+```sh
+kubectl -n tx-participant patch secret tx-bootstrap-participant-secrets \
+  --type merge -p '{"stringData":{"tailnet-authkey":"<TAILNET_AUTHKEY>"}}'
+helm upgrade --install participant deploy/helm/participant \
+  --namespace tx-participant --values participant-values.yaml \
+  --set tunnel.enabled=true \
+  --set tunnel.headscaleUrl=https://headscale.example.org \
+  --set tunnel.hostname=bpnl000000000002
+```
+
+With `tunnel.enabled`, the chart runs a single-replica Tailscale node in
+userspace mode: no capabilities, no TUN device, a read-only root filesystem and
+no Kubernetes API access. It forwards only tailnet TCP 18080 to the public
+gateway Service. The node's outbound connections go to `tunnel.headscaleUrl`
+and Tailscale relay (DERP) servers, so allow them in egress policies.
+
+The key is single-use and needed only for the first start. The node identity
+then lives in a PersistentVolumeClaim (`tunnel.persistence`, kept on
+`helm uninstall`), and the key may be removed from the Secret afterwards. Keep
+the claim across upgrades; deleting it requires a new key from the operator.
 
 The federated catalog defaults to one replica. Increasing
 `federatedCatalog.replicaCount` creates one PVC per pod; replicas crawl

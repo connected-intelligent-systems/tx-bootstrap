@@ -185,15 +185,67 @@ manifest="$(jq -n \
         }
     }')"
 
-log "Creating IdentityHub participant context ${IDENTITYHUB_CONTEXT_ID}"
-result="$(http_status_with_body POST "${IDENTITYHUB_IDENTITY_URL}/v1alpha/participants/" "$manifest")"
-status="$(printf '%s' "$result" | sed -n '1p')"
-body="$(printf '%s' "$result" | sed '1d')"
-case "$status" in
-    200|201|204) log "IdentityHub participant context created" ;;
-    409) log "IdentityHub participant context already exists" ;;
-    *) printf '%s\n' "$body" >&2; fail "participant context creation failed with HTTP ${status}" ;;
-esac
+IDENTITYHUB_CONTEXT_B64="$(printf '%s' "$IDENTITYHUB_CONTEXT_ID" | base64 | tr -d '\n')"
+IDENTITYHUB_CONTEXT_URL="${IDENTITYHUB_IDENTITY_URL}/v1alpha/participants/${IDENTITYHUB_CONTEXT_B64}"
+DID_DOCUMENT_ATTEMPTS="${DID_DOCUMENT_ATTEMPTS:-3}"
+DID_DOCUMENT_WAIT_SECONDS="${DID_DOCUMENT_WAIT_SECONDS:-15}"
+
+create_participant_context() {
+    log "Creating IdentityHub participant context ${IDENTITYHUB_CONTEXT_ID}"
+    result="$(http_status_with_body POST "${IDENTITYHUB_IDENTITY_URL}/v1alpha/participants/" "$manifest")"
+    status="$(printf '%s' "$result" | sed -n '1p')"
+    body="$(printf '%s' "$result" | sed '1d')"
+    case "$status" in
+        200|201|204) log "IdentityHub participant context created" ;;
+        409) log "IdentityHub participant context already exists" ;;
+        *) printf '%s\n' "$body" >&2; fail "participant context creation failed with HTTP ${status}" ;;
+    esac
+}
+
+# IdentityHub can publish the DID document without the participant's key when
+# the key pair and DID resource are written concurrently under load. Other
+# participants then cannot verify its tokens, so wait for the published
+# document to list the key.
+did_document_ready() {
+    key_id="${PARTICIPANT_DID}#key-1"
+    deadline=$(($(date +%s) + DID_DOCUMENT_WAIT_SECONDS))
+    while [ "$(date +%s)" -lt "$deadline" ]; do
+        result="$(http_status_with_body POST "${IDENTITYHUB_CONTEXT_URL}/dids/query" '{}')"
+        if [ "$(printf '%s' "$result" | sed -n '1p')" = "200" ] &&
+            printf '%s' "$result" | sed '1d' | jq -e \
+                --arg did "$PARTICIPANT_DID" --arg key "$key_id" \
+                'any(.[]; .id == $did and any(.verificationMethod[]?; .id == $key))' \
+                >/dev/null 2>&1; then
+            result="$(http_status_with_body POST "${IDENTITYHUB_CONTEXT_URL}/dids/state" \
+                "$(jq -nc --arg did "$PARTICIPANT_DID" '{did: $did}')")"
+            if printf '%s' "$result" | sed '1d' | grep -q PUBLISHED; then
+                return 0
+            fi
+        fi
+        sleep 1
+    done
+    return 1
+}
+
+attempt=1
+while :; do
+    create_participant_context
+    if did_document_ready; then
+        log "DID document published with key ${PARTICIPANT_DID}#key-1"
+        break
+    fi
+    [ "$attempt" -lt "$DID_DOCUMENT_ATTEMPTS" ] ||
+        fail "DID document for ${PARTICIPANT_DID} is not published with its key after ${attempt} attempts"
+    # Without a verification method no token of this participant can be
+    # verified, so the context cannot hold credentials yet; recreate it.
+    log "DID document lacks the participant key; recreating participant context (attempt $((attempt + 1)) of ${DID_DOCUMENT_ATTEMPTS})"
+    result="$(http_status_with_body DELETE "$IDENTITYHUB_CONTEXT_URL")"
+    case "$(printf '%s' "$result" | sed -n '1p')" in
+        200|204|404) ;;
+        *) fail "participant context deletion failed with HTTP $(printf '%s' "$result" | sed -n '1p')" ;;
+    esac
+    attempt=$((attempt + 1))
+done
 
 log "IdentityHub participant context requested as active"
 

@@ -5,6 +5,14 @@ this repository.
 
 - `compose/` contains Docker Compose application manifests published as OCI
   artifacts to GitHub Container Registry.
+  `participant.tailnet.override.yaml` is an optional override that exposes a
+  participant through the operator's tunnel ingress instead of its own public
+  HTTPS proxy; it is published together with the participant as
+  `tx-bootstrap-participant-tunnel`. `tunnel.compose.yaml` is the operator side
+  of that tunnel, a wildcard-TLS ingress that joins the operator's own
+  Headscale, published as `tx-bootstrap-tunnel` with `tunnel.env.example` as
+  its settings template. See
+  [Participant tunnel](../docs/participant-tunnel.md).
 - `helm/` contains production-oriented Kubernetes charts for the operator and
   participant deployments, published below the `tx-bootstrap-charts` OCI
   namespace in GitHub Container Registry.

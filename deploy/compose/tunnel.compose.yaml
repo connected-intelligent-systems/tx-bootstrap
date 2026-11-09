@@ -1,0 +1,262 @@
+# Optional operator tunnel ingress: a public TLS endpoint for participants
+# that cannot run their own public HTTPS endpoint. It joins an existing
+# Headscale server, which the operator runs like Postgres or Vault.
+#
+#   https://<name>.${TUNNEL_DOMAIN}  ──▶ traefik (wildcard cert, ACME DNS-01)
+#                                     ──▶ tunnel-router (nginx in tunnel-node)
+#                                     ──▶ <name>.<MagicDNS domain>:18080 over WireGuard
+#
+# Participants only need outbound connectivity; see docs/participant-tunnel.md
+# for the Headscale requirements.
+# Public ports: TCP 80/443 and UDP 41641 (direct WireGuard, announced as
+# TUNNEL_PUBLIC_ENDPOINT).
+# Required: TUNNEL_HEADSCALE_URL, TUNNEL_DOMAIN, TUNNEL_ACME_EMAIL,
+# TUNNEL_ACME_DNS_PROVIDER, the provider's credentials in TUNNEL_ACME_ENV_FILE
+# (Traefik/lego variable names, e.g. HETZNER_API_TOKEN) and a tag:txb-ingress
+# pre-auth key in TUNNEL_INGRESS_AUTHKEY_FILE for the first start.
+
+name: ${COMPOSE_PROJECT_NAME:-tx-bootstrap-tunnel}
+
+x-runtime-defaults: &runtime-defaults
+  restart: "${RESTART_POLICY:-unless-stopped}"
+  init: true
+  pids_limit: 256
+  stop_grace_period: 30s
+  security_opt:
+    - no-new-privileges:true
+  logging:
+    driver: "${LOG_DRIVER:-json-file}"
+    options:
+      max-size: "${LOG_MAX_SIZE:-10m}"
+      max-file: "${LOG_MAX_FILES:-3}"
+
+services:
+  # The ingress's own WireGuard peer. Kernel mode so the router sharing its
+  # network namespace can reach tailnet addresses and MagicDNS (100.100.100.100).
+  # The key is only used for the first start; the node identity then lives in
+  # the tunnel-node-state volume.
+  tunnel-node:
+    <<: *runtime-defaults
+    image: tailscale/tailscale:v1.104.4@sha256:ed6480b33c6eb67c9cbd203ed42b9fb57e361986725b6856def71b7a3d9e276c
+    hostname: ${TUNNEL_INGRESS_HOSTNAME:-txb-ingress}
+    environment:
+      TS_AUTHKEY: file:/run/secrets/ingress-authkey
+      TS_AUTH_ONCE: "true"
+      TS_HOSTNAME: ${TUNNEL_INGRESS_HOSTNAME:-txb-ingress}
+      TS_STATE_DIR: /var/lib/tailscale
+      TS_USERSPACE: "false"
+      TS_ACCEPT_DNS: "true"
+      TS_EXTRA_ARGS: --login-server=${TUNNEL_HEADSCALE_URL:?TUNNEL_HEADSCALE_URL must be set} --accept-routes=false --ssh=false
+      # Fixed WireGuard port, published below, so participants behind NAT
+      # connect directly instead of through a DERP relay.
+      TS_TAILSCALED_EXTRA_ARGS: --port=41641
+      # Behind Docker's NAT the node cannot discover its public address and
+      # port, so announce them (e.g. 203.0.113.10:41641). Empty: relay only.
+      TS_DEBUG_PRETENDPOINT: ${TUNNEL_PUBLIC_ENDPOINT:-}
+      TS_ENABLE_HEALTH_CHECK: "true"
+      TS_LOCAL_ADDR_PORT: 127.0.0.1:9002
+    secrets:
+      - ingress-authkey
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    volumes:
+      - tunnel-node-state:/var/lib/tailscale
+    ports:
+      - target: 41641
+        published: "41641"
+        protocol: udp
+    networks:
+      - tunnel
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "-q",
+          "-O",
+          "/dev/null",
+          "http://127.0.0.1:9002/healthz",
+        ]
+      interval: 10s
+      timeout: 3s
+      retries: 30
+      start_period: 15s
+    mem_limit: 256m
+    cpus: 0.5
+
+  # Maps <name>.${TUNNEL_DOMAIN} to the tailnet node of the same name. Node
+  # names are assigned by the operator console, never by participants.
+  tunnel-router:
+    <<: *runtime-defaults
+    image: nginxinc/nginx-unprivileged:1.30.4-alpine3.24@sha256:adf5042a17f4ecdd200c595fa9ffd1be37efb18f89a830bd1a00e4ab4d59d42c
+    network_mode: service:tunnel-node
+    cap_drop:
+      - ALL
+    configs:
+      - source: tunnel-router
+        target: /etc/nginx/conf.d/default.conf
+    depends_on:
+      tunnel-node:
+        condition: service_healthy
+        restart: true
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "-q",
+          "-O",
+          "/dev/null",
+          "http://127.0.0.1:8081/healthz",
+        ]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+    mem_limit: 128m
+    cpus: 0.5
+
+  traefik:
+    <<: *runtime-defaults
+    image: traefik:v3.7.17@sha256:f4bb143d1135a579b630ed491e17ec50f6f7c9c6a30585ff3d385471d2a86f5a
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    # Loads the DNS provider credentials (for example HETZNER_API_TOKEN) from
+    # a secret instead of an env_file, so they never become part of the
+    # published Compose artifact.
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        if [ -s /run/secrets/acme-env ]; then
+          set -a
+          . /run/secrets/acme-env
+          set +a
+        fi
+        exec traefik "$$@"
+      - traefik
+    command:
+      - --log.level=INFO
+      - --ping.entryPoint=health
+      - --entryPoints.health.address=127.0.0.1:8082
+      - --entryPoints.web.address=:80
+      - --entryPoints.web.http.redirections.entryPoint.to=websecure
+      - --entryPoints.websecure.address=:443
+      # Data-plane transfers through the tunnel can be large and slow.
+      - --entryPoints.websecure.transport.respondingTimeouts.readTimeout=0s
+      - --entryPoints.websecure.transport.respondingTimeouts.writeTimeout=0s
+      - --entryPoints.websecure.transport.respondingTimeouts.idleTimeout=180s
+      - --providers.file.filename=/etc/traefik/dynamic.yaml
+      - --certificatesResolvers.acme.acme.email=${TUNNEL_ACME_EMAIL:?TUNNEL_ACME_EMAIL must be set}
+      - --certificatesResolvers.acme.acme.storage=/acme/acme.json
+      - --certificatesResolvers.acme.acme.caServer=${TUNNEL_ACME_CA_SERVER:-https://acme-v02.api.letsencrypt.org/directory}
+      - --certificatesResolvers.acme.acme.dnsChallenge.provider=${TUNNEL_ACME_DNS_PROVIDER:?TUNNEL_ACME_DNS_PROVIDER must be set}
+      - --certificatesResolvers.acme.acme.dnsChallenge.resolvers=1.1.1.1:53,8.8.8.8:53
+    secrets:
+      - acme-env
+    configs:
+      - source: traefik-dynamic
+        target: /etc/traefik/dynamic.yaml
+    volumes:
+      - traefik-acme:/acme
+    ports:
+      - target: 80
+        published: "${TUNNEL_HTTP_PORT:-80}"
+        protocol: tcp
+      - target: 443
+        published: "${TUNNEL_HTTPS_PORT:-443}"
+        protocol: tcp
+    networks:
+      - tunnel
+    # No dependency on the tunnel node: Traefik may also front the operator's
+    # Headscale, which the node needs before it can become healthy.
+    # Participant requests return 502 until the router is up.
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "traefik",
+          "healthcheck",
+          "--ping",
+          "--ping.entryPoint=health",
+          "--entryPoints.health.address=127.0.0.1:8082",
+        ]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+    mem_limit: 256m
+    cpus: 0.5
+
+configs:
+  tunnel-router:
+    content: |
+      server {
+          listen 127.0.0.1:8081;
+          location = /healthz { return 204; }
+      }
+
+      server {
+          listen 8080 default_server;
+          return 404;
+      }
+
+      server {
+          listen 8080;
+          server_name "~^(?<node>[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)\.${TUNNEL_DOMAIN:?TUNNEL_DOMAIN must be set}$$";
+          resolver 100.100.100.100 valid=10s ipv6=off;
+          resolver_timeout 3s;
+          client_max_body_size 0;
+          proxy_request_buffering off;
+          proxy_buffering off;
+
+          location / {
+              proxy_pass http://$$node.${TUNNEL_MAGICDNS_DOMAIN:-tailnet.internal}:18080;
+              proxy_http_version 1.1;
+              proxy_set_header Host $$host;
+              proxy_set_header X-Forwarded-Proto https;
+              proxy_set_header X-Forwarded-Host $$host;
+              proxy_set_header X-Forwarded-For $$proxy_add_x_forwarded_for;
+              proxy_connect_timeout 5s;
+              proxy_read_timeout 300s;
+          }
+      }
+
+  traefik-dynamic:
+    content: |
+      http:
+        routers:
+          participants:
+            rule: HostRegexp(`^[a-z0-9-]+\.${TUNNEL_DOMAIN:?TUNNEL_DOMAIN must be set}$$`)
+            entryPoints: [websecure]
+            service: participants
+            tls:
+              certResolver: acme
+              domains:
+                - main: "${TUNNEL_DOMAIN:?TUNNEL_DOMAIN must be set}"
+                  sans: ["*.${TUNNEL_DOMAIN:?TUNNEL_DOMAIN must be set}"]
+        services:
+          participants:
+            loadBalancer:
+              passHostHeader: true
+              servers:
+                - url: http://tunnel-node:8080
+
+networks:
+  tunnel:
+    name: ${COMPOSE_PROJECT_NAME:-tx-bootstrap-tunnel}
+
+secrets:
+  # KEY=value lines with the DNS provider's credentials for ACME DNS-01.
+  acme-env:
+    file: ${TUNNEL_ACME_ENV_FILE:-./secrets/acme.env}
+  # Single-use tag:txb-ingress pre-auth key from the operator's Headscale.
+  ingress-authkey:
+    file: ${TUNNEL_INGRESS_AUTHKEY_FILE:-./secrets/ingress-authkey}
+
+volumes:
+  tunnel-node-state:
+  traefik-acme:

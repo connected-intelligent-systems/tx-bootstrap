@@ -86,6 +86,75 @@ export const createAdminRoutes: FastifyPluginAsync<{
     await controller.createParticipant(request.raw, reply.raw, request.body);
   });
 
+  app.get(
+    "/admin/network",
+    {
+      schema: {
+        tags: ["admin"],
+        description:
+          "Check the optional Headscale provider without exposing credentials",
+      },
+    },
+    async (_request, reply) => {
+      reply.header("Cache-Control", "no-store");
+      return controller.getNetworkStatus();
+    },
+  );
+
+  app.get<{ Params: { participantId: string } }>(
+    "/admin/participants/:participantId/network-enrollments",
+    {
+      schema: {
+        tags: ["admin"],
+        description:
+          "List deployment enrollments and observe their Headscale nodes",
+      },
+    },
+    async (request, reply) => {
+      reply.header("Cache-Control", "no-store");
+      return controller.listNetworkEnrollments(request.params.participantId);
+    },
+  );
+
+  app.post<{ Params: { participantId: string } }>(
+    "/admin/participants/:participantId/network-enrollments",
+    {
+      schema: {
+        tags: ["admin"],
+        description:
+          "Issue a one-use deployment enrollment key; body: { deploymentId: UUID, purpose?: 'deployment' | 'invitation' }. The key is returned once.",
+      },
+    },
+    async (request, reply) => {
+      reply.header("Cache-Control", "no-store");
+      const result = await controller.createNetworkEnrollment(
+        request.params.participantId,
+        request.body,
+        auth.eventActor(request.raw),
+      );
+      return reply.status(201).send(result);
+    },
+  );
+
+  app.post<{ Params: { participantId: string; deploymentId: string } }>(
+    "/admin/participants/:participantId/network-enrollments/:deploymentId/revoke",
+    {
+      schema: {
+        tags: ["admin"],
+        description:
+          "Expire the enrollment key and remove its nodes; safe to retry",
+      },
+    },
+    async (request, reply) => {
+      reply.header("Cache-Control", "no-store");
+      return controller.revokeNetworkEnrollment(
+        request.params.participantId,
+        request.params.deploymentId,
+        auth.eventActor(request.raw),
+      );
+    },
+  );
+
   app.get("/admin/participants/:participantId", async (request, reply) => {
     const { participantId } = request.params as { participantId: string };
     await controller.handleAdminParticipant(

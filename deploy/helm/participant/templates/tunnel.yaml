@@ -1,0 +1,134 @@
+{{- if .Values.tunnel.enabled }}
+{{- $tunnel := .Values.tunnel -}}
+{{- $name := include "tx-bootstrap-participant.componentName" (dict "root" . "component" "tunnel") -}}
+{{- $gateway := include "tx-bootstrap-participant.componentName" (dict "root" . "component" "public-gateway") -}}
+{{- $claim := default $name $tunnel.persistence.existingClaim -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "tx-bootstrap-participant.labels" . | nindent 4 }}
+    app.kubernetes.io/component: tunnel
+data:
+  # Raw TCP forward keeps the Host header the operator's ingress sent.
+  serve.json: |
+    {"TCP": {"18080": {"TCPForward": "{{ $gateway }}:{{ .Values.publicGateway.service.port }}"}}}
+---
+{{- if not $tunnel.persistence.existingClaim }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "tx-bootstrap-participant.labels" . | nindent 4 }}
+    app.kubernetes.io/component: tunnel
+  annotations:
+    # The node identity outlives the single-use key; never drop it on uninstall.
+    helm.sh/resource-policy: keep
+spec:
+  accessModes:
+    - ReadWriteOnce
+  {{- with $tunnel.persistence.storageClassName }}
+  storageClassName: {{ . | quote }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ $tunnel.persistence.size }}
+---
+{{- end }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "tx-bootstrap-participant.labels" . | nindent 4 }}
+    app.kubernetes.io/component: tunnel
+spec:
+  # One node identity: never run two pods with the same state.
+  replicas: 1
+  strategy:
+    type: Recreate
+  revisionHistoryLimit: {{ .Values.revisionHistoryLimit }}
+  selector:
+    matchLabels:
+      {{- include "tx-bootstrap-participant.selectorLabels" (dict "root" . "component" "tunnel") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "tx-bootstrap-participant.selectorLabels" (dict "root" . "component" "tunnel") | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      annotations:
+        checksum/serve: {{ printf "%s:%v" $gateway .Values.publicGateway.service.port | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- include "tx-bootstrap-participant.podDefaultsWith" (dict "root" . "securityContext" (dict "fsGroup" $tunnel.securityContext.runAsGroup "fsGroupChangePolicy" "OnRootMismatch")) | nindent 6 }}
+      containers:
+        - name: tunnel
+          image: {{ include "tx-bootstrap-participant.image" (dict "root" . "image" $tunnel.image) | quote }}
+          imagePullPolicy: {{ $tunnel.image.pullPolicy }}
+          securityContext:
+            {{- include "tx-bootstrap-participant.containerSecurityContext" (dict "root" . "component" (merge (dict "readOnlyRootFilesystem" true) $tunnel.securityContext)) | nindent 12 }}
+          env:
+            - { name: TS_AUTHKEY, value: "file:/run/secrets/tailnet/authkey" }
+            - { name: TS_AUTH_ONCE, value: "true" }
+            - { name: TS_HOSTNAME, value: {{ $tunnel.hostname | quote }} }
+            # A subdirectory, because tailscaled chmods its state directory and
+            # the volume root belongs to root (fsGroup only sets the group).
+            - { name: TS_STATE_DIR, value: /var/lib/tailscale/state }
+            # Keep state in the volume instead of a Kubernetes Secret, so the
+            # pod needs no API access.
+            - { name: TS_KUBE_SECRET, value: "" }
+            - { name: TS_SOCKET, value: /tmp/tailscaled.sock }
+            - { name: TS_USERSPACE, value: "true" }
+            - { name: TS_ACCEPT_DNS, value: "false" }
+            - name: TS_EXTRA_ARGS
+              value: {{ printf "--login-server=%s --accept-routes=false --ssh=false" $tunnel.headscaleUrl | quote }}
+            - { name: TS_SERVE_CONFIG, value: /config/serve.json }
+            - { name: TS_ENABLE_HEALTH_CHECK, value: "true" }
+            - { name: TS_LOCAL_ADDR_PORT, value: "127.0.0.1:9002" }
+          volumeMounts:
+            - { name: state, mountPath: /var/lib/tailscale }
+            - { name: tmp, mountPath: /tmp }
+            - { name: serve, mountPath: /config, readOnly: true }
+            - { name: authkey, mountPath: /run/secrets/tailnet, readOnly: true }
+          startupProbe:
+            exec:
+              command: [wget, -q, -O, /dev/null, "http://127.0.0.1:9002/healthz"]
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 60
+          readinessProbe:
+            exec:
+              command: [wget, -q, -O, /dev/null, "http://127.0.0.1:9002/healthz"]
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            {{- toYaml $tunnel.resources | nindent 12 }}
+      volumes:
+        - name: state
+          persistentVolumeClaim:
+            claimName: {{ $claim }}
+        - name: tmp
+          emptyDir:
+            medium: Memory
+            sizeLimit: 16Mi
+        - name: serve
+          configMap:
+            name: {{ $name }}
+        - name: authkey
+          secret:
+            secretName: {{ .Values.existingSecret.name }}
+            # Only needed for the first start; the pod must also start after
+            # the key was removed from the Secret.
+            optional: true
+            defaultMode: 0440
+            items:
+              - key: {{ $tunnel.authKeySecretKey }}
+                path: authkey
+{{- end }}

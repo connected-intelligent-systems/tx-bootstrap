@@ -11,15 +11,30 @@ import {
   Stack,
   TextField,
 } from "@mui/material";
+import {
+  tunnelSetupText,
+  type IssuedNetworkEnrollment,
+} from "../api/network-api";
 import type { ParticipantInvite } from "../types";
+import { ErrorAlert } from "./participant-ui";
+import { SecretTextBlock } from "./participant-tunnel";
+
+export interface CreatedParticipant {
+  invite: ParticipantInvite;
+  /** Present when the operator asked to publish through the tunnel. */
+  tunnel?: { enrollment: IssuedNetworkEnrollment } | { error: unknown };
+}
 
 export function ParticipantInviteDialog({
-  invite,
+  created,
   onClose,
 }: {
-  invite: ParticipantInvite;
+  created: CreatedParticipant;
   onClose: () => void;
 }) {
+  const { invite, tunnel } = created;
+  const enrollment =
+    tunnel && "enrollment" in tunnel ? tunnel.enrollment : undefined;
   const [copied, setCopied] = useState<"bpn" | "token" | null>(null);
   const [copyFailed, setCopyFailed] = useState<"bpn" | "token" | null>(null);
 
@@ -35,7 +50,12 @@ export function ParticipantInviteDialog({
   }
 
   return (
-    <Dialog open onClose={onClose} fullWidth maxWidth="sm">
+    <Dialog
+      open
+      onClose={onClose}
+      fullWidth
+      maxWidth={enrollment ? "md" : "sm"}
+    >
       <DialogTitle>Participant created</DialogTitle>
       <DialogContent>
         <Stack spacing={2} sx={{ pt: 1 }}>
@@ -44,9 +64,16 @@ export function ParticipantInviteDialog({
             The participant record and onboarding invitation are ready.
           </Alert>
           <Alert severity="warning" variant="outlined">
-            Save these participant details now. The registration token may not
-            be shown again after this dialog is closed.
+            Save these participant details now. The registration token
+            {enrollment ? " and the tunnel key are" : " may not be"} shown only
+            once{enrollment ? "" : " after this dialog is closed"}.
           </Alert>
+          {tunnel && "error" in tunnel ? (
+            <ErrorAlert
+              title="Tunnel key not issued. Issue it from the participant's Tunnel tab."
+              error={tunnel.error}
+            />
+          ) : null}
           <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
             <TextField
               label="Assigned BPN"
@@ -75,35 +102,50 @@ export function ParticipantInviteDialog({
               {copied === "bpn" ? "Copied" : "Copy BPN"}
             </Button>
           </Stack>
-          <TextField
-            label="Registration token"
-            value={invite.registrationToken}
-            multiline
-            minRows={3}
-            fullWidth
-            slotProps={{
-              input: {
-                readOnly: true,
-                sx: { fontFamily: "monospace", overflowWrap: "anywhere" },
-              },
-            }}
-            helperText={
-              copyFailed === "token"
-                ? "Clipboard access failed. Select and copy the token manually."
-                : copied === "token"
-                  ? "Copied to clipboard."
-                  : "Share this token securely with the participant."
-            }
-          />
+          {enrollment ? (
+            <SecretTextBlock
+              label="Invitation bundle"
+              value={tunnelSetupText(enrollment, [
+                `# Participant invitation for ${invite.participant.organization.legalName}`,
+                `BPN=${invite.participant.bpn.assignedBpn}`,
+                `REGISTRATION_TOKEN=${invite.registrationToken}`,
+                "",
+              ])}
+              helperText="Send this securely to the participant: registration token and tunnel settings."
+            />
+          ) : (
+            <TextField
+              label="Registration token"
+              value={invite.registrationToken}
+              multiline
+              minRows={3}
+              fullWidth
+              slotProps={{
+                input: {
+                  readOnly: true,
+                  sx: { fontFamily: "monospace", overflowWrap: "anywhere" },
+                },
+              }}
+              helperText={
+                copyFailed === "token"
+                  ? "Clipboard access failed. Select and copy the token manually."
+                  : copied === "token"
+                    ? "Copied to clipboard."
+                    : "Share this token securely with the participant."
+              }
+            />
+          )}
         </Stack>
       </DialogContent>
       <DialogActions>
-        <Button
-          onClick={() => copyValue(invite.registrationToken, "token")}
-          startIcon={<ContentCopyIcon />}
-        >
-          {copied === "token" ? "Copied" : "Copy token"}
-        </Button>
+        {enrollment ? null : (
+          <Button
+            onClick={() => copyValue(invite.registrationToken, "token")}
+            startIcon={<ContentCopyIcon />}
+          >
+            {copied === "token" ? "Copied" : "Copy token"}
+          </Button>
+        )}
         <Button variant="contained" onClick={onClose}>
           Done
         </Button>
