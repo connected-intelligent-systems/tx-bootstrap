@@ -5,6 +5,7 @@ import type {
   ParticipantOrganizationUpdate,
   TechnicalMetadataUpdate,
 } from "@/shared/api";
+import { apiKeyHeaders, handleUnauthorized } from "@/features/auth/api-key";
 
 const adminBaseUrl = "/api/admin/participants";
 
@@ -91,10 +92,12 @@ export async function request<T>(
     headers: {
       Accept: "application/json",
       ...(hasBody ? { "Content-Type": "application/json" } : {}),
+      ...apiKeyHeaders(),
     },
     body: hasBody ? JSON.stringify(options.body) : undefined,
   });
 
+  handleUnauthorized(response.status);
   const text = await response.text();
   const payload = text ? JSON.parse(text) : undefined;
   if (!response.ok) throw new Error(payload?.error ?? response.statusText);

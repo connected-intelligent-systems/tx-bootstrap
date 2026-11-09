@@ -356,7 +356,9 @@ services:
       ISSUER_DID: "did:web:${ISSUER_DID_HOST:?ISSUER_DID_HOST must be set}:${BPN_ISSUER:?BPN_ISSUER must be set}"
       ISSUER_ADMIN_URL: "http://issuerservice:8086/api/admin"
       ISSUER_IDENTITY_URL: "http://issuerservice:8087/api/identity"
-      ISSUER_ISSUANCE_URL: "http://issuerservice:8082/api/issuance"
+      # Published in the issuer's DID document: participants request
+      # credentials here, so it must be their public route to the issuer.
+      ISSUER_ISSUANCE_URL: "${ISSUER_ISSUANCE_URL:-https://${ISSUER_DID_HOST:?ISSUER_DID_HOST must be set}/api/issuance}"
       ISSUER_CLAIMS_DATABASE_URL: "${ISSUER_CLAIMS_DATABASE_URL:?ISSUER_CLAIMS_DATABASE_URL must be set}"
       ISSUER_CONTEXT: "${BPN_ISSUER:?BPN_ISSUER must be set}"
       ISSUER_CONTEXT_PATH_ID: "${BPN_ISSUER_BASE64:?BPN_ISSUER_BASE64 must be set}"
@@ -441,6 +443,12 @@ configs:
               proxy_pass http://issuerservice:8088/statuslist/;
               proxy_set_header Host $$host;
               proxy_set_header Accept application/json;
+              proxy_set_header X-Real-IP $$remote_addr;
+          }
+
+          location /api/issuance/ {
+              proxy_pass http://issuerservice:8082/api/issuance/;
+              proxy_set_header Host $$host;
               proxy_set_header X-Real-IP $$remote_addr;
           }
 

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import DarkModeIcon from "@mui/icons-material/DarkMode";
 import LightModeIcon from "@mui/icons-material/LightMode";
+import LogoutIcon from "@mui/icons-material/Logout";
 import ShieldOutlinedIcon from "@mui/icons-material/ShieldOutlined";
 import {
   AppBar,
@@ -14,6 +15,8 @@ import {
   Typography,
 } from "@mui/material";
 import { alpha, ThemeProvider } from "@mui/material/styles";
+import { ApiKeyGate } from "@/features/auth/api-key-gate";
+import { clearApiKey, useApiKey } from "@/features/auth/api-key";
 import { ParticipantsPage } from "@/features/participants/components/participants-page";
 import { consoleConfig } from "@/config";
 import { initialThemeMode, persistThemeMode } from "@/storage";
@@ -22,6 +25,7 @@ import type { ThemeMode } from "@/types";
 
 const title = consoleConfig.title?.trim() || "Participant Operations";
 const subtitle = consoleConfig.subtitle?.trim() || "Dataspace Administration";
+const apiKeyRequired = consoleConfig.apiKeyRequired === true;
 
 export default function App() {
   const [themeMode, setThemeMode] = useState<ThemeMode>(() =>
@@ -78,7 +82,13 @@ export default function App() {
             py: { xs: 2, md: 3 },
           }}
         >
-          <ParticipantsPage />
+          {apiKeyRequired ? (
+            <ApiKeyGate>
+              <ParticipantsPage />
+            </ApiKeyGate>
+          ) : (
+            <ParticipantsPage />
+          )}
         </Container>
       </Box>
     </ThemeProvider>
@@ -113,6 +123,7 @@ function ShellBar({
       >
         <Brand logo={logo} />
         <Box sx={{ flex: 1 }} />
+        {apiKeyRequired && <ForgetApiKeyButton />}
         <Tooltip
           title={themeMode === "dark" ? "Use light theme" : "Use dark theme"}
         >
@@ -126,6 +137,22 @@ function ShellBar({
         </Tooltip>
       </Toolbar>
     </AppBar>
+  );
+}
+
+function ForgetApiKeyButton() {
+  const apiKey = useApiKey();
+  if (!apiKey) return null;
+  return (
+    <Tooltip title="Forget API key">
+      <IconButton
+        aria-label="Forget API key"
+        onClick={clearApiKey}
+        color="inherit"
+      >
+        <LogoutIcon />
+      </IconButton>
+    </Tooltip>
   );
 }
 
