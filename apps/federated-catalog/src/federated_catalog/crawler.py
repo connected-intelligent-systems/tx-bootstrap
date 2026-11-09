@@ -17,7 +17,7 @@ from .jsonld import (
     rdf_nquads,
 )
 from .models import CrawlStatus, DatasetRecord, Participant, iso, parse_time, utc_now
-from .store import CatalogStore, stable_entry_id
+from .store import CatalogStore, is_valid_endpoint, stable_entry_id
 
 LOGGER = logging.getLogger(__name__)
 
@@ -75,7 +75,13 @@ class CatalogCrawler:
         for value in payload.get("participants", []):
             if value.get("bpn") == self.settings.participant_bpn:
                 continue
-            if not all(value.get(key) for key in ("name", "bpn", "did", "dspEndpoint")):
+            if not all(
+                isinstance(value.get(key), str) and value.get(key) for key in ("name", "bpn", "did", "dspEndpoint")
+            ):
+                continue
+            if not is_valid_endpoint(value["dspEndpoint"]):
+                # One malformed directory entry must not stop crawling for everyone.
+                LOGGER.warning("Skipping participant %s: DSP endpoint is not a valid HTTP(S) IRI", value["bpn"])
                 continue
             result.append(
                 Participant(
@@ -90,17 +96,10 @@ class CatalogCrawler:
     async def synchronize_directory(self, participants: list[Participant]) -> None:
         current = {participant.bpn: participant for participant in participants}
         for participant in participants:
-            status = self.store.get_status(participant.bpn)
-            if status is None:
-                self.store.put_status(CrawlStatus(participant=participant))
-                continue
-            if status.participant != participant or not status.active:
-                status.participant = participant
-                status.active = True
-                status.inactive_since = None
-                status.state = "pending"
-                self.next_crawl[participant.bpn] = 0
-                self.store.put_status(status)
+            try:
+                self._synchronize_participant(participant)
+            except Exception as error:
+                LOGGER.warning("Cannot synchronize directory entry %s: %s", participant.bpn, self._error_message(error))
         now = iso(utc_now())
         for status in self.store.statuses():
             if status.active and status.participant.bpn not in current:
@@ -108,6 +107,19 @@ class CatalogCrawler:
                 status.state = "inactive"
                 status.inactive_since = now
                 self.store.deactivate(status)
+
+    def _synchronize_participant(self, participant: Participant) -> None:
+        status = self.store.get_status(participant.bpn)
+        if status is None:
+            self.store.put_status(CrawlStatus(participant=participant))
+            return
+        if status.participant != participant or not status.active:
+            status.participant = participant
+            status.active = True
+            status.inactive_since = None
+            status.state = "pending"
+            self.next_crawl[participant.bpn] = 0
+            self.store.put_status(status)
 
     async def crawl_participant(self, participant: Participant) -> None:
         status = self.store.get_status(participant.bpn) or CrawlStatus(participant=participant)

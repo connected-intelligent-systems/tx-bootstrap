@@ -58,6 +58,17 @@ def entry_node(entry_id: str) -> NamedNode:
     return NamedNode(BASE + "entry:" + entry_id)
 
 
+def is_valid_endpoint(value: str) -> bool:
+    """True when the value is an absolute HTTP(S) IRI that RDF can represent."""
+    if not value.startswith(("http://", "https://")):
+        return False
+    try:
+        NamedNode(value)
+    except ValueError:
+        return False
+    return True
+
+
 def stable_entry_id(bpn: str, dataset_id: str) -> str:
     return hashlib.sha256(f"{bpn}\0{dataset_id}".encode()).hexdigest()
 
@@ -102,19 +113,24 @@ class CatalogStore:
     def put_status(self, status: CrawlStatus) -> None:
         subject = status_node(status.participant.bpn)
         payload = Literal(json.dumps(status.to_dict(), separators=(",", ":"), ensure_ascii=False))
+        # Validate everything derived from directory data before mutating, so a
+        # malformed entry cannot leave a half-written status behind.
+        public_quads = self._public_participant_quads(status)
         with self.lock:
             existing = list(self.store.quads_for_pattern(subject, None, None, CONTROL_GRAPH))
             for quad in existing:
                 self.store.remove(quad)
             self.store.add(Quad(subject, STATE_PREDICATE, payload, CONTROL_GRAPH))
-            self._replace_public_participant(status)
+            graph = live_graph(status.participant.bpn)
+            for quad in list(self.store.quads_for_pattern(graph, None, None, PUBLIC_GRAPH)):
+                self.store.remove(quad)
+            self.store.extend(public_quads)
 
-    def _replace_public_participant(self, status: CrawlStatus) -> None:
+    @staticmethod
+    def _public_participant_quads(status: CrawlStatus) -> list[Quad]:
         graph = live_graph(status.participant.bpn)
-        for quad in list(self.store.quads_for_pattern(graph, None, None, PUBLIC_GRAPH)):
-            self.store.remove(quad)
         if not status.active:
-            return
+            return []
         participant = status.participant
         values: dict[NamedNode, NamedNode | Literal] = {
             TYPE_PREDICATE: CATALOG_TYPE,
@@ -125,8 +141,7 @@ class CatalogStore:
         }
         if status.last_success_at:
             values[NamedNode("http://www.w3.org/ns/prov#generatedAtTime")] = Literal(status.last_success_at)
-        for predicate, value in values.items():
-            self.store.add(Quad(graph, predicate, value, PUBLIC_GRAPH))
+        return [Quad(graph, predicate, value, PUBLIC_GRAPH) for predicate, value in values.items()]
 
     def replace_catalog(
         self,
@@ -137,6 +152,8 @@ class CatalogStore:
         suffix = hashlib.sha256(f"{status.participant.bpn}:{utc_now().timestamp()}".encode()).hexdigest()[:16]
         staging_data = NamedNode(BASE + f"staging:data:{suffix}")
         staging_meta = NamedNode(BASE + f"staging:metadata:{suffix}")
+        # Fails before any graph is touched if the directory entry is unusable.
+        self._public_participant_quads(status)
         with self.lock:
             self.store.add_graph(staging_data)
             self.store.add_graph(staging_meta)

@@ -176,3 +176,28 @@ def dataset(identifier: str) -> dict[str, Any]:
         "dct:description": "Description",
         "dcat:theme": "mobility",
     }
+
+
+@pytest.mark.asyncio
+async def test_malformed_dsp_endpoint_does_not_stop_directory_sync(tmp_path) -> None:
+    # "{" passes WHATWG URL parsing (it is percent-encoded there) but is not a
+    # valid IRI code point, so it used to abort every crawl cycle.
+    bad = {"name": "Bad", "bpn": "BPNL-BAD", "did": "did:web:bad", "dspEndpoint": "https://bad.example/{dsp}"}
+    good = {"name": "Good", "bpn": "BPNL-GOOD", "did": "did:web:good", "dspEndpoint": "https://good.example/dsp"}
+
+    async def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"participants": [bad, good]})
+
+    configured = settings(tmp_path)
+    store = CatalogStore(configured.store_path, 1800)
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    crawler = CatalogCrawler(configured, store, client)
+
+    participants = await crawler.fetch_participants()
+    assert [item.bpn for item in participants] == ["BPNL-GOOD"]
+
+    # Even if a malformed entry reaches synchronization, the others still sync.
+    malformed = Participant("Bad", "BPNL-BAD", "did:web:bad", "https://bad.example/{dsp}")
+    await crawler.synchronize_directory([malformed, *participants])
+    assert [status.participant.bpn for status in store.statuses()] == ["BPNL-GOOD"]
+    await client.aclose()

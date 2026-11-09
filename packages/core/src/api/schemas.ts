@@ -54,7 +54,22 @@ const requiredHttpUrlString = requiredString("URL", 2048).refine(
   "Must be a valid http(s) URL",
 );
 
+// Characters WHATWG URL parsing silently percent-encodes but RFC 3987 IRIs
+// forbid. The raw value is stored and reused as an RDF IRI downstream (the
+// federated catalog), where one such character used to stall crawling.
+const iriForbiddenCharacters = new Set('<>"{}|\\^`');
+
+function hasIriForbiddenCharacter(value: string) {
+  return [...value].some((character) => {
+    const code = character.charCodeAt(0);
+    return (
+      code <= 0x20 || code === 0x7f || iriForbiddenCharacters.has(character)
+    );
+  });
+}
+
 function isHttpUrl(value: string) {
+  if (hasIriForbiddenCharacter(value)) return false;
   try {
     const url = new URL(value);
     return url.protocol === "http:" || url.protocol === "https:";
