@@ -119,6 +119,12 @@ All repository-owned components follow one lockstep stack version. See
 
 ## Documentation
 
+The MkDocs documentation site is configured for GitHub Pages at
+**[connected-intelligent-systems.github.io/tx-bootstrap](https://connected-intelligent-systems.github.io/tx-bootstrap/)**.
+It deploys from `main` through GitHub Actions. See
+[the documentation guide](docs/documentation.md) for local preview, strict
+builds, and GitHub Pages setup.
+
 - [Deployment artifacts and lifecycle](deploy/README.md)
 - [Helm charts](deploy/helm/README.md)
 - [Operator stack](docs/operator.md)

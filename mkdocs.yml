@@ -1,0 +1,85 @@
+site_name: tx-bootstrap
+site_description: Bootstrap, deploy, and operate a Tractus-X-style dataspace.
+site_url: https://connected-intelligent-systems.github.io/tx-bootstrap/
+repo_url: https://github.com/connected-intelligent-systems/tx-bootstrap
+repo_name: connected-intelligent-systems/tx-bootstrap
+edit_uri: edit/main/docs/
+copyright: Copyright &copy; 2026 DFKI · MIT License
+strict: true
+
+theme:
+  name: material
+  language: en
+  font: false
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: teal
+      accent: cyan
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: teal
+      accent: cyan
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+  features:
+    - navigation.sections
+    - navigation.top
+    - navigation.footer
+    - search.highlight
+    - search.suggest
+    - content.action.edit
+    - content.code.copy
+
+nav:
+  - Home: index.md
+  - Getting started:
+      - Local Compose: local-deployment.md
+      - Local Kubernetes: deployment/local-kubernetes.md
+  - Deployment:
+      - Artifacts and lifecycle: deployment/index.md
+      - PostgreSQL provisioning: deployment/database.md
+      - Helm charts: deployment/helm/index.md
+      - Operator chart: deployment/helm/operator.md
+      - Participant chart: deployment/helm/participant.md
+  - Operations:
+      - Operator services: operator.md
+      - Participant runtime: participant.md
+      - Participant tunnel: participant-tunnel.md
+      - S3 HTTP-pull: s3-http-pull.md
+  - Development:
+      - Contributing: development.md
+      - Operator console: applications/operator-console.md
+      - Federated catalog: applications/federated-catalog.md
+      - Data-plane image: applications/edc-dataplane.md
+      - Participant API: applications/participant-api.md
+      - Documentation site: documentation.md
+  - Releases:
+      - Versioning and releases: versioning.md
+      - "0.2.1": releases/0.2.1.md
+      - "0.2.0": releases/0.2.0.md
+
+plugins:
+  - search
+
+hooks:
+  - scripts/docs_hooks.py
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - toc:
+      permalink: true
+  - pymdownx.highlight
+  - pymdownx.superfences
+
+validation:
+  nav:
+    omitted_files: warn
+  links:
+    anchors: warn
+    unrecognized_links: warn

@@ -3,6 +3,9 @@ dist/
 dist-server/
 coverage/
 .venv/
+.venv-docs/
+site/
+__pycache__/
 .env
 deploy/local_compose/tunnel/secrets/
 deploy/local_compose/consumer/secrets/
