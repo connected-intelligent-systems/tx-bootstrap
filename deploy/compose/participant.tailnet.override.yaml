@@ -32,6 +32,15 @@ services:
       options:
         max-size: "${LOG_MAX_SIZE:-10m}"
         max-file: "${LOG_MAX_FILES:-3}"
+    # Starts Traefik (with the command below) once the operator's ingress
+    # routes the public host to this node; see the tailnet-tls-start config.
+    entrypoint:
+      - /bin/sh
+      - /etc/traefik/tls-start.sh
+      - ${PARTICIPANT_PUBLIC_HOST:?PARTICIPANT_PUBLIC_HOST must be set}
+      - 0.0.0.0
+      - /acme/acme.json
+      - --
     command:
       - --log.level=INFO
       - --ping.entryPoint=health
@@ -54,12 +63,12 @@ services:
     configs:
       - source: tailnet-tls
         target: /etc/traefik/dynamic.yaml
+      - source: tailnet-tls-start
+        target: /etc/traefik/tls-start.sh
     volumes:
       - tailnet-tls-acme:/acme
     networks:
       - public
-    # Starts once the node is on the tailnet, so the first certificate request
-    # can already reach it through the ingress.
     depends_on:
       public-gateway:
         condition: service_healthy
@@ -183,6 +192,60 @@ configs:
               passHostHeader: true
               servers:
                 - url: http://${TAILNET_FORWARD_HOST:-${PARTICIPANT_PUBLIC_HOST}}:80
+
+  # Keep in sync with tls-start.sh in the participant Helm chart's tunnel.yaml.
+  tailnet-tls-start:
+    content: |
+      # Usage: sh tls-start.sh HOST LISTEN_ADDRESS ACME_STORAGE -- TRAEFIK_ARGS...
+      #
+      # Traefik requests its certificate once at startup and does not retry a
+      # failed TLS-ALPN-01 challenge until it restarts. The operator's ingress only
+      # routes approved participants, so a certificate request made before approval
+      # fails, leaves the endpoint without a certificate, and counts against the
+      # CA's failed-validation limit. Wait until the public host name reaches this
+      # node through the ingress, then start Traefik.
+      set -eu
+      host="$$1"
+      listen="$$2"
+      storage="$$3"
+      shift 4
+
+      if ! grep -qs "\"main\": *\"$$host\"" "$$storage"; then
+        token="$$(od -An -N16 -tx1 /dev/urandom | tr -d ' \n')"
+        # Answer probes that arrive through the tunnel with this start's token.
+        nc -lk -s "$$listen" -p 8443 -e echo "$$token" &
+        probe_listener=$$!
+        # Report healthy while waiting: approval is an operator decision, and
+        # deployments must not time out on it.
+        nc -lk -s 127.0.0.1 -p 8082 -e printf 'HTTP/1.0 200 OK\r\nContent-Length: 0\r\n\r\n' &
+        health_listener=$$!
+
+        byte() { printf "\\$$(printf %03o "$$1")"; }
+        # A minimal TLS ClientHello carrying only the server name the ingress routes by.
+        client_hello() {
+          n=$${#host}
+          byte 22; byte 3; byte 1; byte $$(((n + 56) >> 8)); byte $$(((n + 56) & 255))
+          byte 1; byte 0; byte $$(((n + 52) >> 8)); byte $$(((n + 52) & 255)); byte 3; byte 3
+          i=0
+          while [ "$$i" -lt 32 ]; do byte 0; i=$$((i + 1)); done
+          byte 0; byte 0; byte 2; byte 192; byte 47; byte 1; byte 0
+          byte $$(((n + 9) >> 8)); byte $$(((n + 9) & 255)); byte 0; byte 0
+          byte $$(((n + 5) >> 8)); byte $$(((n + 5) & 255))
+          byte $$(((n + 3) >> 8)); byte $$(((n + 3) & 255)); byte 0
+          byte $$((n >> 8)); byte $$((n & 255))
+          printf %s "$$host"
+        }
+
+        echo "Waiting until the operator's ingress routes $$host to this node"
+        # BusyBox nc stops reading once its input ends; keep it open for the reply.
+        until { client_hello; sleep 10; } | timeout 10 nc "$$host" 443 2>/dev/null | grep -q "$$token"; do
+          sleep 5
+        done
+        kill "$$probe_listener" "$$health_listener"
+        wait "$$probe_listener" "$$health_listener" 2>/dev/null || true
+        echo "$$host routes to this node; requesting its certificate"
+      fi
+      exec traefik "$$@"
 
 secrets:
   tailnet-authkey:

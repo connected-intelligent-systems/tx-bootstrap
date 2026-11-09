@@ -20,6 +20,59 @@ data:
       "18443": {"TCPForward": "127.0.0.1:8443"},
       "18080": {"TCPForward": "{{ $gateway }}:{{ .Values.publicGateway.service.port }}"}
     }}
+  # Keep in sync with the tailnet-tls-start config in
+  # deploy/compose/participant.tailnet.override.yaml.
+  tls-start.sh: |
+    # Usage: sh tls-start.sh HOST LISTEN_ADDRESS ACME_STORAGE -- TRAEFIK_ARGS...
+    #
+    # Traefik requests its certificate once at startup and does not retry a
+    # failed TLS-ALPN-01 challenge until it restarts. The operator's ingress only
+    # routes approved participants, so a certificate request made before approval
+    # fails, leaves the endpoint without a certificate, and counts against the
+    # CA's failed-validation limit. Wait until the public host name reaches this
+    # node through the ingress, then start Traefik.
+    set -eu
+    host="$1"
+    listen="$2"
+    storage="$3"
+    shift 4
+
+    if ! grep -qs "\"main\": *\"$host\"" "$storage"; then
+      token="$(od -An -N16 -tx1 /dev/urandom | tr -d ' \n')"
+      # Answer probes that arrive through the tunnel with this start's token.
+      nc -lk -s "$listen" -p 8443 -e echo "$token" &
+      probe_listener=$!
+      # Report healthy while waiting: approval is an operator decision, and
+      # deployments must not time out on it.
+      nc -lk -s 127.0.0.1 -p 8082 -e printf 'HTTP/1.0 200 OK\r\nContent-Length: 0\r\n\r\n' &
+      health_listener=$!
+
+      byte() { printf "\\$(printf %03o "$1")"; }
+      # A minimal TLS ClientHello carrying only the server name the ingress routes by.
+      client_hello() {
+        n=${#host}
+        byte 22; byte 3; byte 1; byte $(((n + 56) >> 8)); byte $(((n + 56) & 255))
+        byte 1; byte 0; byte $(((n + 52) >> 8)); byte $(((n + 52) & 255)); byte 3; byte 3
+        i=0
+        while [ "$i" -lt 32 ]; do byte 0; i=$((i + 1)); done
+        byte 0; byte 0; byte 2; byte 192; byte 47; byte 1; byte 0
+        byte $(((n + 9) >> 8)); byte $(((n + 9) & 255)); byte 0; byte 0
+        byte $(((n + 5) >> 8)); byte $(((n + 5) & 255))
+        byte $(((n + 3) >> 8)); byte $(((n + 3) & 255)); byte 0
+        byte $((n >> 8)); byte $((n & 255))
+        printf %s "$host"
+      }
+
+      echo "Waiting until the operator's ingress routes $host to this node"
+      # BusyBox nc stops reading once its input ends; keep it open for the reply.
+      until { client_hello; sleep 10; } | timeout 10 nc "$host" 443 2>/dev/null | grep -q "$token"; do
+        sleep 5
+      done
+      kill "$probe_listener" "$health_listener"
+      wait "$probe_listener" "$health_listener" 2>/dev/null || true
+      echo "$host routes to this node; requesting its certificate"
+    fi
+    exec traefik "$@"
   # The participant's own TLS endpoint; the operator's ingress only passes
   # the encrypted connection through.
   tls.yaml: |
@@ -148,14 +201,18 @@ spec:
           imagePullPolicy: {{ $tunnel.tls.image.pullPolicy }}
           securityContext:
             {{- include "tx-bootstrap-participant.containerSecurityContext" (dict "root" . "component" (merge (dict "readOnlyRootFilesystem" true) $tunnel.securityContext)) | nindent 12 }}
-          # Start once the node is on the tailnet, so the first certificate
-          # request can already reach this pod through the operator's ingress.
+          env:
+            - name: PUBLIC_HOST
+              value: {{ $publicHost | quote }}
+          # Start once the node is on the tailnet and the operator's ingress
+          # routes the public host to it (see tls-start.sh), so the first
+          # certificate request can reach this pod.
           command:
             - /bin/sh
             - -c
             - |
               until wget -q -O /dev/null http://127.0.0.1:9002/healthz; do sleep 2; done
-              exec traefik "$@"
+              exec sh /config/tls-start.sh "$PUBLIC_HOST" 127.0.0.1 /var/lib/tailscale/acme.json -- "$@"
             - traefik
           args:
             - --log.level=INFO

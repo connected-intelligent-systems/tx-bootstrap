@@ -52,6 +52,14 @@ requires a new enrollment key. Certificates are obtained and renewed through
 the tunnel using ACME; set `TAILNET_ACME_EMAIL` for the contact address or
 `TAILNET_ACME_CA_SERVER` for another certificate authority.
 
+The first certificate is requested only after the operator's ingress routes
+your public host name to your node, which requires the operator's approval.
+Until then the TLS endpoint logs `Waiting until the operator's ingress routes
+<host> to this node` and reports healthy. To detect the route, the endpoint
+connects to its own public host name on port 443, so the participant needs
+outbound access to the operator's ingress. Once a certificate is stored, later
+restarts start immediately.
+
 The portal, management APIs, Vault, and PostgreSQL remain private.
 
 ## Operator

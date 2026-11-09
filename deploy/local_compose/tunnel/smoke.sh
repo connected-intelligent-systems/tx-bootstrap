@@ -77,6 +77,12 @@ for attempt in $(seq 1 60); do
 done
 issuer "$host" | grep -q Pebble || { echo "Participant certificate was not issued through the tunnel" >&2; exit 1; }
 echo "Participant terminates TLS with its own certificate ($(issuer "$host"))"
+# The TLS endpoint waits for its route: a request before approval would fail,
+# count against the CA's failed-validation limit, and not be retried.
+if participant logs tailnet-tls 2>&1 | grep -q "Unable to obtain ACME certificate"; then
+  echo "The participant requested a certificate before its route was approved" >&2
+  exit 1
+fi
 
 for attempt in $(seq 1 10); do
   [ "$(request "$host")" = 200 ] && break
