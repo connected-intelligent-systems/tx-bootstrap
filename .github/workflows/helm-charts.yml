@@ -184,6 +184,9 @@ jobs:
           grep -q '"18443": {"TCPForward": "127.0.0.1:8443"}' /tmp/participant-tunnel.yaml
           grep -q 'rule: Host(`bpnl000000000002.tunnel.example.invalid`)' /tmp/participant-tunnel.yaml
           grep -q 'acme.tlsChallenge=true' /tmp/participant-tunnel.yaml
+          # No certificate request before the ingress routes the host here.
+          grep -q 'exec sh /config/tls-start.sh "$PUBLIC_HOST"' /tmp/participant-tunnel.yaml
+          grep -q '^  tls-start.sh: |$' /tmp/participant-tunnel.yaml
           grep -q '^kind: PersistentVolumeClaim$' /tmp/participant-tunnel.yaml
           if grep -q 'tx-bootstrap-participant-tunnel' /tmp/participant-default.yaml; then
             echo "The tunnel rendered while disabled." >&2
