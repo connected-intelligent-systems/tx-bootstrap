@@ -8,8 +8,8 @@ components keep their upstream versions.
 
 | Build       | Version format           | Use                              |
 | ----------- | ------------------------ | -------------------------------- |
-| Release     | `0.3.0`                  | A published, fixed stack version |
-| Development | `0.3.0-dev.sha.<commit>` | A specific build from `main`     |
+| Release     | `0.3.1`                  | A published, fixed stack version |
+| Development | `0.3.1-dev.sha.<commit>` | A specific build from `main`     |
 | Local       | `local`                  | Images built from your checkout  |
 
 Prefer an explicit release, development version, or digest for repeatable
@@ -18,10 +18,10 @@ deployments. Floating aliases such as `latest` can change.
 ## Prepare a release
 
 From the repository root, set the next version and validate it. For example,
-to prepare a patch after `0.3.0`:
+to prepare a patch after `0.3.1`:
 
 ```sh
-npm run version:set -- 0.3.1
+npm run version:set -- 0.3.2
 npm run version:check
 ```
 
@@ -46,6 +46,7 @@ also publish immutable development builds. See the
 
 ## Release notes
 
+- [0.3.1](releases/0.3.1.md) — Operator deployment fixes and console API key prompt
 - [0.3.0](releases/0.3.0.md) — Optional participant tunnels and documentation site
 - [0.2.1](releases/0.2.1.md) — S3 secret references in the portal
 - [0.2.0](releases/0.2.0.md) — S3 HTTP-pull and Compose network changes
