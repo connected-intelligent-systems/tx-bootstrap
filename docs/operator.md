@@ -45,14 +45,22 @@ Expose the onboarding API and issuer gateway through HTTPS:
 | `/api/onboarding-cases*`                     | Participant onboarding |
 | `/.well-known/did.json` and issuer DID paths | Identity resolution    |
 | `/statuslist/*`                              | Credential status      |
+| `/api/issuance/*`                            | Credential issuance    |
 | `/api/directory/*`                           | BPN-to-DID lookup      |
 | `/.well-known/api/*`                         | Service discovery      |
 
 Keep the console, BDRS management, issuer administration, Vault, and PostgreSQL
 on administrative networks. The console supports `api-key` authentication or
 `forwarded-header` behind a trusted authentication proxy. API-key mode requires
-`OPERATOR_CONSOLE_API_KEY`; forwarded-header mode requires the proxy to
-replace caller-supplied identity headers.
+`OPERATOR_CONSOLE_API_KEY`; the web console then asks for the key and keeps it
+for the browser tab only, and scripts send it in the `x-api-key` header.
+Forwarded-header mode requires the proxy to replace caller-supplied identity
+headers.
+
+The issuer's DID document advertises `https://<ISSUER_DID_HOST>/api/issuance`
+as its credential service, which participants call to request credentials.
+Set `ISSUER_ISSUANCE_URL` in Compose if the issuer is published under another
+public URL.
 
 The local demo uses loopback-only administrative ports with `network` auth
 mode. Use authenticated access for non-local deployments.

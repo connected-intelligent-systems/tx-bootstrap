@@ -166,6 +166,19 @@ jobs:
           docker compose --dry-run ${{ steps.files.outputs.args }} \
             publish "example.invalid/tx-bootstrap-${{ matrix.artifact }}:validation" --yes
 
+      - name: Validate published image defaults
+        shell: bash
+        run: |
+          # As published: repository images default to the artifact's own
+          # tag, so the artifact resolves without image settings.
+          files="$(printf '%s' "${{ steps.files.outputs.args }}" | sed 's/-f //g')"
+          work="$(mktemp -d)"
+          for file in $files; do install -D "$file" "$work/$file"; done
+          (cd "$work" && "$GITHUB_WORKSPACE/scripts/compose-image-defaults.sh" ghcr.io/example validation $files)
+          (cd "$work" && env -u OPERATOR_CONSOLE_IMAGE -u OPERATOR_ONBOARDING_SERVICE_IMAGE \
+            -u PARTICIPANT_INIT_IMAGE -u PARTICIPANT_PORTAL_BACKEND_IMAGE -u FEDERATED_CATALOG_IMAGE \
+            docker compose ${{ steps.files.outputs.args }} config --quiet)
+
       - name: Log in to GitHub Container Registry
         if: github.event_name != 'pull_request'
         uses: docker/login-action@v3
@@ -196,11 +209,16 @@ jobs:
           while IFS= read -r tag; do
             [ -n "$tag" ] || continue
             image_tag="${tag##*:}"
-            export OPERATOR_CONSOLE_IMAGE="ghcr.io/${{ github.repository_owner }}/tx-bootstrap-operator-console:$image_tag"
-            export OPERATOR_ONBOARDING_SERVICE_IMAGE="ghcr.io/${{ github.repository_owner }}/tx-bootstrap-operator-onboarding-service:$image_tag"
-            export PARTICIPANT_INIT_IMAGE="ghcr.io/${{ github.repository_owner }}/tx-bootstrap-participant-init:$image_tag"
-            export PARTICIPANT_PORTAL_BACKEND_IMAGE="ghcr.io/${{ github.repository_owner }}/tx-bootstrap-participant-portal-backend:$image_tag"
-            export FEDERATED_CATALOG_IMAGE="ghcr.io/${{ github.repository_owner }}/tx-bootstrap-federated-catalog:$image_tag"
+            registry="ghcr.io/${{ github.repository_owner }}"
+            # Defaults in the published files, so the artifact needs no image
+            # settings; --resolve-image-digests then pins them by digest.
+            scripts/compose-image-defaults.sh "$registry" "$image_tag" \
+              $(printf '%s' "${{ steps.files.outputs.args }}" | sed 's/-f //g')
+            export OPERATOR_CONSOLE_IMAGE="$registry/tx-bootstrap-operator-console:$image_tag"
+            export OPERATOR_ONBOARDING_SERVICE_IMAGE="$registry/tx-bootstrap-operator-onboarding-service:$image_tag"
+            export PARTICIPANT_INIT_IMAGE="$registry/tx-bootstrap-participant-init:$image_tag"
+            export PARTICIPANT_PORTAL_BACKEND_IMAGE="$registry/tx-bootstrap-participant-portal-backend:$image_tag"
+            export FEDERATED_CATALOG_IMAGE="$registry/tx-bootstrap-federated-catalog:$image_tag"
             docker compose ${{ steps.files.outputs.args }} \
               publish "$tag" --resolve-image-digests --yes
           done <<< "$ARTIFACT_TAGS"

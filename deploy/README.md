@@ -27,7 +27,8 @@ applications are:
 
 Use a published release version or an immutable development version. See
 [Versioning](../docs/versioning.md) for the tag format. Published artifacts
-pin their images to digests.
+pin their images to digests, so image settings such as
+`OPERATOR_CONSOLE_IMAGE` are optional; set them only to run other images.
 
 Before starting a reusable application:
 

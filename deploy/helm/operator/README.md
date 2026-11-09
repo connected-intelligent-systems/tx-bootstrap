@@ -19,8 +19,10 @@ values file with:
 Keep the console ingress administrative. Publish the onboarding API and issuer
 gateway as described in [Operator services](../../../docs/operator.md).
 
-Console authentication supports `api-key` or `forwarded-header`. Header mode
-requires a trusted authentication proxy that overwrites caller identity headers.
+Console authentication supports `api-key` or `forwarded-header`. In API-key
+mode the web console asks for the key and keeps it for the browser tab only.
+Header mode requires a trusted authentication proxy that overwrites caller
+identity headers.
 
 ## Required Secret
 

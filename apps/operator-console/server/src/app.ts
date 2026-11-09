@@ -43,6 +43,7 @@ export function createApp({
           title: config.console.title,
           subtitle: config.console.subtitle,
           theme: config.console.theme ?? undefined,
+          apiKeyRequired: config.adminAuth.mode === "api-key",
         })};\n`,
       );
   });
