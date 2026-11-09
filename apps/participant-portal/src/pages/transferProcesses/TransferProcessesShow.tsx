@@ -1,5 +1,5 @@
-import { useState, useEffect, Suspense } from "react";
-import type React from "react";
+import { useState, useEffect, Suspense } from 'react'
+import type React from 'react'
 import {
   Show,
   SimpleShowLayout,
@@ -19,110 +19,94 @@ import {
   RecordContextProvider,
   Loading,
   useGetOne,
-} from "react-admin";
-import { Alert, Box, Tabs, Tab } from "@mui/material";
-import { Link } from "react-router-dom";
-import CancelIcon from "@mui/icons-material/Cancel";
-import DownloadIcon from "@mui/icons-material/Download";
-import InfoIcon from "@mui/icons-material/Info";
-import AccountTreeIcon from "@mui/icons-material/AccountTree";
-import SecurityIcon from "@mui/icons-material/Security";
-import AssessmentIcon from "@mui/icons-material/Assessment";
-import DevicesIcon from "@mui/icons-material/Devices";
-import CloudIcon from "@mui/icons-material/Cloud";
-import { TransferProcess } from "../../types/transferProcess";
-import { Dataset } from "../../types/catalog";
-import {
-  BasicInformation,
-  Provenance,
-  DataPrivacy,
-  DataQuality,
-  ApiDescription,
-} from "../../components/assets";
-import { ServiceInformation } from "../../components/datasets";
+} from 'react-admin'
+import { Alert, Box, Tabs, Tab } from '@mui/material'
+import { Link } from 'react-router-dom'
+import CancelIcon from '@mui/icons-material/Cancel'
+import DownloadIcon from '@mui/icons-material/Download'
+import InfoIcon from '@mui/icons-material/Info'
+import AccountTreeIcon from '@mui/icons-material/AccountTree'
+import SecurityIcon from '@mui/icons-material/Security'
+import AssessmentIcon from '@mui/icons-material/Assessment'
+import DevicesIcon from '@mui/icons-material/Devices'
+import CloudIcon from '@mui/icons-material/Cloud'
+import { TransferProcess } from '../../types/transferProcess'
+import { Dataset } from '../../types/catalog'
+import { BasicInformation, Provenance, DataPrivacy, DataQuality, ApiDescription } from '../../components/assets'
+import { ServiceInformation } from '../../components/datasets'
 
 const downloadBlob = async (blob: Blob, filename: string) => {
-  const showSaveFilePicker = window.showSaveFilePicker;
+  const showSaveFilePicker = window.showSaveFilePicker
 
   if (showSaveFilePicker) {
     try {
       const handle = await showSaveFilePicker({
         suggestedName: filename,
-      });
-      const writable = await handle.createWritable();
-      await writable.write(blob);
-      await writable.close();
-      return;
+      })
+      const writable = await handle.createWritable()
+      await writable.write(blob)
+      await writable.close()
+      return
     } catch (err) {
-      if (err instanceof Error && err.name !== "AbortError") {
-        console.error("Error saving file:", err);
+      if (err instanceof Error && err.name !== 'AbortError') {
+        console.error('Error saving file:', err)
       }
     }
   }
 
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
-};
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  a.click()
+  URL.revokeObjectURL(url)
+}
 
 const TransferProcessesShowBar = () => {
-  const record = useRecordContext<TransferProcess>();
-  const dataProvider = useDataProvider();
-  const notify = useNotify();
-  const translate = useTranslate();
-  const [downloading, setDownloading] = useState(false);
+  const record = useRecordContext<TransferProcess>()
+  const dataProvider = useDataProvider()
+  const notify = useNotify()
+  const translate = useTranslate()
+  const [downloading, setDownloading] = useState(false)
 
   const handleDownload = async () => {
-    if (!record?.id) return;
+    if (!record?.id) return
 
     try {
-      setDownloading(true);
+      setDownloading(true)
 
-      const { data: dataAddress } = await dataProvider.getOne("datarequests", {
+      const { data: dataAddress } = await dataProvider.getOne('datarequests', {
         id: record.id,
-      });
+      })
 
       const response = await fetch(dataAddress.endpoint, {
         headers: {
           Authorization: dataAddress.authorization,
         },
-      });
+      })
 
       if (!response.ok) {
-        throw new Error(`Failed to download data: ${response.statusText}`);
+        throw new Error(`Failed to download data: ${response.statusText}`)
       }
 
-      const blob = await response.blob();
-      downloadBlob(blob, `${record.id}_${Date.now()}`);
+      const blob = await response.blob()
+      downloadBlob(blob, `${record.id}_${Date.now()}`)
 
-      notify(
-        translate("resources.transferprocesses.messages.downloadSuccessful"),
-        { type: "success" },
-      );
+      notify(translate('resources.transferprocesses.messages.downloadSuccessful'), { type: 'success' })
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Unknown error";
-      notify(
-        `${translate(
-          "resources.transferprocesses.messages.downloadFailed",
-        )}: ${message}`,
-        { type: "error" },
-      );
+      const message = error instanceof Error ? error.message : 'Unknown error'
+      notify(`${translate('resources.transferprocesses.messages.downloadFailed')}: ${message}`, { type: 'error' })
     } finally {
-      setDownloading(false);
+      setDownloading(false)
     }
-  };
+  }
 
   const canDownload =
-    record?.transferType === "HttpData-PULL" &&
-    record?.transferDirection === "CONSUMER" &&
-    record?.state === "STARTED";
+    record?.transferType === 'HttpData-PULL' && record?.transferDirection === 'CONSUMER' && record?.state === 'STARTED'
 
-  const isCompleted = record?.state === "COMPLETED";
-  const isTerminated = record?.state === "TERMINATED";
-  const cannotTerminate = isCompleted || isTerminated;
+  const isCompleted = record?.state === 'COMPLETED'
+  const isTerminated = record?.state === 'TERMINATED'
+  const cannotTerminate = isCompleted || isTerminated
 
   return (
     <TopToolbar>
@@ -131,8 +115,8 @@ const TransferProcessesShowBar = () => {
         disabled={!canDownload || downloading}
         label={
           downloading
-            ? translate("resources.transferprocesses.actions.downloading")
-            : translate("resources.transferprocesses.actions.download")
+            ? translate('resources.transferprocesses.actions.downloading')
+            : translate('resources.transferprocesses.actions.download')
         }
         startIcon={<DownloadIcon />}
       />
@@ -141,102 +125,84 @@ const TransferProcessesShowBar = () => {
         color="error"
         to={`/transferprocesses/${record?.id}/terminate`}
         disabled={cannotTerminate}
-        label={translate("resources.transferprocesses.actions.terminate")}
+        label={translate('resources.transferprocesses.actions.terminate')}
         startIcon={<CancelIcon />}
       />
     </TopToolbar>
-  );
-};
+  )
+}
 
 export const TransferProcessesShow = () => {
-  const translate = useTranslate();
-  const { record } = useShowController<TransferProcess>();
-  const refresh = useRefresh();
-  const [activeTab, setActiveTab] = useState(0);
+  const translate = useTranslate()
+  const { record } = useShowController<TransferProcess>()
+  const refresh = useRefresh()
+  const [activeTab, setActiveTab] = useState(0)
 
   useEffect(() => {
     const interval = setInterval(() => {
-      refresh();
-    }, 5000);
+      refresh()
+    }, 5000)
 
-    return () => clearInterval(interval);
-  }, [refresh]);
+    return () => clearInterval(interval)
+  }, [refresh])
 
   const { data: negotiations } = useGetList(
-    "contractnegotiations",
+    'contractnegotiations',
     {
-      filter: { "contractAgreement.id": record?.contractId },
+      filter: { 'contractAgreement.id': record?.contractId },
       pagination: { page: 1, perPage: 1 },
     },
     { enabled: !!record?.contractId },
-  );
+  )
 
-  const negotiation = negotiations?.[0];
-  const counterPartyAddress = negotiation?.counterPartyAddress;
-  const catalogId = btoa(counterPartyAddress);
-  const compositeId = `${catalogId}--${record?.assetId}`;
+  const negotiation = negotiations?.[0]
+  const counterPartyAddress = negotiation?.counterPartyAddress
+  const catalogId = btoa(counterPartyAddress)
+  const compositeId = `${catalogId}--${record?.assetId}`
 
-  const isConsumer = record?.transferDirection === "CONSUMER";
+  const isConsumer = record?.transferDirection === 'CONSUMER'
   const { data: dataset } = useGetOne<Dataset>(
-    "datasets",
+    'datasets',
     { id: compositeId },
     { enabled: isConsumer && !!compositeId },
-  );
-
+  )
 
   const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
-    setActiveTab(newValue);
-  };
+    setActiveTab(newValue)
+  }
 
   return (
     <Show actions={<TransferProcessesShowBar />}>
       <SimpleShowLayout>
+        <TextField label={translate('resources.transferprocesses.fields.id')} source="id" />
         <TextField
-          label={translate("resources.transferprocesses.fields.id")}
-          source="id"
-        />
-        <TextField
-          label={translate(
-            "resources.transferprocesses.fields.transferDirection",
-          )}
+          label={translate('resources.transferprocesses.fields.transferDirection')}
           source="transferDirection"
         />
-        <TextField
-          label={translate("resources.transferprocesses.fields.transferType")}
-          source="transferType"
-        />
+        <TextField label={translate('resources.transferprocesses.fields.transferType')} source="transferType" />
         <DateField
-          label={translate("resources.transferprocesses.fields.stateTimestamp")}
+          label={translate('resources.transferprocesses.fields.stateTimestamp')}
           source="stateTimestamp"
           showTime
         />
-        <TextField
-          label={translate("resources.transferprocesses.fields.state")}
-          source="state"
-        />
-        <TextField
-          label={translate("resources.transferprocesses.fields.correlationId")}
-          source="correlationId"
-        />
+        <TextField label={translate('resources.transferprocesses.fields.state')} source="state" />
+        <TextField label={translate('resources.transferprocesses.fields.correlationId')} source="correlationId" />
         {record?.errorDetail && (
-          <Labeled
-            label={translate("resources.transferprocesses.fields.errorDetail")}
-            fullWidth
-          >
+          <Labeled label={translate('resources.transferprocesses.fields.errorDetail')} fullWidth>
             <Alert severity="error">{record?.errorDetail}</Alert>
           </Labeled>
         )}
         <ReferenceField
-          label={translate("resources.transferprocesses.fields.contractId")}
+          label={translate('resources.transferprocesses.fields.contractId')}
           source="contractId"
           reference="contractagreements"
           link="show"
         >
           <TextField source="id" />
         </ReferenceField>
-        {record?.transferDirection === "CONSUMER" && counterPartyAddress && (
+        {record?.transferDirection === 'CONSUMER' && counterPartyAddress && (
           <ReferenceField
-            label={translate("resources.transferprocesses.fields.dataset")}
+            label={translate('resources.transferprocesses.fields.dataset')}
             record={{ ...record, assetId: compositeId }}
             reference="datasets"
             source="assetId"
@@ -245,9 +211,9 @@ export const TransferProcessesShow = () => {
             <TextField source="originalId" />
           </ReferenceField>
         )}
-        {record?.transferDirection === "PROVIDER" && (
+        {record?.transferDirection === 'PROVIDER' && (
           <ReferenceField
-            label={translate("resources.transferprocesses.fields.asset")}
+            label={translate('resources.transferprocesses.fields.asset')}
             reference="assets"
             source="assetId"
             link="show"
@@ -255,13 +221,11 @@ export const TransferProcessesShow = () => {
             <TextField source="id" />
           </ReferenceField>
         )}
-        {record?.transferType === "HttpData-PULL" &&
-          record?.transferDirection === "CONSUMER" &&
-          record?.state !== "TERMINATED" && (
+        {record?.transferType === 'HttpData-PULL' &&
+          record?.transferDirection === 'CONSUMER' &&
+          record?.state !== 'TERMINATED' && (
             <ReferenceField
-              label={translate(
-                "resources.transferprocesses.fields.dataRequest",
-              )}
+              label={translate('resources.transferprocesses.fields.dataRequest')}
               source="id"
               reference="datarequests"
               link="show"
@@ -272,7 +236,7 @@ export const TransferProcessesShow = () => {
 
         {isConsumer && dataset && (
           <Box>
-            <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
+            <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
               <Tabs
                 value={activeTab}
                 onChange={handleTabChange}
@@ -283,38 +247,32 @@ export const TransferProcessesShow = () => {
               >
                 <Tab
                   icon={<InfoIcon />}
-                  label={translate("resources.catalog.dataset.tabs.overview")}
+                  label={translate('resources.catalog.dataset.tabs.overview')}
                   aria-controls="dataset-overview-tab"
                 />
                 <Tab
                   icon={<AccountTreeIcon />}
-                  label={translate("resources.catalog.dataset.tabs.provenance")}
+                  label={translate('resources.catalog.dataset.tabs.provenance')}
                   aria-controls="dataset-provenance-tab"
                 />
                 <Tab
                   icon={<SecurityIcon />}
-                  label={translate(
-                    "resources.catalog.dataset.tabs.dataPrivacy",
-                  )}
+                  label={translate('resources.catalog.dataset.tabs.dataPrivacy')}
                   aria-controls="dataset-privacy-tab"
                 />
                 <Tab
                   icon={<AssessmentIcon />}
-                  label={translate(
-                    "resources.catalog.dataset.tabs.dataQuality",
-                  )}
+                  label={translate('resources.catalog.dataset.tabs.dataQuality')}
                   aria-controls="dataset-quality-tab"
                 />
                 <Tab
                   icon={<DevicesIcon />}
-                  label={translate("resources.assets.tabs.apiDescription")}
+                  label={translate('resources.assets.tabs.apiDescription')}
                   aria-controls="dataset-api-description"
                 />
                 <Tab
                   icon={<CloudIcon />}
-                  label={translate(
-                    "resources.catalog.dataset.tabs.serviceInfo",
-                  )}
+                  label={translate('resources.catalog.dataset.tabs.serviceInfo')}
                   aria-controls="dataset-service-tab"
                 />
               </Tabs>
@@ -336,5 +294,5 @@ export const TransferProcessesShow = () => {
         )}
       </SimpleShowLayout>
     </Show>
-  );
-};
+  )
+}

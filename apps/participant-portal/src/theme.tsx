@@ -1,13 +1,13 @@
-import { alpha, createTheme, PaletteOptions, Theme } from "@mui/material";
-import { merge } from "lodash";
-import type { ThemeLogoConfig, ThemeModeOverrides } from "./config";
+import { alpha, createTheme, PaletteOptions, Theme } from '@mui/material'
+import { merge } from 'lodash'
+import type { ThemeLogoConfig, ThemeModeOverrides } from './config'
 
 const componentsOverrides = (theme: Theme) => {
   const shadows = [
     alpha(theme.palette.primary.main, 0.2),
     alpha(theme.palette.primary.main, 0.1),
     alpha(theme.palette.primary.main, 0.05),
-  ];
+  ]
   return {
     MuiAppBar: {
       styleOverrides: {
@@ -24,7 +24,7 @@ const componentsOverrides = (theme: Theme) => {
     },
     MuiButton: {
       defaultProps: {
-        variant: "outlined" as const,
+        variant: 'outlined' as const,
       },
       styleOverrides: {
         sizeSmall: {
@@ -34,9 +34,9 @@ const componentsOverrides = (theme: Theme) => {
     },
     MuiFormControl: {
       defaultProps: {
-        variant: "outlined" as const,
-        margin: "dense" as const,
-        size: "small" as const,
+        variant: 'outlined' as const,
+        margin: 'dense' as const,
+        size: 'small' as const,
         fullWidth: true,
       },
     },
@@ -46,7 +46,7 @@ const componentsOverrides = (theme: Theme) => {
           boxShadow: `${shadows[0]} -2px 2px, ${shadows[1]} -4px 4px,${shadows[2]} -6px 6px`,
         },
         root: {
-          backgroundClip: "padding-box",
+          backgroundClip: 'padding-box',
         },
       },
     },
@@ -54,10 +54,10 @@ const componentsOverrides = (theme: Theme) => {
       styleOverrides: {
         root: {
           padding: theme.spacing(1.5),
-          "&.MuiTableCell-sizeSmall": {
+          '&.MuiTableCell-sizeSmall': {
             padding: theme.spacing(1),
           },
-          "&.MuiTableCell-paddingNone": {
+          '&.MuiTableCell-paddingNone': {
             padding: 0,
           },
         },
@@ -66,22 +66,22 @@ const componentsOverrides = (theme: Theme) => {
     MuiTableRow: {
       styleOverrides: {
         root: {
-          "&:last-child td": { border: 0 },
+          '&:last-child td': { border: 0 },
         },
       },
     },
     MuiTextField: {
       defaultProps: {
-        variant: "outlined" as const,
-        margin: "dense" as const,
-        size: "small" as const,
+        variant: 'outlined' as const,
+        margin: 'dense' as const,
+        size: 'small' as const,
         fullWidth: true,
       },
     },
     RaDatagrid: {
       styleOverrides: {
         root: {
-          "& .RaDatagrid-headerCell": {
+          '& .RaDatagrid-headerCell': {
             color: theme.palette.primary.main,
           },
         },
@@ -90,7 +90,7 @@ const componentsOverrides = (theme: Theme) => {
     RaFilterForm: {
       styleOverrides: {
         root: {
-          [theme.breakpoints.up("sm")]: {
+          [theme.breakpoints.up('sm')]: {
             minHeight: theme.spacing(6),
           },
         },
@@ -99,7 +99,7 @@ const componentsOverrides = (theme: Theme) => {
     RaLayout: {
       styleOverrides: {
         root: {
-          "& .RaLayout-appFrame": { marginTop: theme.spacing(5) },
+          '& .RaLayout-appFrame': { marginTop: theme.spacing(5) },
         },
       },
     },
@@ -107,14 +107,14 @@ const componentsOverrides = (theme: Theme) => {
       styleOverrides: {
         root: {
           borderLeft: `3px solid ${theme.palette.primary.contrastText}`,
-          "&:hover": {},
-          "&.RaMenuItemLink-active": {
+          '&:hover': {},
+          '&.RaMenuItemLink-active': {
             borderLeft: `3px solid ${theme.palette.primary.main}`,
             backgroundImage: `linear-gradient(98deg, ${theme.palette.primary.light}, ${theme.palette.primary.dark} 94%)`,
             boxShadow: theme.shadows[1],
             color: theme.palette.primary.contrastText,
 
-            "& .MuiSvgIcon-root": {
+            '& .MuiSvgIcon-root': {
               fill: theme.palette.primary.contrastText,
             },
           },
@@ -131,75 +131,71 @@ const componentsOverrides = (theme: Theme) => {
         fullWidth: true,
       },
     },
-  };
-};
+  }
+}
 
 const alertPalette = {
-  error: { main: "#E53935" },
-  warning: { main: "#FFB74D" },
-  info: { main: "#29B6F6" },
-  success: { main: "#66BB6A" },
-};
+  error: { main: '#E53935' },
+  warning: { main: '#FFB74D' },
+  info: { main: '#29B6F6' },
+  success: { main: '#66BB6A' },
+}
 
 const darkPalette: PaletteOptions = {
-  primary: { main: "#9055fd" },
-  secondary: { main: "#FF83F6" },
-  background: { default: "#110e1c", paper: "#151221" },
+  primary: { main: '#9055fd' },
+  secondary: { main: '#FF83F6' },
+  background: { default: '#110e1c', paper: '#151221' },
   ...alertPalette,
-  mode: "dark" as "dark",
-};
+  mode: 'dark' as 'dark',
+}
 
 const lightPalette: PaletteOptions = {
-  primary: { main: "#0043ce" },
-  secondary: { main: "#1D49B8" },
-  background: { default: "#ffffff" },
+  primary: { main: '#0043ce' },
+  secondary: { main: '#1D49B8' },
+  background: { default: '#ffffff' },
   text: {
-    primary: "#544f5a",
-    secondary: "#89868D",
+    primary: '#544f5a',
+    secondary: '#89868D',
   },
   ...alertPalette,
-  mode: "light" as "light",
-};
+  mode: 'light' as 'light',
+}
 
 const baseTypography = {
   h1: {
     fontWeight: 500,
-    fontSize: "6rem",
+    fontSize: '6rem',
   },
   h2: { fontWeight: 600 },
   h3: { fontWeight: 700 },
   h4: { fontWeight: 800 },
   h5: { fontWeight: 900 },
   button: { textTransform: undefined, fontWeight: 700 },
-};
+}
 
-export type ThemeMode = "light" | "dark";
+export type ThemeMode = 'light' | 'dark'
 
 const getThemeOverrides = (mode: ThemeMode): ThemeModeOverrides => {
-  if (typeof window === "undefined") {
-    return {};
+  if (typeof window === 'undefined') {
+    return {}
   }
 
-  return window.config.theme?.[mode] ?? {};
-};
+  return window.config.theme?.[mode] ?? {}
+}
 
 const createRadiantTheme = (mode: ThemeMode) => {
-  const overrides = getThemeOverrides(mode);
+  const overrides = getThemeOverrides(mode)
 
-  const palette = merge(
-    {},
-    mode === "light" ? lightPalette : darkPalette,
-    overrides.palette ?? {}
-  ) as PaletteOptions;
+  const palette = merge({}, mode === 'light' ? lightPalette : darkPalette, overrides.palette ?? {}) as PaletteOptions
 
-  palette.mode = mode;
+  palette.mode = mode
 
-  const typography = merge({}, baseTypography, overrides.typography ?? {});
+  const typography = merge({}, baseTypography, overrides.typography ?? {})
 
-  const shape = merge({}, { borderRadius: 0 }, overrides.shape ?? {});
+  const shape = merge({}, { borderRadius: 0 }, overrides.shape ?? {})
 
-  const sidebarWidth = overrides.sidebarWidth ?? 250;
-  const spacing = overrides.spacing ?? 10;
+  const sidebarWidth = overrides.sidebarWidth ?? 250
+  const spacing = overrides.spacing ?? 10
 
   const themeOptions = {
     palette,
@@ -207,22 +203,22 @@ const createRadiantTheme = (mode: ThemeMode) => {
     sidebar: { width: sidebarWidth },
     spacing,
     typography,
-  };
+  }
 
-  const theme = createTheme(themeOptions);
-  theme.components = componentsOverrides(theme);
-  return { theme, logo: overrides.logo };
-};
+  const theme = createTheme(themeOptions)
+  theme.components = componentsOverrides(theme)
+  return { theme, logo: overrides.logo }
+}
 
-const lightThemeResult = createRadiantTheme("light");
-const darkThemeResult = createRadiantTheme("dark");
+const lightThemeResult = createRadiantTheme('light')
+const darkThemeResult = createRadiantTheme('dark')
 
-export const theme = lightThemeResult.theme;
-export const darkTheme = darkThemeResult.theme;
+export const theme = lightThemeResult.theme
+export const darkTheme = darkThemeResult.theme
 
 const logoByMode: Record<ThemeMode, ThemeLogoConfig | undefined> = {
   light: lightThemeResult.logo,
   dark: darkThemeResult.logo,
-};
+}
 
-export const getThemeLogo = (mode: ThemeMode) => logoByMode[mode];
+export const getThemeLogo = (mode: ThemeMode) => logoByMode[mode]

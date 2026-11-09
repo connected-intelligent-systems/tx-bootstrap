@@ -1,4 +1,4 @@
-export { ContractDefinitionsList } from "./ContractDefinitionsList";
-export { ContractDefinitionCreate } from "./ContractDefinitionCreate";
-export { ContractDefinitionShow } from "./ContractDefinitionShow";
-export { ContractDefinitionEdit } from "./ContractDefinitionEdit";
+export { ContractDefinitionsList } from './ContractDefinitionsList'
+export { ContractDefinitionCreate } from './ContractDefinitionCreate'
+export { ContractDefinitionShow } from './ContractDefinitionShow'
+export { ContractDefinitionEdit } from './ContractDefinitionEdit'

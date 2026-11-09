@@ -6,56 +6,44 @@ import {
   required,
   useTranslate,
   useLocale,
-} from "react-admin";
-import { Typography } from "@mui/material";
-import { getCategoryIds } from "../../../../utils/categories";
-import { getMediaTypeChoices } from "../../../../utils/mediaTypes";
+} from 'react-admin'
+import { Typography } from '@mui/material'
+import { getCategoryIds } from '../../../../utils/categories'
+import { getMediaTypeChoices } from '../../../../utils/mediaTypes'
 
 export const BasicInformationStep = () => {
-  const translate = useTranslate();
-  const locale = useLocale();
+  const translate = useTranslate()
+  const locale = useLocale()
 
   const categoryChoices = getCategoryIds().map((id) => ({
     id,
-    name: translate(
-      `resources.assets.create.basicInformation.categories.${id.toLowerCase()}`
-    ),
-  }));
+    name: translate(`resources.assets.create.basicInformation.categories.${id.toLowerCase()}`),
+  }))
 
-  const mediaTypeChoices = getMediaTypeChoices(locale);
+  const mediaTypeChoices = getMediaTypeChoices(locale)
   return (
     <>
       <Typography variant="h6" gutterBottom>
-        {translate("resources.assets.create.basicInformation.title")}
+        {translate('resources.assets.create.basicInformation.title')}
       </Typography>
       <TextInput
         source="title"
-        label={translate(
-          "resources.assets.create.basicInformation.fields.title"
-        )}
-        helperText={translate(
-          "resources.assets.create.basicInformation.fields.titleHelper"
-        )}
+        label={translate('resources.assets.create.basicInformation.fields.title')}
+        helperText={translate('resources.assets.create.basicInformation.fields.titleHelper')}
         validate={required()}
         fullWidth
       />
       <TextInput
         source="abstract"
-        label={translate(
-          "resources.assets.create.basicInformation.fields.shortDescription"
-        )}
-        helperText={translate(
-          "resources.assets.create.basicInformation.fields.shortDescriptionHelper"
-        )}
+        label={translate('resources.assets.create.basicInformation.fields.shortDescription')}
+        helperText={translate('resources.assets.create.basicInformation.fields.shortDescriptionHelper')}
         validate={[
           required(),
           (value) => {
             if (value && value.length > 255) {
-              return translate(
-                "resources.assets.create.basicInformation.fields.shortDescriptionValidation"
-              );
+              return translate('resources.assets.create.basicInformation.fields.shortDescriptionValidation')
             }
-            return undefined;
+            return undefined
           },
         ]}
         fullWidth
@@ -64,45 +52,31 @@ export const BasicInformationStep = () => {
       />
       <ArrayInput
         source="keywords"
-        label={translate(
-          "resources.assets.create.basicInformation.fields.keywords"
-        )}
+        label={translate('resources.assets.create.basicInformation.fields.keywords')}
         sx={{ mt: 3 }}
       >
         <SimpleFormIterator>
           <TextInput
             source=""
-            label={translate(
-              "resources.assets.create.basicInformation.fields.keyword"
-            )}
-            helperText={translate(
-              "resources.assets.create.basicInformation.fields.keywordHelper"
-            )}
+            label={translate('resources.assets.create.basicInformation.fields.keyword')}
+            helperText={translate('resources.assets.create.basicInformation.fields.keywordHelper')}
           />
         </SimpleFormIterator>
       </ArrayInput>
       <AutocompleteInput
         source="theme.title"
-        label={translate(
-          "resources.assets.create.basicInformation.fields.category"
-        )}
-        helperText={translate(
-          "resources.assets.create.basicInformation.fields.categoryHelper"
-        )}
+        label={translate('resources.assets.create.basicInformation.fields.category')}
+        helperText={translate('resources.assets.create.basicInformation.fields.categoryHelper')}
         choices={categoryChoices}
         fullWidth
       />
       <AutocompleteInput
         source="mediaType"
-        label={translate(
-          "resources.assets.create.basicInformation.fields.mediaType"
-        )}
-        helperText={translate(
-          "resources.assets.create.basicInformation.fields.mediaTypeHelper"
-        )}
+        label={translate('resources.assets.create.basicInformation.fields.mediaType')}
+        helperText={translate('resources.assets.create.basicInformation.fields.mediaTypeHelper')}
         choices={mediaTypeChoices}
         fullWidth
       />
     </>
-  );
-};
+  )
+}

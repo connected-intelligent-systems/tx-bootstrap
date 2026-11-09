@@ -1,32 +1,19 @@
-import React, { useState, Suspense, useMemo } from "react";
-import type { ReactElement, ReactNode } from "react";
-import {
-  useTranslate,
-  RecordContextProvider,
-  Loading,
-  useGetOne,
-  useLocale,
-} from "react-admin";
-import { useParams } from "react-router-dom";
-import { Typography, Box, Tabs, Tab, Container, Paper } from "@mui/material";
-import InfoIcon from "@mui/icons-material/Info";
-import AccountTreeIcon from "@mui/icons-material/AccountTree";
-import SecurityIcon from "@mui/icons-material/Security";
-import AssessmentIcon from "@mui/icons-material/Assessment";
-import CloudIcon from "@mui/icons-material/Cloud";
-import DevicesIcon from "@mui/icons-material/Devices";
-import CodeIcon from "@mui/icons-material/Code";
-import { Dataset } from "../../../types/catalog";
-import {
-  Raw,
-  BasicInformation,
-  Provenance,
-  DataPrivacy,
-  DataQuality,
-  ApiDescription,
-} from "../../../components/assets";
-import { ServiceInformation } from "../../../components/datasets";
-import { getTitleValue } from "../../../utils/multiLanguageUtils";
+import React, { useState, Suspense, useMemo } from 'react'
+import type { ReactElement, ReactNode } from 'react'
+import { useTranslate, RecordContextProvider, Loading, useGetOne, useLocale } from 'react-admin'
+import { useParams } from 'react-router-dom'
+import { Typography, Box, Tabs, Tab, Container, Paper } from '@mui/material'
+import InfoIcon from '@mui/icons-material/Info'
+import AccountTreeIcon from '@mui/icons-material/AccountTree'
+import SecurityIcon from '@mui/icons-material/Security'
+import AssessmentIcon from '@mui/icons-material/Assessment'
+import CloudIcon from '@mui/icons-material/Cloud'
+import DevicesIcon from '@mui/icons-material/Devices'
+import CodeIcon from '@mui/icons-material/Code'
+import { Dataset } from '../../../types/catalog'
+import { Raw, BasicInformation, Provenance, DataPrivacy, DataQuality, ApiDescription } from '../../../components/assets'
+import { ServiceInformation } from '../../../components/datasets'
+import { getTitleValue } from '../../../utils/multiLanguageUtils'
 
 const hasBasicInformation = (dataset: any) => {
   return !!(
@@ -38,175 +25,166 @@ const hasBasicInformation = (dataset: any) => {
     dataset?.created ||
     dataset?.modified ||
     dataset?.abstract
-  );
-};
+  )
+}
 
 const hasProvenance = (dataset: any) => {
   return !!(
     dataset?.provenance?.derivedFromId ||
     dataset?.provenance?.generatedByDescription ||
     dataset?.provenance?.attributedToId
-  );
-};
+  )
+}
 
 const hasDataPrivacy = (dataset: any) => {
   return !!(
     dataset?.privacySettings?.personalDataHandling &&
     Array.isArray(dataset.privacySettings.personalDataHandling) &&
     dataset.privacySettings.personalDataHandling.length > 0
-  );
-};
+  )
+}
 
 const hasDataQuality = (dataset: any) => {
   return !!(
     dataset?.qualityMeasurements &&
     Array.isArray(dataset.qualityMeasurements) &&
     dataset.qualityMeasurements.length > 0
-  );
-};
+  )
+}
 
 const hasServiceInformation = (dataset: any) => {
-  return !!(
-    dataset?.distributions &&
-    Array.isArray(dataset.distributions) &&
-    dataset.distributions.length > 0
-  );
-};
+  return !!(dataset?.distributions && Array.isArray(dataset.distributions) && dataset.distributions.length > 0)
+}
 
 const hasApiDescription = (dataset: any) => {
-  return !!dataset?.apiDescription;
-};
+  return !!dataset?.apiDescription
+}
 
 const hasRaw = (dataset: any) => {
-  return !!dataset?.raw;
-};
+  return !!dataset?.raw
+}
 
 interface TabConfig {
-  id: string;
-  icon: ReactElement;
-  label: string;
-  ariaControls: string;
-  component: ReactNode;
+  id: string
+  icon: ReactElement
+  label: string
+  ariaControls: string
+  component: ReactNode
 }
 
 export const DatasetShow = () => {
-  const [activeTab, setActiveTab] = useState(0);
-  const translate = useTranslate();
-  const locale = useLocale();
+  const [activeTab, setActiveTab] = useState(0)
+  const translate = useTranslate()
+  const locale = useLocale()
   const { catalogId, datasetId } = useParams<{
-    catalogId: string;
-    datasetId: string;
-  }>();
+    catalogId: string
+    datasetId: string
+  }>()
 
   // Construct composite ID for data provider
-  const compositeId =
-    catalogId && datasetId ? `${catalogId}--${datasetId}` : "";
+  const compositeId = catalogId && datasetId ? `${catalogId}--${datasetId}` : ''
 
   // Use react-admin's data fetching pattern
   const {
     data: dataset,
     isPending,
     error,
-  } = useGetOne<Dataset>(
-    "datasets",
-    { id: compositeId },
-    { enabled: !!compositeId }
-  );
+  } = useGetOne<Dataset>('datasets', { id: compositeId }, { enabled: !!compositeId })
 
   const visibleTabs = useMemo(() => {
-    if (!dataset) return [];
+    if (!dataset) return []
 
-    const allTabs: TabConfig[] = [];
+    const allTabs: TabConfig[] = []
 
     if (hasBasicInformation(dataset)) {
       allTabs.push({
-        id: "overview",
+        id: 'overview',
         icon: <InfoIcon />,
-        label: translate("resources.catalog.dataset.tabs.overview"),
-        ariaControls: "dataset-overview-tab",
+        label: translate('resources.catalog.dataset.tabs.overview'),
+        ariaControls: 'dataset-overview-tab',
         component: <BasicInformation />,
-      });
+      })
     }
 
     if (hasProvenance(dataset)) {
       allTabs.push({
-        id: "provenance",
+        id: 'provenance',
         icon: <AccountTreeIcon />,
-        label: translate("resources.catalog.dataset.tabs.provenance"),
-        ariaControls: "dataset-provenance-tab",
+        label: translate('resources.catalog.dataset.tabs.provenance'),
+        ariaControls: 'dataset-provenance-tab',
         component: <Provenance />,
-      });
+      })
     }
 
     if (hasDataPrivacy(dataset)) {
       allTabs.push({
-        id: "privacy",
+        id: 'privacy',
         icon: <SecurityIcon />,
-        label: translate("resources.catalog.dataset.tabs.dataPrivacy"),
-        ariaControls: "dataset-privacy-tab",
+        label: translate('resources.catalog.dataset.tabs.dataPrivacy'),
+        ariaControls: 'dataset-privacy-tab',
         component: <DataPrivacy />,
-      });
+      })
     }
 
     if (hasDataQuality(dataset)) {
       allTabs.push({
-        id: "quality",
+        id: 'quality',
         icon: <AssessmentIcon />,
-        label: translate("resources.catalog.dataset.tabs.dataQuality"),
-        ariaControls: "dataset-quality-tab",
+        label: translate('resources.catalog.dataset.tabs.dataQuality'),
+        ariaControls: 'dataset-quality-tab',
         component: <DataQuality />,
-      });
+      })
     }
 
     if (hasServiceInformation(dataset)) {
       allTabs.push({
-        id: "service-info",
+        id: 'service-info',
         icon: <CloudIcon />,
-        label: translate("resources.catalog.dataset.tabs.serviceInfo"),
-        ariaControls: "dataset-service-tab",
+        label: translate('resources.catalog.dataset.tabs.serviceInfo'),
+        ariaControls: 'dataset-service-tab',
         component: <ServiceInformation dataset={dataset} />,
-      });
+      })
     }
 
     if (hasApiDescription(dataset)) {
       allTabs.push({
-        id: "api-description",
+        id: 'api-description',
         icon: <DevicesIcon />,
-        label: translate("resources.assets.tabs.apiDescription"),
-        ariaControls: "dataset-api-description",
+        label: translate('resources.assets.tabs.apiDescription'),
+        ariaControls: 'dataset-api-description',
         component: <ApiDescription />,
-      });
+      })
     }
 
     if (hasRaw(dataset)) {
       allTabs.push({
-        id: "raw",
+        id: 'raw',
         icon: <CodeIcon />,
-        label: translate("resources.catalog.dataset.tabs.raw"),
-        ariaControls: "dataset-raw",
+        label: translate('resources.catalog.dataset.tabs.raw'),
+        ariaControls: 'dataset-raw',
         component: <Raw />,
-      });
+      })
     }
 
-    return allTabs;
-  }, [dataset, translate]);
+    return allTabs
+  }, [dataset, translate])
 
   const handleTabChange = (_: React.SyntheticEvent, newValue: number) => {
-    setActiveTab(newValue);
-  };
+    setActiveTab(newValue)
+  }
 
   if (isPending) {
-    return <Loading />;
+    return <Loading />
   }
 
   if (error || !dataset) {
     return (
       <Container>
         <Typography variant="h6" color="error">
-          {error ? `Error: ${error.message}` : "Dataset not found"}
+          {error ? `Error: ${error.message}` : 'Dataset not found'}
         </Typography>
       </Container>
-    );
+    )
   }
 
   return (
@@ -216,17 +194,13 @@ export const DatasetShow = () => {
           <Typography variant="h4" gutterBottom>
             {getTitleValue(dataset?.titles, dataset?.title, locale) ||
               dataset?.name ||
-              translate("resources.datasets.unnamedDataset")}
+              translate('resources.datasets.unnamedDataset')}
           </Typography>
           <Typography variant="caption" color="text.secondary">
             ID: {dataset?.originalId || dataset?.id}
           </Typography>
           {dataset?.catalogUrl && (
-            <Typography
-              variant="caption"
-              color="text.secondary"
-              sx={{ display: "block" }}
-            >
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
               Catalog: {dataset.catalogUrl}
             </Typography>
           )}
@@ -235,7 +209,7 @@ export const DatasetShow = () => {
         <Box sx={{ mt: 3 }}>
           {visibleTabs.length > 0 ? (
             <>
-              <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
+              <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
                 <Tabs
                   value={activeTab}
                   onChange={handleTabChange}
@@ -245,12 +219,7 @@ export const DatasetShow = () => {
                   allowScrollButtonsMobile
                 >
                   {visibleTabs.map((tab) => (
-                    <Tab
-                      key={tab.id}
-                      icon={tab.icon}
-                      label={tab.label}
-                      aria-controls={tab.ariaControls}
-                    />
+                    <Tab key={tab.id} icon={tab.icon} label={tab.label} aria-controls={tab.ariaControls} />
                   ))}
                 </Tabs>
               </Box>
@@ -259,12 +228,7 @@ export const DatasetShow = () => {
                 <Suspense fallback={<div>Loading...</div>}>
                   <RecordContextProvider value={dataset}>
                     {visibleTabs.map((tab, index) => (
-                      <div
-                        key={tab.id}
-                        id={tab.ariaControls}
-                        role="tabpanel"
-                        hidden={activeTab !== index}
-                      >
+                      <div key={tab.id} id={tab.ariaControls} role="tabpanel" hidden={activeTab !== index}>
                         {activeTab === index && tab.component}
                       </div>
                     ))}
@@ -280,5 +244,5 @@ export const DatasetShow = () => {
         </Box>
       </Paper>
     </Container>
-  );
-};
+  )
+}

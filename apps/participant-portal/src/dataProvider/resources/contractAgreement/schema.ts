@@ -1,44 +1,42 @@
-import { z } from "zod";
+import { z } from 'zod'
 
 export const CoreContractAgreementSchema = z.object({
-  "@id": z.string(),
-  "@type": z.string(),
+  '@id': z.string(),
+  '@type': z.string(),
   providerId: z.string(),
   consumerId: z.string(),
   assetId: z.string(),
-  contractSigningDate: z
-    .number()
-    .transform((val) => new Date(val * 1000).toISOString()),
+  contractSigningDate: z.number().transform((val) => new Date(val * 1000).toISOString()),
   policy: z.any(),
-});
+})
 
 export const frame = {
-  "@context": {
-    "@vocab": "https://w3id.org/edc/v0.0.1/ns/",
-    odrl: "http://www.w3.org/ns/odrl/2/",
+  '@context': {
+    '@vocab': 'https://w3id.org/edc/v0.0.1/ns/',
+    odrl: 'http://www.w3.org/ns/odrl/2/',
   },
-  "@type": "ContractAgreement",
-};
+  '@type': 'ContractAgreement',
+}
 
 export const filterMapping = (key: string, value: any) => {
   switch (key) {
-    case "consumerId":
+    case 'consumerId':
       return {
-        field: "consumerId",
-        operator: "like",
+        field: 'consumerId',
+        operator: 'like',
         value: `%${value}%`,
-      };
-    case "providerId":
+      }
+    case 'providerId':
       return {
-        field: "providerId",
-        operator: "like",
+        field: 'providerId',
+        operator: 'like',
         value: `%${value}%`,
-      };
+      }
     default:
       return {
         field: key,
-        operator: "=",
+        operator: '=',
         value,
-      };
+      }
   }
-};
+}

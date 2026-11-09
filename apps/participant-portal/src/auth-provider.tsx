@@ -1,9 +1,9 @@
-import { AuthProvider } from "react-admin";
+import { AuthProvider } from 'react-admin'
 
 async function fetchUserInfo() {
-  const response = await fetch("/api/portal/userinfo");
-  const userInfo = await response.json();
-  return userInfo;
+  const response = await fetch('/api/portal/userinfo')
+  const userInfo = await response.json()
+  return userInfo
 }
 
 const authProvider: AuthProvider = {
@@ -13,6 +13,6 @@ const authProvider: AuthProvider = {
   getIdentity: () => fetchUserInfo(),
   getPermissions: () => Promise.resolve(),
   logout: () => Promise.resolve(),
-};
+}
 
-export default authProvider;
+export default authProvider
