@@ -140,6 +140,13 @@ as its credential service, which participants call to request credentials.
 Set `ISSUER_ISSUANCE_URL` in Compose if the issuer is published under another
 public URL.
 
+Credentials advertise the public issuer's `/statuslist` endpoint for revocation
+checks. In Compose, `ISSUER_STATUSLIST_CALLBACK_ADDRESS` overrides that URL;
+Helm derives it from `identity.issuerDidHost` and `identity.useHttpsDidWeb`.
+Every participant must be able to reach it. Existing credentials and status
+lists retain their original addresses; keep those endpoints reachable until
+the credentials and their status lists have been replaced.
+
 The local demo uses loopback-only administrative ports with `network` auth
 mode. Use authenticated access for non-local deployments.
 

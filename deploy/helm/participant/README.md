@@ -68,6 +68,11 @@ The [participant guide](../../../docs/participant.md#api-access) covers API
 clients, scopes, and the OpenAPI contract. Keep HTTPS headers enabled outside
 HTTP-only local environments.
 
+Preview, download, and application data proxy requests require public network
+addresses by default. For private participant endpoints, explicitly list their
+hostnames in `portal.preview.allowedPrivateHosts` (preview and download) and
+`portal.dataProxy.allowedPrivateHosts` (application data proxy).
+
 ## Install
 
 From the repository root, validate your settings:

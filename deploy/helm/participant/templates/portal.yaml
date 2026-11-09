@@ -79,6 +79,8 @@ spec:
               value: {{ .Values.portal.rateLimit.window | quote }}
             - name: PARTICIPANT_PORTAL_UPSTREAM_TIMEOUT_MS
               value: {{ .Values.portal.upstreamTimeoutMs | quote }}
+            - name: PARTICIPANT_PORTAL_PREVIEW_ALLOWED_PRIVATE_HOSTS
+              value: {{ join "," .Values.portal.preview.allowedPrivateHosts | quote }}
             - name: PARTICIPANT_PORTAL_DATA_PROXY_TIMEOUT_MS
               value: {{ .Values.portal.dataProxy.timeoutMs | quote }}
             - name: PARTICIPANT_PORTAL_DATA_PROXY_MAX_REQUEST_BYTES

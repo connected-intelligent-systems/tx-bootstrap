@@ -53,6 +53,14 @@ portal:
   title: Portal - Consumer
   name: Local Consumer
   httpsHeaders: false
+  preview:
+    allowedPrivateHosts:
+      - provider.__INGRESS_IP__.nip.io
+      - consumer.__INGRESS_IP__.nip.io
+  dataProxy:
+    allowedPrivateHosts:
+      - provider.__INGRESS_IP__.nip.io
+      - consumer.__INGRESS_IP__.nip.io
   auth:
     mode: none
     allowInsecure: true

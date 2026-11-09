@@ -64,7 +64,7 @@ spec:
             - { name: EDC_IAM_CREDENTIAL_REVOCATION_MIMETYPE, value: application/json }
             - { name: EDC_ISSUER_STATUSLIST_SIGNING_KEY_ALIAS, value: default }
             - name: EDC_STATUSLIST_CALLBACK_ADDRESS
-              value: "http://{{ include "tx-bootstrap-operator.componentName" (dict "root" . "component" "issuer-did") }}/statuslist"
+              value: "{{ include "tx-bootstrap-operator.issuerPublicUrl" . }}/statuslist"
             - name: EDC_ENCRYPTION_AES_KEY_ALIAS
               value: {{ .Values.issuerService.encryptionKeyAlias | quote }}
             - name: EDC_ENCRYPTION_STRICT
