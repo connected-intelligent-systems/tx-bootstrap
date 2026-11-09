@@ -31,3 +31,6 @@ class Settings:
     sparql_max_results: int = _int("SPARQL_MAX_RESULTS", 1000)
     sparql_max_query_bytes: int = _int("SPARQL_MAX_QUERY_BYTES", 65_536)
     sparql_max_response_bytes: int = _int("SPARQL_MAX_RESPONSE_BYTES", 5_242_880)
+    # "required" refuses to run SPARQL without the Linux seccomp network sandbox.
+    # "best-effort" is only meant for local development on other platforms.
+    sparql_sandbox: str = os.getenv("SPARQL_NETWORK_SANDBOX", "required")

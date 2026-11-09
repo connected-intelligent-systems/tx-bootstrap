@@ -17,7 +17,7 @@ from typing import Any
 from pyoxigraph import Literal, NamedNode, Quad, RdfFormat, Store, parse
 
 from .models import CrawlStatus, DatasetRecord, parse_time, utc_now
-from .query_worker import run_query
+from .query_worker import SANDBOX_REQUIRED, run_query
 
 BASE = "urn:tx-bootstrap:federated-catalog:"
 CONTROL_GRAPH = NamedNode(BASE + "control")
@@ -273,8 +273,9 @@ class CatalogStore:
         max_bytes: int,
         *,
         timeout_seconds: float = 30,
+        sandbox: str = SANDBOX_REQUIRED,
     ) -> tuple[bytes, str]:
-        """Evaluate user SPARQL in a killable child process."""
+        """Evaluate user SPARQL in a killable, network-sandboxed child process."""
         with self.lock:
             active = [live_graph(status.participant.bpn).value for status in self.statuses() if status.active]
         with self.snapshots.acquire() as snapshot:
@@ -287,6 +288,7 @@ class CatalogStore:
                 max_results=max_results,
                 max_bytes=max_bytes,
                 timeout_seconds=timeout_seconds,
+                sandbox=sandbox,
             )
 
 
@@ -347,12 +349,23 @@ class QuerySnapshots:
             shutil.rmtree(path, ignore_errors=True)
 
 
-_DANGEROUS = re.compile(r"\b(SERVICE|INSERT|DELETE|LOAD|CLEAR|CREATE|DROP|COPY|MOVE|ADD|WITH)\b", re.I)
-_FORM = re.compile(r"\b(SELECT|ASK|CONSTRUCT|DESCRIBE)\b", re.I)
-_LIMIT = re.compile(r"\bLIMIT\s+(\d+)\b", re.I)
+# SPARQL keywords that must not appear outside literals, IRIs, and comments.
+# Variables such as ?add or $with are not keywords.
+_DANGEROUS = re.compile(r"(?<![?$\w])(SERVICE|INSERT|DELETE|LOAD|CLEAR|CREATE|DROP|COPY|MOVE|ADD|WITH)\b", re.I)
+_FORM = re.compile(r"(?<![?$\w])(SELECT|ASK|CONSTRUCT|DESCRIBE)\b", re.I)
+_LIMIT = re.compile(r"(?<![?$\w])LIMIT\s+(\d+)\b", re.I)
+# SPARQL 1.1 IRIREF terminal. A "<" that does not start one is the less-than operator.
+_IRIREF = re.compile(r'<[^<>"{}|^`\\\x00-\x20]*>')
 
 
 def validate_query(query: str, max_results: int) -> str:
+    """Reject obviously unsupported queries early with a helpful message.
+
+    This is a usability filter, not the security boundary: SPARQL's "<" is
+    ambiguous between an IRI and less-than, so text inspection cannot exactly
+    mirror Oxigraph's parser. SERVICE is contained by the query process
+    sandbox and runaway queries by its kill-on-timeout (see query_worker).
+    """
     scrubbed = _scrub_literals_iris_comments(query)
     if _DANGEROUS.search(scrubbed):
         raise ValueError("SPARQL updates and SERVICE clauses are not allowed")
@@ -370,51 +383,53 @@ def validate_query(query: str, max_results: int) -> str:
 
 
 def _scrub_literals_iris_comments(value: str) -> str:
-    result = list(value)
+    """Blank out comments, string literals, and IRIs following SPARQL's lexical rules."""
+    result: list[str] = []
     index = 0
-    while index < len(result):
-        char = result[index]
+    length = len(value)
+    while index < length:
+        char = value[index]
         if char == "#":
-            while index < len(result) and result[index] not in "\r\n":
-                result[index] = " "
-                index += 1
+            end = index
+            while end < length and value[end] not in "\r\n":
+                end += 1
+            result.append(" " * (end - index))
+            index = end
             continue
         if char == "<":
-            result[index] = " "
-            index += 1
-            while index < len(result):
-                next_char = result[index]
-                result[index] = " "
+            match = _IRIREF.match(value, index)
+            if match:
+                result.append(" " * (match.end() - index))
+                index = match.end()
+            else:
+                result.append(char)
                 index += 1
-                if next_char == ">":
-                    break
             continue
         if char in {'"', "'"}:
-            quote = char
-            triple = "".join(result[index : index + 3]) == quote * 3
-            count = 3 if triple else 1
-            for _ in range(count):
-                result[index] = " "
-                index += 1
-            while index < len(result):
-                if result[index] == "\\":
-                    result[index] = " "
-                    index += 1
-                    if index < len(result):
-                        result[index] = " "
-                        index += 1
-                    continue
-                if triple and "".join(result[index : index + 3]) == quote * 3:
-                    for _ in range(3):
-                        result[index] = " "
-                        index += 1
-                    break
-                if not triple and result[index] == quote:
-                    result[index] = " "
-                    index += 1
-                    break
-                result[index] = " "
-                index += 1
+            end = _string_end(value, index)
+            result.append(" " * (end - index))
+            index = end
             continue
+        result.append(char)
         index += 1
     return "".join(result)
+
+
+def _string_end(value: str, start: int) -> int:
+    quote = value[start]
+    long_string = value.startswith(quote * 3, start)
+    index = start + (3 if long_string else 1)
+    while index < len(value):
+        char = value[index]
+        if char == "\\":
+            index += 2
+            continue
+        if long_string and value.startswith(quote * 3, index):
+            return index + 3
+        if not long_string:
+            if char == quote:
+                return index + 1
+            if char in "\r\n":
+                raise ValueError("Unterminated SPARQL string literal")
+        index += 1
+    raise ValueError("Unterminated SPARQL string literal")

@@ -128,6 +128,7 @@ def create_app(
                     configured.sparql_max_results,
                     configured.sparql_max_response_bytes,
                     timeout_seconds=configured.sparql_timeout_seconds,
+                    sandbox=configured.sparql_sandbox,
                 )
             except QueryTimeoutError as error:
                 raise HTTPException(status_code=504, detail="SPARQL query timed out") from error

@@ -31,6 +31,12 @@ the store, written to `FEDERATED_CATALOG_SNAPSHOT_PATH` (default
 checkpoints are hard links. A query that exceeds `SPARQL_TIMEOUT_SECONDS` is
 killed.
 
+On Linux the query process installs a seccomp filter that blocks all network
+sockets before evaluation, so `SERVICE` clauses cannot reach other hosts even
+if they get past the query validator. With the default
+`SPARQL_NETWORK_SANDBOX=required`, queries fail if the filter cannot be
+installed. Set `best-effort` only for local development on other platforms.
+
 ## Development
 
 From the repository root:
