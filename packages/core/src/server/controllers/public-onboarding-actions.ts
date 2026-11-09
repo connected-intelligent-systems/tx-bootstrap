@@ -143,9 +143,10 @@ export function createPublicOnboardingActions({
       throw new BadRequestError("Email is required");
     }
 
-    // Query case by ID and verify email matches
-    const result = await pool.query<OnboardingCaseRow>(
-      "SELECT c.* FROM onboarding_cases c JOIN business_partners bp ON c.business_partner_id = bp.id WHERE c.id = $1 AND LOWER(bp.contact_email) = $2",
+    const result = await pool.query<
+      Pick<OnboardingCaseRow, "id" | "organization_name" | "contact_email">
+    >(
+      "SELECT * FROM onboarding_public_get_token_recovery_case($1::uuid, $2::text)",
       [caseId, email],
     );
 
@@ -160,14 +161,9 @@ export function createPublicOnboardingActions({
 
     const row = result.rows[0];
 
-    // Generate new token and update hash
+    // Keep the previous secret usable until the replacement email is sent.
     const newToken = randomToken();
     const newTokenHash = hashToken(newToken);
-
-    await pool.query(
-      "UPDATE onboarding_cases SET participant_token_hash = $1, updated_at = NOW() WHERE id = $2",
-      [newTokenHash, caseId],
-    );
     // Send email with rotated registration token
     const registrationToken = encodeRegistrationToken({
       caseId,
@@ -180,12 +176,18 @@ export function createPublicOnboardingActions({
       statusUrl,
     });
 
-    await emailService.sendEmail({
-      to: email,
+    const sent = await emailService.sendEmail({
+      to: row.contact_email,
       subject: emailContent.subject,
       text: emailContent.text,
       html: emailContent.html,
     });
+    if (sent) {
+      await pool.query(
+        "SELECT * FROM onboarding_public_rotate_participant_token($1::uuid, $2::text, $3::text)",
+        [caseId, email, newTokenHash],
+      );
+    }
 
     sendJson(response, 200, {
       message:

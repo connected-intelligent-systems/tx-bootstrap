@@ -8,6 +8,13 @@ source "$SCRIPT_DIR/lib.sh"
 require_commands helm kubectl
 check_context
 
+helm_major="$(helm version --template '{{.Version}}' | sed -E 's/^v([0-9]+).*/\1/')"
+helm_wait_flags=(--wait)
+if [ "$helm_major" -ge 4 ]; then
+    # Match install-apps.sh: Helm 4's watcher can stall on deleted resources.
+    helm_wait_flags=(--wait=legacy)
+fi
+
 remove_volumes=false
 if [ "${1:-}" = "--volumes" ]; then
     remove_volumes=true
@@ -25,14 +32,14 @@ for release_namespace in \
     helm --kube-context "$KUBE_CONTEXT" uninstall "$release" \
         --namespace "$namespace" \
         --ignore-not-found \
-        --wait
+        "${helm_wait_flags[@]}"
 done
 
 if [ "$remove_volumes" = "true" ]; then
     helm --kube-context "$KUBE_CONTEXT" uninstall vault \
         --namespace tx-infra \
         --ignore-not-found \
-        --wait
+        "${helm_wait_flags[@]}"
     kubectl --context "$KUBE_CONTEXT" delete namespace \
         tx-operator tx-provider tx-consumer tx-infra \
         --ignore-not-found \
@@ -40,7 +47,7 @@ if [ "$remove_volumes" = "true" ]; then
     helm --kube-context "$KUBE_CONTEXT" uninstall cnpg \
         --namespace cnpg-system \
         --ignore-not-found \
-        --wait
+        "${helm_wait_flags[@]}"
     kubectl --context "$KUBE_CONTEXT" delete namespace cnpg-system \
         --ignore-not-found \
         --wait=true

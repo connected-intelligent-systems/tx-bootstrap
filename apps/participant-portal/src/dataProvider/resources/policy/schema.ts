@@ -1,3 +1,3 @@
-import { z } from "zod";
+import { z } from 'zod'
 
-export const CorePolicySchema = z.object({}).passthrough();
+export const CorePolicySchema = z.object({}).passthrough()

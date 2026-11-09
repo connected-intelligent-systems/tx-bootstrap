@@ -1,8 +1,8 @@
 export interface DataConsumerPull {
-  id: string;
-  type: string;
-  transferProcessId: string;
-  state: string;
-  createdAt: string;
-  updatedAt: string;
+  id: string
+  type: string
+  transferProcessId: string
+  state: string
+  createdAt: string
+  updatedAt: string
 }

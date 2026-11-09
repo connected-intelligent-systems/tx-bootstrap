@@ -1,27 +1,20 @@
-import { Datagrid, Labeled, TextField, useTranslate } from "react-admin";
-import { Typography, Box } from "@mui/material";
-import { EnsureArrayField } from "../EnsureArrayField";
+import { Datagrid, Labeled, TextField, useTranslate } from 'react-admin'
+import { Typography, Box } from '@mui/material'
+import { EnsureArrayField } from '../EnsureArrayField'
 
 export const DataQuality = () => {
-  const translate = useTranslate();
+  const translate = useTranslate()
 
   return (
     <Box>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-        {translate("resources.assets.tabs.dataQualityTab.shortDescription")}
+        {translate('resources.assets.tabs.dataQualityTab.shortDescription')}
       </Typography>
 
-      <Labeled
-        fullWidth
-        label={translate(
-          "resources.assets.tabs.dataQualityTab.qualityMeasurements"
-        )}
-      >
+      <Labeled fullWidth label={translate('resources.assets.tabs.dataQualityTab.qualityMeasurements')}>
         <EnsureArrayField
           source="qualityMeasurements"
-          emptyText={translate(
-            "resources.assets.tabs.dataQualityTab.noQualityMeasurements"
-          )}
+          emptyText={translate('resources.assets.tabs.dataQualityTab.noQualityMeasurements')}
         >
           <Datagrid
             bulkActionButtons={false}
@@ -29,31 +22,27 @@ export const DataQuality = () => {
             size="small"
             hover={false}
             sx={{
-              "& .MuiTableCell-root": {
-                whiteSpace: "normal",
-                wordBreak: "break-word",
+              '& .MuiTableCell-root': {
+                whiteSpace: 'normal',
+                wordBreak: 'break-word',
               },
             }}
           >
             <TextField
               source="measurementOf.title"
-              label={translate(
-                "resources.assets.tabs.dataQualityTab.measurement"
-              )}
+              label={translate('resources.assets.tabs.dataQualityTab.measurement')}
               emptyText="-"
               sortable={false}
             />
             <TextField
               source="value"
-              label={translate("resources.assets.tabs.dataQualityTab.value")}
+              label={translate('resources.assets.tabs.dataQualityTab.value')}
               emptyText="-"
               sortable={false}
             />
             <TextField
               source="description"
-              label={translate(
-                "resources.assets.tabs.dataQualityTab.measurementDescription"
-              )}
+              label={translate('resources.assets.tabs.dataQualityTab.measurementDescription')}
               emptyText="-"
               sortable={false}
             />
@@ -61,5 +50,5 @@ export const DataQuality = () => {
         </EnsureArrayField>
       </Labeled>
     </Box>
-  );
-};
+  )
+}

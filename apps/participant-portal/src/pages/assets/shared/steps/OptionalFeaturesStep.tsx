@@ -1,6 +1,6 @@
-import { useState, type ReactNode, type SyntheticEvent } from "react";
-import { Box, Tabs, Tab } from "@mui/material";
-import { useTranslate } from "react-admin";
+import { useState, type ReactNode, type SyntheticEvent } from 'react'
+import { Box, Tabs, Tab } from '@mui/material'
+import { useTranslate } from 'react-admin'
 import {
   VersioningTab,
   DetailedDescriptionTab,
@@ -8,12 +8,12 @@ import {
   DataPrivacyTab,
   DataQualityTab,
   ApiDescriptionTab,
-} from "../tabs";
+} from '../tabs'
 
 interface TabPanelProps {
-  children?: ReactNode;
-  index: number;
-  value: number;
+  children?: ReactNode
+  index: number
+  value: number
 }
 
 const TabPanel = ({ children, value, index }: TabPanelProps) => {
@@ -26,20 +26,20 @@ const TabPanel = ({ children, value, index }: TabPanelProps) => {
     >
       {value === index && <Box sx={{ py: 3 }}>{children}</Box>}
     </div>
-  );
-};
+  )
+}
 
 export const OptionalFeaturesStep = () => {
-  const [activeTab, setActiveTab] = useState(0);
-  const translate = useTranslate();
+  const [activeTab, setActiveTab] = useState(0)
+  const translate = useTranslate()
 
   const handleTabChange = (_event: SyntheticEvent, newValue: number) => {
-    setActiveTab(newValue);
-  };
+    setActiveTab(newValue)
+  }
 
   return (
-    <Box sx={{ width: "100%" }}>
-      <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
+    <Box sx={{ width: '100%' }}>
+      <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
         <Tabs
           value={activeTab}
           onChange={handleTabChange}
@@ -47,18 +47,12 @@ export const OptionalFeaturesStep = () => {
           variant="scrollable"
           scrollButtons="auto"
         >
-          <Tab label={translate("resources.assets.create.tabs.versioning")} />
-          <Tab
-            label={translate(
-              "resources.assets.create.tabs.detailedDescription"
-            )}
-          />
-          <Tab label={translate("resources.assets.create.tabs.provenance")} />
-          <Tab label={translate("resources.assets.create.tabs.dataPrivacy")} />
-          <Tab label={translate("resources.assets.create.tabs.dataQuality")} />
-          <Tab
-            label={translate("resources.assets.create.tabs.apiDescription")}
-          />
+          <Tab label={translate('resources.assets.create.tabs.versioning')} />
+          <Tab label={translate('resources.assets.create.tabs.detailedDescription')} />
+          <Tab label={translate('resources.assets.create.tabs.provenance')} />
+          <Tab label={translate('resources.assets.create.tabs.dataPrivacy')} />
+          <Tab label={translate('resources.assets.create.tabs.dataQuality')} />
+          <Tab label={translate('resources.assets.create.tabs.apiDescription')} />
         </Tabs>
       </Box>
 
@@ -81,5 +75,5 @@ export const OptionalFeaturesStep = () => {
         <ApiDescriptionTab />
       </TabPanel>
     </Box>
-  );
-};
+  )
+}

@@ -36,6 +36,11 @@ the [Compose application](../deploy/README.md) or
 
 The participant guide covers [the participant's steps](participant.md#onboarding).
 
+An invitation can be rejected before connector setup is queued. Once setup
+is queued, use **Revoke** instead: directory or issuer access may already
+exist, including after a failed setup attempt. Rejection and the setup
+worker's claim cannot take effect at the same time.
+
 ## Revoke a participant
 
 Revocation permanently removes a participant from the dataspace. Open the
@@ -134,6 +139,13 @@ The issuer's DID document advertises `https://<ISSUER_DID_HOST>/api/issuance`
 as its credential service, which participants call to request credentials.
 Set `ISSUER_ISSUANCE_URL` in Compose if the issuer is published under another
 public URL.
+
+Credentials advertise the public issuer's `/statuslist` endpoint for revocation
+checks. In Compose, `ISSUER_STATUSLIST_CALLBACK_ADDRESS` overrides that URL;
+Helm derives it from `identity.issuerDidHost` and `identity.useHttpsDidWeb`.
+Every participant must be able to reach it. Existing credentials and status
+lists retain their original addresses; keep those endpoints reachable until
+the credentials and their status lists have been replaced.
 
 The local demo uses loopback-only administrative ports with `network` auth
 mode. Use authenticated access for non-local deployments.

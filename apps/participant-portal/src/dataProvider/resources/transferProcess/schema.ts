@@ -1,8 +1,8 @@
-import { z } from "zod";
+import { z } from 'zod'
 
 export const CoreTransferProcessSchema = z.object({
-  "@id": z.string(),
-  "@type": z.string(),
+  '@id': z.string(),
+  '@type': z.string(),
   state: z.string(),
   stateTimestamp: z.number().transform((val) => new Date(val).toISOString()),
   type: z.string(), // This is the transfer direction (PROVIDER/CONSUMER)
@@ -20,4 +20,4 @@ export const CoreTransferProcessSchema = z.object({
     .number()
     .optional()
     .transform((val) => (val ? new Date(val).toISOString() : undefined)),
-});
+})

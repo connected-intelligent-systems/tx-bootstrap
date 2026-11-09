@@ -1,9 +1,9 @@
-import { GenericPermissionShow } from "./GenericPermissionShow";
+import { GenericPermissionShow } from './GenericPermissionShow'
 
 type PermissionProps = {
-  permission: any;
-};
+  permission: any
+}
 
 export const PermissionRenderer = ({ permission }: PermissionProps) => {
-  return <GenericPermissionShow permission={permission} />;
-};
+  return <GenericPermissionShow permission={permission} />
+}

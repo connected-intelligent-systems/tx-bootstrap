@@ -1,2 +1,2 @@
-export { PermissionRenderer } from "./PermissionRenderer";
-export { GenericPermissionShow } from "./GenericPermissionShow";
+export { PermissionRenderer } from './PermissionRenderer'
+export { GenericPermissionShow } from './GenericPermissionShow'

@@ -28,6 +28,11 @@ migrations run before the portal starts.
 Without an invitation, the portal shows a missing-invite status. An existing
 invitation can also be attached through `/api/onboarding/attach`.
 
+If the operator replaces your invitation token, attach the replacement even
+when its case ID is unchanged. The portal validates and saves the new secret
+without discarding its credential request history. Token recovery keeps the
+previous token valid if the replacement email cannot be sent.
+
 ## Main configuration
 
 | Setting                                            | Purpose                                               |

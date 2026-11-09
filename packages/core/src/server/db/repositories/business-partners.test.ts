@@ -25,6 +25,8 @@ function database() {
       id: "case-1",
       business_partner_id: "partner-1",
       state: "REVOKED",
+      setup_started_at: null,
+      setup_attempt_count: 0,
       credential_request: { holderPid: "old" },
       credential_receipts: [{ id: "old-credential" }],
     } as Record<string, unknown>,
@@ -58,8 +60,12 @@ function database() {
       snapshot = undefined;
       return result();
     }
-    if (!sql.startsWith("update ")) throw new Error(`Unexpected SQL: ${sql}`);
-    const isPartner = sql.startsWith('update "business_partners"');
+    const selecting = sql.startsWith("select ");
+    if (!sql.startsWith("update ") && !selecting)
+      throw new Error(`Unexpected SQL: ${sql}`);
+    const isPartner =
+      sql.startsWith('update "business_partners"') ||
+      sql.includes('from "business_partners"');
     const row = isPartner ? state.partner : state.onboardingCase;
     const [assignments, conditions] = sql.split(" where ");
     const renewing =
@@ -81,6 +87,7 @@ function database() {
       (!until || until.getTime() <= Date.now())
     )
       return result();
+    if (selecting) return result([{ ...row }]);
     if (
       conditions.includes('"access_lease_until" is null or') &&
       until &&
@@ -152,6 +159,63 @@ const lease: ParticipantAccessLease = {
 };
 
 afterEach(() => vi.useRealTimers());
+
+describe("rejection transaction", () => {
+  it("rejects an unused invitation and its participant together", async () => {
+    const db = database();
+    db.state.partner.verification_status = "VERIFIED";
+    db.state.onboardingCase.state = "REQUESTED";
+    expect(await db.repository.reject("partner-1", "Not eligible", lease)).toBe(
+      true,
+    );
+    expect(db.state.partner).toMatchObject({
+      verification_status: "REJECTED",
+      verification_notes: "Not eligible",
+    });
+    expect(db.state.onboardingCase).toMatchObject({
+      state: "REJECTED",
+      rejection_reason: "Not eligible",
+    });
+  });
+
+  it.each([
+    "IN_REVIEW",
+    "READY_FOR_PARTICIPANT",
+    "CREDENTIALS_REQUESTED",
+    "FAILED",
+    "REVOKED",
+  ])("requires revocation once a case is %s", async (state) => {
+    const db = database();
+    db.state.partner.verification_status = "VERIFIED";
+    db.state.onboardingCase.state = state;
+    const before = structuredClone(db.state);
+    expect(await db.repository.reject("partner-1", "Not eligible", lease)).toBe(
+      false,
+    );
+    expect(db.state).toEqual(before);
+  });
+
+  it("rolls back participant rejection if updating the case fails", async () => {
+    const db = database();
+    db.state.partner.verification_status = "VERIFIED";
+    db.state.onboardingCase.state = "REQUESTED";
+    const before = structuredClone(db.state);
+    db.failCaseWrite(true);
+    await expect(
+      db.repository.reject("partner-1", "Not eligible", lease),
+    ).rejects.toThrow("Case update failed");
+    expect(db.state).toEqual(before);
+  });
+
+  it("does not reject after another action has revoked the participant", async () => {
+    const db = database();
+    db.state.onboardingCase.state = "REQUESTED";
+    expect(await db.repository.reject("partner-1", "Not eligible", lease)).toBe(
+      false,
+    );
+    expect(db.state.partner.verification_status).toBe("REVOKED");
+  });
+});
 
 describe("readmission transaction", () => {
   it("retains the recovery marker and revoked state if the case write fails, then permits retry", async () => {

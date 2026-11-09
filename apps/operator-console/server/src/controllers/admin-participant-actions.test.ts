@@ -90,6 +90,7 @@ function createActions({
 
   const insertBusinessPartner = vi.fn().mockResolvedValue(undefined);
   const revoke = vi.fn().mockResolvedValue(true);
+  const reject = vi.fn().mockResolvedValue(true);
   const setRevocationChecks = vi.fn().mockResolvedValue(undefined);
   const runChecks = vi.fn().mockResolvedValue(revocationChecks);
   const locked: string[] = [];
@@ -127,7 +128,7 @@ function createActions({
     load: vi.fn(),
     insert: insertBusinessPartner,
     updateOrganization,
-    reject: vi.fn(),
+    reject,
     revoke,
     completeReadmission,
     setRevocationChecks,
@@ -180,6 +181,7 @@ function createActions({
     completeReadmission,
     recordParticipantEvent,
     revoke,
+    reject,
     runChecks,
     runReadmission,
     setRevocationChecks,
@@ -380,6 +382,53 @@ describe("createAdminParticipantActions", () => {
     expect(emailService.sendEmail).not.toHaveBeenCalledWith(
       expect.objectContaining({ text: expect.stringContaining("BPN request") }),
     );
+  });
+
+  it.each([
+    "IN_REVIEW",
+    "READY_FOR_PARTICIPANT",
+    "CREDENTIALS_REQUESTED",
+    "FAILED",
+  ])("requires Revoke instead of Reject after reaching %s", async (state) => {
+    const { actions, reject, emailService } = createActions({
+      caseRow: { ...latestCase, state },
+    });
+    await expect(
+      actions.handleAdminParticipant(
+        jsonRequest({}, "POST"),
+        jsonResponse(),
+        "partner-1",
+        "reject",
+        { reason: "Not eligible" },
+      ),
+    ).rejects.toMatchObject({
+      status: 409,
+      message: expect.stringContaining("Revoke"),
+    });
+    expect(reject).not.toHaveBeenCalled();
+    expect(emailService.sendEmail).not.toHaveBeenCalled();
+  });
+
+  it("does not report rejection if setup was queued after the initial check", async () => {
+    const { actions, reject, emailService, recordParticipantEvent } =
+      createActions();
+    reject.mockResolvedValueOnce(false);
+    await expect(
+      actions.handleAdminParticipant(
+        jsonRequest({}, "POST"),
+        jsonResponse(),
+        "partner-1",
+        "reject",
+        { reason: "Not eligible" },
+      ),
+    ).rejects.toMatchObject({ status: 409 });
+    expect(reject).toHaveBeenCalledWith(
+      "partner-1",
+      "Not eligible",
+      expect.objectContaining({ token: "lease-1" }),
+    );
+    expect(emailService.sendEmail).not.toHaveBeenCalled();
+    expect(recordParticipantEvent).not.toHaveBeenCalled();
   });
 
   it("blocks connector metadata updates before BPN verification", async () => {

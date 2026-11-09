@@ -82,6 +82,7 @@ export async function upsertState({
 }
 
 export async function patchState({
+  participantToken,
   state,
   caseData,
   credentialRequest,
@@ -98,6 +99,7 @@ export async function patchState({
        credentials=COALESCE($5::jsonb, credentials),
        assigned_bpn=COALESCE(NULLIF($6, ''), assigned_bpn),
        last_error=$7,
+       participant_token=COALESCE($8, participant_token),
        updated_at=now()
      WHERE id=$1`,
     [
@@ -108,6 +110,7 @@ export async function patchState({
       credentials === undefined ? null : JSON.stringify(credentials ?? []),
       normalizedCase.assignedBpn || normalizedCase.bpn || '',
       lastError || null,
+      participantToken ?? null,
     ],
   )
 }

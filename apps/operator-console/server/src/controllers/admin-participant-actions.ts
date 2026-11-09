@@ -116,8 +116,13 @@ export function createAdminParticipantActions({
         bodyData.verificationNotes ??
         "Rejected by dataspace operator.",
     ).trim();
-    await businessPartners.reject(id, reason);
-    await onboardingCases.rejectForBusinessPartner(id, reason);
+    await withAccessLease(id, async (lease) => {
+      if (!(await businessPartners.reject(id, reason, lease))) {
+        throw new ConflictError(
+          "Rejection is only available before connector setup is queued; use Revoke once setup has started",
+        );
+      }
+    });
     await recordParticipantEvent({
       request,
       businessPartnerId: id,
@@ -223,7 +228,7 @@ export function createAdminParticipantActions({
       );
       if (!result) {
         throw new ConflictError(
-          "Another revocation or readmission is running for this participant; try again shortly",
+          "Another participant access action is running; try again shortly",
         );
       }
       return result.value;
@@ -512,9 +517,13 @@ function assertCanRejectParticipant(partner, latestCase) {
   ) {
     throw new ConflictError("Participant is already rejected");
   }
-  if (latestCase.state === "CREDENTIALS_REQUESTED") {
+  if (
+    latestCase.state !== "REQUESTED" ||
+    latestCase.setup_started_at ||
+    latestCase.setup_attempt_count > 0
+  ) {
     throw new ConflictError(
-      "Participants with requested or issued credentials cannot be rejected through onboarding",
+      "Rejection is only available before connector setup is queued; use Revoke once setup has started",
     );
   }
 }

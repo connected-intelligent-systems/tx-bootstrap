@@ -79,6 +79,8 @@ services:
       edge: {}
 
   issuerservice:
+    environment:
+      EDC_STATUSLIST_CALLBACK_ADDRESS: "http://${ISSUER_DID_HOST:?ISSUER_DID_HOST must be set}/statuslist"
     depends_on:
       operator-vault-init:
         condition: service_completed_successfully

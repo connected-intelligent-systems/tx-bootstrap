@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect } from 'react'
 import {
   Labeled,
   Show,
@@ -15,44 +15,41 @@ import {
   FunctionField,
   useGetOne,
   useRefresh,
-} from "react-admin";
-import DownloadIcon from "@mui/icons-material/Download";
-import { useState } from "react";
-import { ContractAgreement } from "../../types/contractAgreement";
-import { PolicyRulesTabs } from "../../components/policies/PolicyRulesTabs";
-import TransferProcessDialog from "../../components/transferprocesses/TransferProcessDialog";
+} from 'react-admin'
+import DownloadIcon from '@mui/icons-material/Download'
+import { useState } from 'react'
+import { ContractAgreement } from '../../types/contractAgreement'
+import { PolicyRulesTabs } from '../../components/policies/PolicyRulesTabs'
+import TransferProcessDialog from '../../components/transferprocesses/TransferProcessDialog'
 
 const ContractAgreementShowBar = () => {
-  const translate = useTranslate();
-  const record = useRecordContext<ContractAgreement>();
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const translate = useTranslate()
+  const record = useRecordContext<ContractAgreement>()
+  const [isDialogOpen, setIsDialogOpen] = useState(false)
 
   const { data: negotiation } = useGetOne(
-    "contractagreementnegotiation",
-    { id: record?.id || "" },
+    'contractagreementnegotiation',
+    { id: record?.id || '' },
     {
       enabled: !!record?.id,
       onSuccess: () => {},
-    }
-  );
+    },
+  )
 
-  const counterPartyAddress = negotiation?.counterPartyAddress;
-  const canInitiateTransfer =
-    negotiation?.type === "CONSUMER" && !!counterPartyAddress && !!record;
+  const counterPartyAddress = negotiation?.counterPartyAddress
+  const canInitiateTransfer = negotiation?.type === 'CONSUMER' && !!counterPartyAddress && !!record
   const defaultValues = {
     counterPartyAddress,
     contractId: record?.id,
     assetId: record?.assetId,
-  };
+  }
 
   return (
     <>
       <TopToolbar>
         {canInitiateTransfer && (
           <Button
-            label={translate(
-              "resources.contractagreements.actions.transferDataset"
-            )}
+            label={translate('resources.contractagreements.actions.transferDataset')}
             startIcon={<DownloadIcon />}
             onClick={() => setIsDialogOpen(true)}
           />
@@ -66,23 +63,19 @@ const ContractAgreementShowBar = () => {
         />
       )}
     </>
-  );
-};
+  )
+}
 
-const ContractNegotiation = ({
-  contractAggreement,
-}: {
-  contractAggreement: ContractAgreement;
-}) => {
-  const translate = useTranslate();
-  const record = useRecordContext();
-  if (record?.type === "CONSUMER") {
+const ContractNegotiation = ({ contractAggreement }: { contractAggreement: ContractAgreement }) => {
+  const translate = useTranslate()
+  const record = useRecordContext()
+  if (record?.type === 'CONSUMER') {
     // Create composite ID for dataset: catalogId--datasetId
-    const catalogId = btoa(record.counterPartyAddress);
-    const compositeId = `${catalogId}--${contractAggreement.assetId}`;
+    const catalogId = btoa(record.counterPartyAddress)
+    const compositeId = `${catalogId}--${contractAggreement.assetId}`
 
     return (
-      <Labeled label={translate("resources.contractagreements.fields.dataset")}>
+      <Labeled label={translate('resources.contractagreements.fields.dataset')}>
         <ReferenceField
           record={{ ...contractAggreement, assetId: compositeId }}
           reference="datasets"
@@ -92,64 +85,44 @@ const ContractNegotiation = ({
           <TextField source="originalId" />
         </ReferenceField>
       </Labeled>
-    );
-  } else if (record?.type === "PROVIDER") {
+    )
+  } else if (record?.type === 'PROVIDER') {
     return (
-      <Labeled label={translate("resources.contractagreements.fields.asset")}>
-        <ReferenceField
-          record={contractAggreement}
-          reference="assets"
-          source="assetId"
-        >
+      <Labeled label={translate('resources.contractagreements.fields.asset')}>
+        <ReferenceField record={contractAggreement} reference="assets" source="assetId">
           <TextField source="id" />
         </ReferenceField>
       </Labeled>
-    );
+    )
   }
-};
+}
 
 export const ContractAgreementShow = () => {
-  const translate = useTranslate();
-  const refresh = useRefresh();
+  const translate = useTranslate()
+  const refresh = useRefresh()
 
   useEffect(() => {
     const interval = setInterval(() => {
-      refresh();
-    }, 5000);
+      refresh()
+    }, 5000)
 
-    return () => clearInterval(interval);
-  }, [refresh]);
+    return () => clearInterval(interval)
+  }, [refresh])
 
-  const { isPending, record } = useShowController<ContractAgreement>();
+  const { isPending, record } = useShowController<ContractAgreement>()
   if (isPending) {
-    return (
-      <div>{translate("resources.contractagreements.messages.loading")}</div>
-    );
+    return <div>{translate('resources.contractagreements.messages.loading')}</div>
   }
 
   return (
     <Show emptyWhileLoading={false} actions={<ContractAgreementShowBar />}>
       <SimpleShowLayout>
-        <TextField
-          label={translate("resources.contractagreements.fields.id")}
-          source="id"
-        />
-        <TextField
-          label={translate("resources.contractagreements.fields.assetId")}
-          source="assetId"
-        />
-        <TextField
-          label={translate("resources.contractagreements.fields.consumerId")}
-          source="consumerId"
-        />
-        <TextField
-          label={translate("resources.contractagreements.fields.providerId")}
-          source="providerId"
-        />
+        <TextField label={translate('resources.contractagreements.fields.id')} source="id" />
+        <TextField label={translate('resources.contractagreements.fields.assetId')} source="assetId" />
+        <TextField label={translate('resources.contractagreements.fields.consumerId')} source="consumerId" />
+        <TextField label={translate('resources.contractagreements.fields.providerId')} source="providerId" />
         <DateField
-          label={translate(
-            "resources.contractagreements.fields.contractSigningDate"
-          )}
+          label={translate('resources.contractagreements.fields.contractSigningDate')}
           source="contractSigningDate"
           showTime
         />
@@ -161,27 +134,18 @@ export const ContractAgreementShow = () => {
             render={() => <ContractNegotiation contractAggreement={record} />}
           />
         )}
-        <Labeled
-          label={translate("resources.contractagreements.sections.policy")}
-          fullWidth
-        >
+        <Labeled label={translate('resources.contractagreements.sections.policy')} fullWidth>
           <FunctionField
             render={(record: any) => {
-              const permissions = record?.policy?.permissions || [];
-              const obligations = record?.policy?.obligations || [];
-              const prohibitions = record?.policy?.prohibitions || [];
+              const permissions = record?.policy?.permissions || []
+              const obligations = record?.policy?.obligations || []
+              const prohibitions = record?.policy?.prohibitions || []
 
-              return (
-                <PolicyRulesTabs
-                  permissions={permissions}
-                  obligations={obligations}
-                  prohibitions={prohibitions}
-                />
-              );
+              return <PolicyRulesTabs permissions={permissions} obligations={obligations} prohibitions={prohibitions} />
             }}
           />
         </Labeled>
       </SimpleShowLayout>
     </Show>
-  );
-};
+  )
+}
