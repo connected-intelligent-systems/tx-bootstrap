@@ -148,7 +148,24 @@ docker compose -f oci://ghcr.io/<owner>/tx-bootstrap-tunnel:<version> up -d --wa
 ```
 
 Traefik obtains the wildcard certificate within about a minute of the first
-start and renews it automatically. The ingress node's identity is kept in the
+start and renews it automatically.
+
+The ingress limits each participant so that one participant, or traffic aimed
+at one, can't exhaust the shared ingress. Requests over a limit get `429`:
+
+| Setting                                     | Default | Limit                                    |
+| ------------------------------------------- | ------- | ---------------------------------------- |
+| `TUNNEL_RATE_LIMIT_AVERAGE` / `_BURST`      | 100/200 | Requests per second per participant host |
+| `TUNNEL_MAX_CONCURRENT_REQUESTS`            | 64      | Concurrent requests per participant host |
+| `TUNNEL_MAX_CONCURRENT_REQUESTS_PER_CLIENT` | 16      | Concurrent requests per client address   |
+
+Timeouts stay unlimited so large data transfers work; the per-client limit
+bounds how many slow connections one address can hold open.
+
+Traefik loads every file in `/etc/traefik/dynamic`. To publish more routes
+through the same Traefik, for example a Headscale on the same server, mount an
+extra file there (`/etc/traefik/dynamic/headscale.yaml`) with its own router
+and service; the participant routes stay as shipped. The ingress node's identity is kept in the
 `tunnel-node-state` volume; to re-enroll it, remove that volume and provide a
 new key.
 

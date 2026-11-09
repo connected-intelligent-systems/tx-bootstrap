@@ -50,6 +50,13 @@ done
 grep -q "host=$host" "$work/body" || { echo "Participant not reachable through the tunnel" >&2; exit 1; }
 [ "$(request bpnl000000000099.tunnel.test)" != 200 ] || { echo "Unknown participant was routed" >&2; exit 1; }
 
+# A burst above the participant's rate limit (smoke.env) is answered with 429.
+throttled="$(seq 1 30 | xargs -P 15 -I{} curl -sk --max-time 15 \
+  --resolve "$host:28443:127.0.0.1" -o /dev/null -w '%{http_code}\n' \
+  "https://$host:28443/" | grep -c '^429$' || true)"
+[ "$throttled" -gt 0 ] || { echo "Rate limit did not apply" >&2; exit 1; }
+echo "Rate limit applied ($throttled of 30 burst requests throttled)"
+
 participant_ip="$(participant exec -T tailnet tailscale ip -4 | tr -d "\r")"
 tunnel exec -T tunnel-node wget -q -T 5 -O /dev/null "http://$participant_ip:18080/"
 if tunnel exec -T tunnel-node wget -q -T 5 -O /dev/null "http://$participant_ip:18081/" 2>/dev/null; then

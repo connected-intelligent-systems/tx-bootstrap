@@ -4,15 +4,21 @@ type Logger = {
 };
 
 /**
- * Periodically enforces operator-assigned tunnel hostnames in Headscale.
- * A failed run is logged and retried on the next interval.
+ * Periodically reconciles Headscale with the console: revokes enrollments of
+ * rejected participants, retries unfinished revocations and enforces
+ * operator-assigned tunnel hostnames. A failed run is logged and retried on
+ * the next interval.
  */
 export function createNetworkNameReconciler({
   reconcile,
   logger,
   intervalMs = 15_000,
 }: {
-  reconcile: () => Promise<{ renamed: number }>;
+  reconcile: () => Promise<{
+    renamed: number;
+    revoked?: number;
+    failed?: number;
+  }>;
   logger: Logger;
   intervalMs?: number;
 }) {
@@ -29,10 +35,16 @@ export function createNetworkNameReconciler({
 
   async function runOnce() {
     try {
-      const { renamed } = await reconcile();
+      const { renamed, revoked = 0, failed = 0 } = await reconcile();
       if (renamed > 0) logger.info({ renamed }, "Reconciled tunnel node names");
+      if (revoked > 0) logger.info({ revoked }, "Revoked tunnel enrollments");
+      if (failed > 0)
+        logger.error(
+          { failed },
+          "Tunnel enrollment revocation failed; retrying next run",
+        );
     } catch (error) {
-      logger.error(error, "Tunnel node name reconciliation failed");
+      logger.error(error, "Tunnel network reconciliation failed");
     }
   }
 

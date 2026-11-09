@@ -12,6 +12,7 @@ const nodeSchema = z.object({
   ipAddresses: z.array(z.string()).default([]),
   online: z.boolean().default(false),
   expiry: z.iso.datetime({ offset: true }).nullish(),
+  lastSeen: z.iso.datetime({ offset: true }).nullish(),
   preAuthKey: z.object({ id }).nullish(),
 });
 

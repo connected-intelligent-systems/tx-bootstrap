@@ -233,6 +233,7 @@
                 "participantDomain",
                 "enrollmentTtlSeconds",
                 "invitationTtlSeconds",
+                "staleNodeSeconds",
                 "timeoutMs"
               ],
               "properties": {
@@ -252,6 +253,11 @@
                   "type": "integer",
                   "minimum": 3600,
                   "maximum": 2592000
+                },
+                "staleNodeSeconds": {
+                  "type": "integer",
+                  "minimum": 3600,
+                  "maximum": 31536000
                 },
                 "timeoutMs": {
                   "type": "integer",

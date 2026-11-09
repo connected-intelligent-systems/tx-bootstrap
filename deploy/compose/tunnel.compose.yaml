@@ -149,7 +149,9 @@ services:
       - --entryPoints.websecure.transport.respondingTimeouts.readTimeout=0s
       - --entryPoints.websecure.transport.respondingTimeouts.writeTimeout=0s
       - --entryPoints.websecure.transport.respondingTimeouts.idleTimeout=180s
-      - --providers.file.filename=/etc/traefik/dynamic.yaml
+      # A directory, so operators can add routes (for example to a Headscale
+      # behind the same Traefik) as extra files without replacing these.
+      - --providers.file.directory=/etc/traefik/dynamic
       - --certificatesResolvers.acme.acme.email=${TUNNEL_ACME_EMAIL:?TUNNEL_ACME_EMAIL must be set}
       - --certificatesResolvers.acme.acme.storage=/acme/acme.json
       - --certificatesResolvers.acme.acme.caServer=${TUNNEL_ACME_CA_SERVER:-https://acme-v02.api.letsencrypt.org/directory}
@@ -159,7 +161,7 @@ services:
       - acme-env
     configs:
       - source: traefik-dynamic
-        target: /etc/traefik/dynamic.yaml
+        target: /etc/traefik/dynamic/participants.yaml
     volumes:
       - traefik-acme:/acme
     ports:
@@ -233,11 +235,35 @@ configs:
             rule: HostRegexp(`^[a-z0-9-]+\.${TUNNEL_DOMAIN:?TUNNEL_DOMAIN must be set}$$`)
             entryPoints: [websecure]
             service: participants
+            middlewares:
+              - per-participant-rate
+              - per-participant-concurrency
+              - per-client-concurrency
             tls:
               certResolver: acme
               domains:
                 - main: "${TUNNEL_DOMAIN:?TUNNEL_DOMAIN must be set}"
                   sans: ["*.${TUNNEL_DOMAIN:?TUNNEL_DOMAIN must be set}"]
+        # One participant, or traffic aimed at one participant, cannot
+        # exhaust the shared ingress. Exceeding a limit returns 429.
+        middlewares:
+          per-participant-rate:
+            rateLimit:
+              average: ${TUNNEL_RATE_LIMIT_AVERAGE:-100}
+              burst: ${TUNNEL_RATE_LIMIT_BURST:-200}
+              period: 1s
+              sourceCriterion:
+                requestHost: true
+          per-participant-concurrency:
+            inFlightReq:
+              amount: ${TUNNEL_MAX_CONCURRENT_REQUESTS:-64}
+              sourceCriterion:
+                requestHost: true
+          # Slow clients hold connections open (timeouts are unlimited for
+          # large transfers); cap what a single client address can hold.
+          per-client-concurrency:
+            inFlightReq:
+              amount: ${TUNNEL_MAX_CONCURRENT_REQUESTS_PER_CLIENT:-16}
         services:
           participants:
             loadBalancer:

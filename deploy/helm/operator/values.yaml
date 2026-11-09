@@ -208,6 +208,8 @@ operatorConsole:
     enrollmentTtlSeconds: 900
     # Lifetime of keys sent with a participant invitation.
     invitationTtlSeconds: 604800
+    # Offline nodes older than this are flagged as stale in the console.
+    staleNodeSeconds: 604800
     timeoutMs: 5000
   service:
     type: ClusterIP

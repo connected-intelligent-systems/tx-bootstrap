@@ -10,6 +10,7 @@ export type HeadscaleConfig = {
   enrollmentTtlSeconds: number;
   /** Lifetime of keys sent with a participant invitation. */
   invitationTtlSeconds: number;
+  staleNodeSeconds: number;
   timeoutMs: number;
 };
 
@@ -24,6 +25,7 @@ export function readHeadscaleConfig(
     participantDomain: "",
     enrollmentTtlSeconds: 900,
     invitationTtlSeconds: 604800,
+    staleNodeSeconds: 604800,
     timeoutMs: 5000,
   };
   if (!env.HEADSCALE_ENABLED || env.HEADSCALE_ENABLED === "false")
@@ -113,6 +115,13 @@ export function readHeadscaleConfig(
       604800,
       3600,
       2592000,
+    ),
+    // Offline nodes older than this are flagged as stale (never deleted).
+    staleNodeSeconds: integer(
+      "HEADSCALE_STALE_NODE_SECONDS",
+      604800,
+      3600,
+      31536000,
     ),
     timeoutMs: integer("HEADSCALE_TIMEOUT_MS", 5000, 100, 30000),
   };

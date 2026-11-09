@@ -55,6 +55,27 @@ export function createNetworkEnrollmentRepository(db: Kysely<Database>) {
         .where("e.state", "=", "ISSUED")
         .execute();
     },
+    /**
+     * Enrollments to revoke on one Headscale server: unfinished revocations
+     * and issued enrollments of rejected participants.
+     */
+    async listPendingRevocations(controlUrl: string) {
+      return db
+        .selectFrom("network_enrollments as e")
+        .innerJoin("business_partners as p", "p.id", "e.business_partner_id")
+        .select(["e.id", "e.business_partner_id"])
+        .where("e.control_url", "=", controlUrl)
+        .where((eb) =>
+          eb.or([
+            eb("e.state", "=", "REVOKING"),
+            eb.and([
+              eb("e.state", "=", "ISSUED"),
+              eb("p.verification_status", "=", "REJECTED"),
+            ]),
+          ]),
+        )
+        .execute();
+    },
     async list(participantId: string) {
       return db
         .selectFrom("network_enrollments")

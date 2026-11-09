@@ -102,6 +102,7 @@ HEADSCALE_PARTICIPANT_TAG=tag:txb-participant
 HEADSCALE_PARTICIPANT_DOMAIN=tunnel.example.org
 HEADSCALE_ENROLLMENT_TTL_SECONDS=900
 HEADSCALE_INVITATION_TTL_SECONDS=604800
+HEADSCALE_STALE_NODE_SECONDS=604800
 HEADSCALE_TIMEOUT_MS=5000
 ```
 
@@ -160,8 +161,11 @@ creation response; hand it directly to the participant deployment mechanism.
 Create keys when preparing deployment, rather than when creating the business
 partner. The node ID and IP exist only after it joins. Status maps nodes
 through the Headscale pre-auth key ID, not their self-reported hostname. It
-reports `AWAITING_JOIN`, `EXPIRED`, `ONLINE`, `OFFLINE`, `AMBIGUOUS`, or
-`UNKNOWN`.
+reports `AWAITING_JOIN`, `EXPIRED`, `ONLINE`, `OFFLINE`, `STALE`, `AMBIGUOUS`,
+or `UNKNOWN`, plus the node's last-seen time. `STALE` means offline for longer
+than `HEADSCALE_STALE_NODE_SECONDS` (7 days by default). Stale nodes are only
+flagged, never removed automatically, because a participant may be offline on
+purpose.
 
 The tunnel hostname is the participant's lowercase BPN, so it stays the same
 across re-enrollment. Participants choose their own hostname when joining, so
@@ -180,16 +184,22 @@ requires inspection in Headscale before a new deployment is issued; the
 short key TTL limits new registrations but does not remove a node that already
 joined. If database persistence fails after key creation, the backend attempts
 to expire the key. Revocation commits `REVOKING` before remote cleanup, so a
-failed cleanup can be retried with the same revoke endpoint. Changing the
+failed cleanup can be retried with the same revoke endpoint; the reconciliation
+below also retries it automatically. Changing the
 configured server origin prevents cleanup of old records against the new
 server's IDs. A lost successful creation response requires revoking that
 deployment and issuing a new deployment UUID.
 
-The console only issues keys, tracks nodes and assigns names. Routing follows
-from the name: the ingress forwards `<name>.<participant domain>` to the node of
-the same MagicDNS name, so no per-participant route is ever pushed. The console
-UI and delivery through the invitation flow are subsequent work; today the
-enrollment response is handed to the participant out of band.
+The same 15-second reconciliation also ties the tunnel to the participant's
+lifecycle. When a participant is rejected, its issued enrollment is revoked:
+the key is expired, its node deleted and a `participant.network_enrollment_revoked`
+event recorded with the actor `system:network-reconciler`. Revocations stuck in
+`REVOKING`, for example because Headscale was unreachable, are retried on every
+run until they succeed.
+
+The console only issues keys, tracks nodes, assigns names and revokes. Routing
+follows from the name: the ingress forwards `<name>.<participant domain>` to
+the node of the same MagicDNS name, so no per-participant route is ever pushed.
 
 API contracts: [Headscale REST mappings](https://github.com/juanfont/headscale/blob/v0.29.7/proto/headscale/v1/headscale.proto),
 [enrollment keys](https://github.com/juanfont/headscale/blob/v0.29.7/proto/headscale/v1/preauthkey.proto),

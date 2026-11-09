@@ -13,7 +13,7 @@ services:
       - --entryPoints.web.transport.respondingTimeouts.readTimeout=0s
       - --entryPoints.web.transport.respondingTimeouts.writeTimeout=0s
       - --entryPoints.web.transport.respondingTimeouts.idleTimeout=180s
-      - --providers.file.filename=/etc/traefik/dynamic.yaml
+      - --providers.file.directory=/etc/traefik/dynamic
     ports: !reset []
     secrets: !reset []
     networks:
@@ -45,6 +45,27 @@ configs:
             priority: 10
             entryPoints: [web]
             service: participants
+            middlewares:
+              - per-participant-rate
+              - per-participant-concurrency
+              - per-client-concurrency
+        # Same limits as tunnel.compose.yaml.
+        middlewares:
+          per-participant-rate:
+            rateLimit:
+              average: 100
+              burst: 200
+              period: 1s
+              sourceCriterion:
+                requestHost: true
+          per-participant-concurrency:
+            inFlightReq:
+              amount: 64
+              sourceCriterion:
+                requestHost: true
+          per-client-concurrency:
+            inFlightReq:
+              amount: 16
         services:
           headscale:
             loadBalancer:

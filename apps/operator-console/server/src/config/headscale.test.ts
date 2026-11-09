@@ -23,7 +23,11 @@ describe("Headscale configuration", () => {
       url: "https://headscale.example.org",
       enrollmentTtlSeconds: 900,
       invitationTtlSeconds: 604800,
+      staleNodeSeconds: 604800,
     });
+    expect(() =>
+      readHeadscaleConfig({ ...enabled, HEADSCALE_STALE_NODE_SECONDS: "60" }),
+    ).toThrow("HEADSCALE_STALE_NODE_SECONDS");
     expect(
       readHeadscaleConfig({
         ...enabled,

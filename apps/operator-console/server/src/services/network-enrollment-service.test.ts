@@ -3,7 +3,10 @@ import type { Repositories } from "@tx-bootstrap/core/server/db/repositories/ind
 import type { NetworkEnrollmentRepository } from "@tx-bootstrap/core/server/db/repositories/network-enrollments.js";
 import type { NetworkEnrollmentRow } from "@tx-bootstrap/core/server/db/database.js";
 import { readHeadscaleConfig } from "../config/headscale.js";
-import { createNetworkEnrollmentService } from "./network-enrollment-service.js";
+import {
+  NETWORK_RECONCILER_ACTOR,
+  createNetworkEnrollmentService,
+} from "./network-enrollment-service.js";
 import type { HeadscaleClient } from "./headscale-client.js";
 
 const participantId = "550e8400-e29b-41d4-a716-446655440000";
@@ -18,6 +21,7 @@ const config = readHeadscaleConfig({
 function fixture() {
   const rows = new Map<string, NetworkEnrollmentRow>();
   const bpnByParticipant = new Map([[participantId, "BPNL000000000001"]]);
+  const rejected = new Set<string>();
   const events: unknown[] = [];
   const client = {
     createEnrollmentKey: vi
@@ -60,6 +64,20 @@ function fixture() {
           id: row.id,
           pre_auth_key_id: row.pre_auth_key_id,
           assigned_bpn: bpnByParticipant.get(row.business_partner_id) ?? "",
+        }));
+    },
+    async listPendingRevocations(controlUrl) {
+      return [...rows.values()]
+        .filter(
+          (row) =>
+            row.control_url === controlUrl &&
+            (row.state === "REVOKING" ||
+              (row.state === "ISSUED" &&
+                rejected.has(row.business_partner_id))),
+        )
+        .map((row) => ({
+          id: row.id,
+          business_partner_id: row.business_partner_id,
         }));
     },
     async list(id) {
@@ -111,7 +129,7 @@ function fixture() {
     repositories,
     client,
   });
-  return { service, rows, events, client, repositories, load };
+  return { service, rows, events, client, repositories, load, rejected };
 }
 
 describe("deployment network enrollment", () => {
@@ -529,5 +547,104 @@ describe("deployment network enrollment", () => {
     ]);
     expect(await f.service.reconcileNodeNames()).toEqual({ renamed: 0 });
     expect(f.client.renameNode).not.toHaveBeenCalled();
+  });
+
+  it("revokes enrollments of rejected participants on reconciliation", async () => {
+    const f = fixture();
+    await f.service.createNetworkEnrollment(
+      participantId,
+      { deploymentId },
+      "admin",
+    );
+    f.client.listNodes.mockResolvedValue([
+      {
+        id: "2",
+        name: "bpnl000000000001",
+        givenName: "bpnl000000000001",
+        online: true,
+        ipAddresses: [],
+        preAuthKey: { id: "7" },
+      },
+    ]);
+    expect(await f.service.reconcileNetwork()).toEqual({
+      renamed: 0,
+      revoked: 0,
+      failed: 0,
+    });
+    expect(f.rows.get(deploymentId)!.state).toBe("ISSUED");
+
+    f.rejected.add(participantId);
+    expect(await f.service.reconcileNetwork()).toMatchObject({
+      revoked: 1,
+      failed: 0,
+    });
+    expect(f.rows.get(deploymentId)!.state).toBe("REVOKED");
+    expect(f.client.expireEnrollmentKey).toHaveBeenCalledWith("7");
+    expect(f.client.deleteNode).toHaveBeenCalledExactlyOnceWith("2");
+    expect(f.events).toContainEqual({
+      deploymentId,
+      action: "participant.network_enrollment_revoked",
+      actor: NETWORK_RECONCILER_ACTOR,
+    });
+  });
+
+  it("retries unfinished revocations and keeps failures pending", async () => {
+    const f = fixture();
+    await f.service.createNetworkEnrollment(
+      participantId,
+      { deploymentId },
+      "admin",
+    );
+    f.client.expireEnrollmentKey.mockRejectedValueOnce(
+      new Error("upstream unavailable"),
+    );
+    await expect(
+      f.service.revokeNetworkEnrollment(participantId, deploymentId, "admin"),
+    ).rejects.toThrow();
+    expect(f.rows.get(deploymentId)!.state).toBe("REVOKING");
+
+    f.client.expireEnrollmentKey.mockRejectedValueOnce(
+      new Error("still unavailable"),
+    );
+    expect(await f.service.reconcileNetwork()).toMatchObject({
+      revoked: 0,
+      failed: 1,
+    });
+    expect(f.rows.get(deploymentId)!.state).toBe("REVOKING");
+
+    expect(await f.service.reconcileNetwork()).toMatchObject({
+      revoked: 1,
+      failed: 0,
+    });
+    expect(f.rows.get(deploymentId)!.state).toBe("REVOKED");
+  });
+
+  it("flags nodes offline longer than the stale threshold", async () => {
+    const f = fixture();
+    await f.service.createNetworkEnrollment(
+      participantId,
+      { deploymentId },
+      "admin",
+    );
+    const node = (lastSeen: string | null) => ({
+      id: "2",
+      name: "bpnl000000000001",
+      givenName: "bpnl000000000001",
+      online: false,
+      ipAddresses: [],
+      lastSeen,
+      preAuthKey: { id: "7" },
+    });
+    const day = 24 * 60 * 60 * 1000;
+    const connection = async (lastSeen: string | null) => {
+      f.client.listNodes.mockResolvedValue([node(lastSeen)]);
+      const [row] = await f.service.listNetworkEnrollments(participantId);
+      return [row.connection, row.node?.lastSeen];
+    };
+    const recent = new Date(Date.now() - day).toISOString();
+    const old = new Date(Date.now() - 8 * day).toISOString();
+    expect(await connection(recent)).toEqual(["OFFLINE", recent]);
+    expect(await connection(old)).toEqual(["STALE", old]);
+    expect(await connection(null)).toEqual(["OFFLINE", null]);
   });
 });

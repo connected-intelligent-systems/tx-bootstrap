@@ -290,6 +290,12 @@ function EnrollmentCard({
             label={node ? "Key used" : "Key valid until"}
             value={node ? "Yes" : formatDate(enrollment.enrollmentExpiresAt)}
           />
+          {node && !node.online ? (
+            <Info
+              label="Last seen"
+              value={node.lastSeen ? formatDate(node.lastSeen) : "Never"}
+            />
+          ) : null}
           <Info label="Deployment ID" value={enrollment.deploymentId} mono />
         </InfoGrid>
         {connectionHint(enrollment) ? (
@@ -336,6 +342,7 @@ function connectionChip(
     EXPIRED: "error",
     ONLINE: "success",
     OFFLINE: "warning",
+    STALE: "error",
     AMBIGUOUS: "error",
     UNKNOWN: "default",
   };
@@ -354,6 +361,8 @@ function connectionHint(enrollment: NetworkEnrollmentStatus) {
       return "More than one node joined with this key. Revoke the enrollment and issue a new key.";
     case "OFFLINE":
       return "The node is registered but not connected.";
+    case "STALE":
+      return "The node has been offline for a long time. Check with the participant, or revoke the enrollment if the deployment is gone.";
     default:
       return enrollment.node && !enrollment.node.routable
         ? "The console assigns the node's name within a few seconds; traffic is routed once it matches."

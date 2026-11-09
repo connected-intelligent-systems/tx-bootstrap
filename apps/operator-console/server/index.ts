@@ -43,7 +43,7 @@ const technicalSetupWorker = createTechnicalSetupWorker({
 });
 const networkNameReconciler = config.headscale.enabled
   ? createNetworkNameReconciler({
-      reconcile: controller.reconcileNodeNames,
+      reconcile: controller.reconcileNetwork,
       logger: app.log,
     })
   : undefined;

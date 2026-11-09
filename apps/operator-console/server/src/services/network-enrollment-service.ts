@@ -13,6 +13,9 @@ import {
   type HeadscaleClient,
 } from "./headscale-client.js";
 
+/** Actor recorded for revocations the console performs on its own. */
+export const NETWORK_RECONCILER_ACTOR = "system:network-reconciler";
+
 /** Stable per participant so its did:web survives re-enrollment. */
 export function tunnelHostname(bpn: string) {
   return bpn.toLowerCase();
@@ -62,7 +65,7 @@ export function createNetworkEnrollmentService({
     };
   }
 
-  return {
+  const service = {
     async getNetworkStatus() {
       if (!config.enabled) return { enabled: false };
       await client.listNodes();
@@ -178,6 +181,12 @@ export function createNetworkEnrollmentService({
               )
             : [];
         const node = matches.length === 1 ? matches[0] : null;
+        const stale =
+          !!node &&
+          !node.online &&
+          !!node.lastSeen &&
+          Date.now() - Date.parse(node.lastSeen) >
+            config.staleNodeSeconds * 1000;
         const connection =
           row.state !== "ISSUED" || row.control_url !== config.url
             ? "UNKNOWN"
@@ -186,7 +195,9 @@ export function createNetworkEnrollmentService({
               : node
                 ? node.online
                   ? "ONLINE"
-                  : "OFFLINE"
+                  : stale
+                    ? "STALE"
+                    : "OFFLINE"
                 : row.expires_at.getTime() <= Date.now()
                   ? "EXPIRED"
                   : "AWAITING_JOIN";
@@ -202,11 +213,39 @@ export function createNetworkEnrollmentService({
                   node.givenName === tunnelHostname(partner.assigned_bpn),
                 ipAddresses: node.ipAddresses,
                 online: node.online,
+                lastSeen: node.lastSeen ?? null,
                 expiresAt: node.expiry ?? null,
               }
             : null,
         };
       });
+    },
+    /**
+     * One reconciliation pass: revoke what must no longer be on the tailnet,
+     * then enforce node names. A failed revocation stays pending and is
+     * retried on the next pass; it does not block the others.
+     */
+    async reconcileNetwork() {
+      if (!config.enabled) return { renamed: 0, revoked: 0, failed: 0 };
+      const pending = await networkEnrollments.listPendingRevocations(
+        config.url,
+      );
+      let revoked = 0;
+      let failed = 0;
+      for (const row of pending) {
+        try {
+          await service.revokeNetworkEnrollment(
+            row.business_partner_id,
+            row.id,
+            NETWORK_RECONCILER_ACTOR,
+          );
+          revoked++;
+        } catch {
+          failed++;
+        }
+      }
+      const { renamed } = await service.reconcileNodeNames();
+      return { renamed, revoked, failed };
     },
     /**
      * Assign each enrolled node its canonical MagicDNS name and move squatters
@@ -302,4 +341,5 @@ export function createNetworkEnrollmentService({
       );
     },
   };
+  return service;
 }

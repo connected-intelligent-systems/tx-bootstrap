@@ -75,6 +75,8 @@ spec:
               value: {{ .Values.operatorConsole.headscale.enrollmentTtlSeconds | quote }}
             - name: HEADSCALE_INVITATION_TTL_SECONDS
               value: {{ .Values.operatorConsole.headscale.invitationTtlSeconds | quote }}
+            - name: HEADSCALE_STALE_NODE_SECONDS
+              value: {{ .Values.operatorConsole.headscale.staleNodeSeconds | quote }}
             - name: HEADSCALE_TIMEOUT_MS
               value: {{ .Values.operatorConsole.headscale.timeoutMs | quote }}
             {{- end }}

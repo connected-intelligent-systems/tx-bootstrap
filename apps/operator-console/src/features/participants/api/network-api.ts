@@ -18,7 +18,13 @@ export type NetworkEnrollmentState =
   "CREATING" | "ISSUED" | "FAILED" | "REVOKING" | "REVOKED";
 
 export type NetworkConnection =
-  "AWAITING_JOIN" | "EXPIRED" | "ONLINE" | "OFFLINE" | "AMBIGUOUS" | "UNKNOWN";
+  | "AWAITING_JOIN"
+  | "EXPIRED"
+  | "ONLINE"
+  | "OFFLINE"
+  | "STALE"
+  | "AMBIGUOUS"
+  | "UNKNOWN";
 
 export interface NetworkEnrollment {
   deploymentId: string;
@@ -39,6 +45,7 @@ export interface NetworkEnrollmentStatus extends NetworkEnrollment {
     routable: boolean;
     ipAddresses: string[];
     online: boolean;
+    lastSeen: string | null;
     expiresAt: string | null;
   } | null;
 }
