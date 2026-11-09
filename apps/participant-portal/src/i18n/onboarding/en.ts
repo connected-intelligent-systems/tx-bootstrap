@@ -24,6 +24,7 @@ export const enCopy = {
   dspEndpoint: 'DSP endpoint',
   heroAttachingInvite: 'Connecting operator invite',
   heroFailed: 'Setup needs attention',
+  heroRevoked: 'Dataspace access revoked',
   heroNeedsInvite: 'Operator invite required',
   heroSettingUpCredentials: 'Setting up credentials',
   heroWaitingForOperator: 'Setting up participant access',
@@ -51,6 +52,8 @@ export const enCopy = {
   participantAccess: 'Participant access',
   automation: 'Automation',
   connectorMetadata: 'Connector metadata',
+  revokedStatus:
+    'The operator revoked this participant. Its credentials are no longer accepted. If the operator readmits it, the gateway removes the revoked credentials and requests new ones automatically.',
   failedStatus:
     'Automatic setup could not finish. Retry credential setup when offered; otherwise the operator will review the failed connector checks.',
   operatorInvite: 'Operator invite',

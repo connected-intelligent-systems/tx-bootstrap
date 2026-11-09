@@ -7,6 +7,7 @@ import { createAdminParticipantActions } from "./admin-participant-actions.js";
 import type { EmailService } from "@tx-bootstrap/core/server/services/email-service.js";
 import { participantsToCsv } from "../utils/csv.js";
 import { createNetworkEnrollmentService } from "../services/network-enrollment-service.js";
+import { createParticipantRevocationService } from "../services/participant-revocation-service.js";
 
 type OperatorAuth = ReturnType<typeof createAuth>;
 
@@ -39,7 +40,14 @@ export function createOperatorController({
     participantEvents,
     approvalService,
   });
+  const revocation = createParticipantRevocationService({
+    approvalService,
+    repositories,
+    tunnels: config.headscale,
+  });
   const participantActions = createAdminParticipantActions({
+    approvalService,
+    revocation,
     businessPartners,
     lifecycle,
     onboardingCases,
@@ -73,6 +81,7 @@ export function createOperatorController({
 
   return {
     approvalService,
+    reconcileRevocations: revocation.reconcile,
     listParticipants,
     getDashboardStats,
     getParticipantEvents,

@@ -69,6 +69,7 @@ export const verificationStatusSchema = z.enum([
   "IN_REVIEW",
   "VERIFIED",
   "REJECTED",
+  "REVOKED",
 ]);
 export const onboardingStateSchema = z.enum([
   "REQUESTED",
@@ -76,6 +77,7 @@ export const onboardingStateSchema = z.enum([
   "READY_FOR_PARTICIPANT",
   "CREDENTIALS_REQUESTED",
   "REJECTED",
+  "REVOKED",
   "FAILED",
 ]);
 export const participantStageSchema = z.enum([
@@ -85,6 +87,7 @@ export const participantStageSchema = z.enum([
   "CONNECTOR_SETUP",
   "CREDENTIALS",
   "REJECTED",
+  "REVOKED",
   "FAILED",
 ]);
 export const credentialStateSchema = z.enum([
@@ -93,6 +96,7 @@ export const credentialStateSchema = z.enum([
   "REQUESTED",
   "ISSUED",
   "FAILED",
+  "REVOKED",
 ]);
 export const credentialReceiptReportStatusSchema = z.enum([
   "reported",
@@ -258,10 +262,21 @@ export const participantEventSchema = z.object({
   createdAt: z.string(),
 });
 
+export const participantRevocationSchema = z.object({
+  revokedAt: z.string(),
+  reason: z.string(),
+  checks: z.array(setupCheckSchema),
+  complete: z.boolean(),
+  // At least one step failed and needs a retry; otherwise an incomplete
+  // revocation is still in progress.
+  failed: z.boolean(),
+});
+
 export const participantSchema = z.object({
   id: z.string(),
   stage: participantStageSchema,
   nextAction: z.string(),
+  revocation: participantRevocationSchema.nullable().optional(),
   organization: participantOrganizationSchema,
   bpn: participantBpnSchema,
   technical: participantTechnicalSchema,
@@ -300,6 +315,13 @@ export const rejectSchema = z.object({
   verificationNotes: optionalInput(4000),
 });
 
+// Revocation and readmission: the BPN must be repeated to confirm the target.
+export const revokeSchema = z.object({
+  confirmBpn: requiredString("Confirmation BPN", 32),
+  reason: requiredString("Reason", 4000),
+});
+export const readmitSchema = revokeSchema;
+
 export const credentialReceiptsReportSchema = z.object({
   status: credentialReceiptReportStatusSchema.default("reported"),
   message: boundedString(2000).optional().default(""),
@@ -334,6 +356,9 @@ export type ParticipantCaseSummary = z.infer<
 >;
 export type ParticipantEvent = z.infer<typeof participantEventSchema>;
 export type Participant = z.infer<typeof participantSchema>;
+export type ParticipantRevocation = z.infer<typeof participantRevocationSchema>;
+export type RevokeInput = z.infer<typeof revokeSchema>;
+export type ReadmitInput = z.infer<typeof readmitSchema>;
 export type ParticipantOrganizationUpdate = z.infer<
   typeof participantOrganizationUpdateSchema
 >;

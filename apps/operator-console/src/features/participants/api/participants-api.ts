@@ -3,6 +3,7 @@ import type {
   ParticipantCreateInput,
   ParticipantInvite,
   ParticipantOrganizationUpdate,
+  RevokeInput,
   TechnicalMetadataUpdate,
 } from "@/shared/api";
 import { apiKeyHeaders, handleUnauthorized } from "@/features/auth/api-key";
@@ -59,6 +60,26 @@ export async function updateParticipantOrganization(
       method: "PATCH",
       body,
     },
+  );
+}
+
+export async function revokeParticipant(
+  id: string,
+  body: RevokeInput,
+): Promise<Participant> {
+  return request<Participant>(
+    `${adminBaseUrl}/${encodeURIComponent(id)}/revoke`,
+    { method: "POST", body },
+  );
+}
+
+export async function readmitParticipant(
+  id: string,
+  body: RevokeInput,
+): Promise<Participant> {
+  return request<Participant>(
+    `${adminBaseUrl}/${encodeURIComponent(id)}/readmit`,
+    { method: "POST", body },
   );
 }
 

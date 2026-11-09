@@ -130,8 +130,9 @@ connection state, issue a replacement key, or revoke access. The participant
 needs a verified BPN before enrollment.
 
 Keys are shown only once. If a key is lost or expires before use, revoke the
-enrollment and issue a new one. Rejecting a participant also triggers tunnel
-revocation. Offline nodes are flagged as stale after 7 days by default; they
+enrollment and issue a new one. Rejecting or
+[revoking](operator.md#revoke-a-participant) a participant also triggers
+tunnel revocation. Offline nodes are flagged as stale after 7 days by default; they
 are not automatically deleted just for being offline.
 
 ### Trust and certificates

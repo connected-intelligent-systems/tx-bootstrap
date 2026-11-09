@@ -110,6 +110,109 @@ describe('participant onboarding credential polling', () => {
   })
 })
 
+describe('participant revocation and readmission', () => {
+  const issuerDid = 'did:web:issuer.example:BPNL000000000001'
+  let row: StateRow
+  let caseData: Record<string, unknown>
+  let clock = 4_000_000_000_000
+
+  beforeEach(() => {
+    // The operator check is throttled per process; move the clock past it.
+    clock += 120_000
+    vi.spyOn(Date, 'now').mockImplementation(() => clock)
+    mocks.dataspaceFetch.mockReset()
+    mocks.identityHubFetch.mockReset()
+    mocks.patchState.mockImplementation(async (patch: PatchStateInput) => {
+      row = {
+        ...row,
+        state: patch.state ?? row.state,
+        case_data: patch.caseData ?? row.case_data,
+        credential_request: patch.credentialRequest ?? row.credential_request,
+        credentials: patch.credentials ?? row.credentials,
+        last_error: patch.lastError === undefined ? row.last_error : patch.lastError || null,
+      }
+    })
+    mocks.loadStateRow.mockImplementation(async () => row)
+    mocks.dataspaceFetch.mockImplementation(async () => caseData)
+  })
+
+  it('notices an operator revocation after onboarding', async () => {
+    row = { ...credentialRequestRow(), state: 'ONBOARDED' }
+    caseData = { ...row.case_data, state: 'REVOKED' }
+
+    const state = await buildStateResponse({ autoProgress: true })
+
+    expect(state.state).toBe('REVOKED')
+    expect(state.onboarded).toBe(false)
+    expect(mocks.identityHubFetch).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['after seeing the revocation', 'REVOKED'],
+    ['when revocation and readmission happened while it was not watching', 'ONBOARDED'],
+  ])('removes the revoked credentials and requests new ones after readmission %s', async (_label, localState) => {
+    row = { ...credentialRequestRow(), state: localState }
+    const newRequest = {
+      holderPid: 'BPNL000000000002-readmitted',
+      issuerDid,
+      credentials: [{ id: 'membership', type: 'MembershipCredential', format: 'ldp_vc' }],
+    }
+    caseData = { id: 'case-1', state: 'READY_FOR_PARTICIPANT', issuerDid, credentialRequest: newRequest }
+    mocks.dataspaceFetch.mockImplementation(async (path: string, options?: { method?: string }) =>
+      options?.method === 'POST' && path.includes('/credential-receipts')
+        ? { ...caseData, state: 'CREDENTIALS_REQUESTED' }
+        : caseData,
+    )
+    const wallet = [
+      {
+        id: 'old-membership',
+        verifiableCredential: {
+          credential: { type: ['VerifiableCredential', 'MembershipCredential'], issuer: issuerDid },
+        },
+      },
+      {
+        id: 'other-issuer',
+        verifiableCredential: {
+          credential: { type: ['VerifiableCredential', 'OtherCredential'], issuer: 'did:web:other' },
+        },
+      },
+    ]
+    mocks.identityHubFetch.mockImplementation(async (path: string, options?: { method?: string }) => {
+      if (options?.method === 'DELETE') {
+        wallet.splice(
+          wallet.findIndex((item) => path.endsWith('/' + item.id)),
+          1,
+        )
+        return undefined
+      }
+      if (options?.method === 'POST') return undefined
+      if (path.endsWith('/credentials')) return wallet
+      return { status: 'REQUESTED' }
+    })
+
+    const state = await buildStateResponse({ autoProgress: true })
+
+    const deletes = mocks.identityHubFetch.mock.calls.filter(([, options]) => options?.method === 'DELETE')
+    expect(deletes.map(([path]) => path)).toEqual([expect.stringMatching(/\/credentials\/old-membership$/)])
+    expect(mocks.identityHubFetch).toHaveBeenCalledWith(
+      expect.stringMatching(/\/credentials\/request$/),
+      expect.objectContaining({ method: 'POST', body: newRequest }),
+    )
+    expect(state.state).toBe('CREDENTIALS_REQUESTED')
+  })
+
+  it('leaves an onboarded participant alone while its request id is unchanged', async () => {
+    row = { ...credentialRequestRow(), state: 'ONBOARDED' }
+    caseData = { ...row.case_data, state: 'CREDENTIALS_REQUESTED' }
+    mocks.identityHubFetch.mockImplementation(async () => [])
+
+    await buildStateResponse({ autoProgress: true })
+
+    expect(mocks.identityHubFetch.mock.calls.some(([, options]) => options?.method === 'DELETE')).toBe(false)
+    expect(row.state).toBe('ONBOARDED')
+  })
+})
+
 function credentialRequestRow(): StateRow {
   const credentialRequest = {
     holderPid: 'BPNL000000000002',

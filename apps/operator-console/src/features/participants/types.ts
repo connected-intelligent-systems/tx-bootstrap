@@ -9,7 +9,9 @@ export type {
   ParticipantInvite,
   ParticipantOrganization,
   ParticipantOrganizationUpdate,
+  ParticipantRevocation,
   ParticipantStage,
   ParticipantTechnical,
+  RevokeInput,
   TechnicalMetadataUpdate,
 } from "@/shared/api";

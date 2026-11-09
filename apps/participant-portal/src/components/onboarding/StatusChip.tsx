@@ -7,7 +7,7 @@ export function StatusChip(props: { state: GatewayState; pageState: PageState; l
   const color =
     props.pageState === 'ready'
       ? 'success'
-      : props.pageState === 'failed'
+      : props.pageState === 'failed' || props.pageState === 'revoked'
         ? 'error'
         : props.pageState === 'needsInvite'
           ? 'warning'

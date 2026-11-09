@@ -2,17 +2,36 @@ import type { Config } from "../config/index.js";
 import type { Repositories } from "@tx-bootstrap/core/server/db/repositories/index.js";
 import { buildCredentialRequestPayload } from "@tx-bootstrap/core/server/domain/credential-request.js";
 import { isValidBpn } from "@tx-bootstrap/core/server/domain/participant-mappers.js";
+import type { ParticipantAccessLease } from "@tx-bootstrap/core/server/db/participant-access-lease.js";
 export type SetupCheck = {
   name: string;
-  status: "ok" | "failed" | "manual";
+  // pending: still in progress and checked again later; skipped: does not
+  // apply to this deployment.
+  status: "ok" | "failed" | "manual" | "pending" | "skipped";
   message: string;
   retryable?: boolean;
 };
 
 const requestTimeoutMs = 15_000;
 const isRetryableStatus = (status: number) => status === 429 || status >= 500;
-const fetchWithTimeout = (url: string, init?: RequestInit) =>
-  fetch(url, { ...init, signal: AbortSignal.timeout(requestTimeoutMs) });
+const fetchWithTimeout = (
+  url: string,
+  init?: RequestInit,
+  lease?: ParticipantAccessLease,
+) => {
+  lease?.assertActive();
+  const timeout = AbortSignal.timeout(requestTimeoutMs);
+  return fetch(url, {
+    ...init,
+    signal: lease ? AbortSignal.any([timeout, lease.signal]) : timeout,
+  });
+};
+
+function credentialSubjectId(credential?: { credentialSubject?: unknown }) {
+  const subject = credential?.credentialSubject;
+  const first = Array.isArray(subject) ? subject[0] : subject;
+  return (first as { id?: string } | undefined)?.id;
+}
 
 export function createParticipantApprovalService({
   config,
@@ -43,7 +62,356 @@ export function createParticipantApprovalService({
     buildCredentialRequest,
     requireVerifiedBusinessPartner,
     runApprovalSetup,
+    runRevocation,
+    runReadmission,
   };
+
+  /**
+   * Reverses the revocation's access blocks so the participant can request
+   * new credentials. Revoked credentials stay revoked. Issuance reopens last:
+   * if the holder cannot be restored, the BDRS entry is removed again so a
+   * failed readmission leaves the participant fully revoked.
+   */
+  async function runReadmission({
+    bpn,
+    did,
+    organizationName,
+    lease,
+  }: {
+    bpn: string;
+    did: string;
+    organizationName: string;
+    lease?: ParticipantAccessLease;
+  }) {
+    const bdrs = (await upsertBdrs({ bpn, did }, lease)) as SetupCheck;
+    if (bdrs.status !== "ok") return [bdrs];
+    const holder = await restoreIssuerHolder(bpn, did, organizationName, lease);
+    lease?.assertActive();
+    if (holder.status === "ok") return [bdrs, holder];
+    const rollback = await removeBdrsEntry(bpn, lease);
+    return [
+      bdrs,
+      holder,
+      {
+        ...rollback,
+        name: "bdrs-rollback",
+        message:
+          rollback.status === "ok"
+            ? `${bpn} removed from BDRS again`
+            : `Could not remove ${bpn} from BDRS again: ${rollback.message}`,
+      },
+    ];
+  }
+
+  async function restoreIssuerHolder(
+    bpn: string,
+    did: string,
+    organizationName: string,
+    lease?: ParticipantAccessLease,
+  ): Promise<SetupCheck> {
+    const name = "issuer-holder-restore";
+    const path = `${issuerParticipantPath()}/holders`;
+    try {
+      const current = await issuerFetch(
+        "GET",
+        `${path}/${encodeURIComponent(bpn)}`,
+        undefined,
+        lease,
+      );
+      if (current.status === 404) {
+        const created = await issuerFetch(
+          "POST",
+          path,
+          {
+            did,
+            holderId: bpn,
+            name: organizationName,
+            properties: {},
+          },
+          lease,
+        );
+        if (!created.ok && created.status !== 409)
+          return failedResponse(name, created);
+        return { name, status: "ok", message: "Holder registered" };
+      }
+      if (!current.ok) return failedResponse(name, current);
+      const holder = (await current.json()) as {
+        did?: string;
+        holderName?: string;
+        properties?: Record<string, unknown>;
+      };
+      const properties = { ...(holder.properties ?? {}) };
+      delete properties.revoked;
+      delete properties.originalDid;
+      if (holder.did === did && !holder.properties?.revoked)
+        return { name, status: "ok", message: "Holder already active" };
+      const update = await issuerFetch(
+        "PUT",
+        path,
+        {
+          holderId: bpn,
+          did,
+          name: holder.holderName ?? organizationName,
+          properties,
+        },
+        lease,
+      );
+      if (!update.ok) return failedResponse(name, update);
+      return {
+        name,
+        status: "ok",
+        message: "Holder restored; the participant can request credentials",
+      };
+    } catch (error) {
+      lease?.assertActive();
+      return {
+        name,
+        status: "failed",
+        retryable: true,
+        message: error.message,
+      };
+    }
+  }
+
+  /**
+   * Removes a participant from the dataspace at the issuer and BDRS. Each step
+   * is idempotent, so a failed revocation can simply be run again. Tunnel
+   * access is removed separately by the network reconciler.
+   *
+   * A credential request the issuer accepted just before the block can still
+   * produce a credential afterwards. Until `settled` (the revocation reconciler
+   * passes it once some time has passed since the block), the credential step
+   * stays pending so the scan is repeated.
+   */
+  async function runRevocation({
+    bpn,
+    did,
+    settled = false,
+    lease,
+  }: {
+    bpn: string;
+    did: string;
+    settled?: boolean;
+    lease?: ParticipantAccessLease;
+  }) {
+    const checks: SetupCheck[] = [];
+    checks.push(await blockIssuerHolder(bpn, lease));
+    checks.push(await revokeIssuedCredentials(bpn, did, settled, lease));
+    checks.push(await removeBdrsEntry(bpn, lease));
+    lease?.assertActive();
+    return checks;
+  }
+
+  // Participants request credentials from their own Identity Hub at any time,
+  // and the issuer serves any registered holder that presents its DID. The
+  // Issuer Service (0.3.x) cannot delete holders, so the holder's DID is
+  // replaced with one nobody can present; the original stays in properties.
+  async function blockIssuerHolder(
+    bpn: string,
+    lease?: ParticipantAccessLease,
+  ): Promise<SetupCheck> {
+    const name = "issuer-holder-block";
+    const blockedDid = `did:web:revoked.invalid:${bpn}`;
+    const path = `${issuerParticipantPath()}/holders`;
+    try {
+      const current = await issuerFetch(
+        "GET",
+        `${path}/${encodeURIComponent(bpn)}`,
+        undefined,
+        lease,
+      );
+      if (current.status === 404)
+        return { name, status: "ok", message: "No holder registered" };
+      if (!current.ok) return failedResponse(name, current);
+      const holder = (await current.json()) as {
+        did?: string;
+        holderName?: string;
+        properties?: Record<string, unknown>;
+      };
+      if (holder.did === blockedDid)
+        return { name, status: "ok", message: "Holder already blocked" };
+      const update = await issuerFetch(
+        "PUT",
+        path,
+        {
+          holderId: bpn,
+          did: blockedDid,
+          name: holder.holderName ?? bpn,
+          properties: {
+            ...(holder.properties ?? {}),
+            revoked: true,
+            originalDid: holder.did,
+          },
+        },
+        lease,
+      );
+      if (!update.ok) return failedResponse(name, update);
+      return {
+        name,
+        status: "ok",
+        message: "Holder blocked; the issuer rejects new credential requests",
+      };
+    } catch (error) {
+      lease?.assertActive();
+      return {
+        name,
+        status: "failed",
+        retryable: true,
+        message: error.message,
+      };
+    }
+  }
+
+  async function revokeIssuedCredentials(
+    bpn: string,
+    did: string,
+    settled: boolean,
+    lease?: ParticipantAccessLease,
+  ): Promise<SetupCheck> {
+    const name = "issuer-credential-revocation";
+    const base = `${issuerParticipantPath()}/credentials`;
+    try {
+      // Read running issuance before scanning: a process that finishes after
+      // this query has stored its credential before the scan below.
+      const processes = await issuerFetch(
+        "POST",
+        `${issuerParticipantPath()}/issuanceprocesses/query`,
+        {
+          offset: 0,
+          limit: 1000,
+          filterExpression: [
+            { operandLeft: "holderId", operator: "=", operandRight: bpn },
+          ],
+        },
+        lease,
+      );
+      if (!processes.ok) return failedResponse(name, processes);
+      const running = (
+        ((await processes.json()) ?? []) as Array<{ state?: string }>
+      ).filter(
+        (process) => !["DELIVERED", "ERRORED"].includes(String(process.state)),
+      ).length;
+
+      const ids: string[] = [];
+      const limit = 200;
+      for (let offset = 0; ; offset += limit) {
+        const response = await issuerFetch(
+          "POST",
+          `${base}/query`,
+          {
+            offset,
+            limit,
+          },
+          lease,
+        );
+        if (!response.ok) return failedResponse(name, response);
+        const page = ((await response.json()) ?? []) as Array<{
+          id: string;
+          credential?: { credentialSubject?: unknown };
+        }>;
+        for (const entry of page) {
+          if (credentialSubjectId(entry.credential) === did) ids.push(entry.id);
+        }
+        if (page.length < limit) break;
+      }
+
+      let revoked = 0;
+      let already = 0;
+      const failures: string[] = [];
+      for (const id of ids) {
+        const path = `${base}/${encodeURIComponent(id)}`;
+        const status = await issuerFetch(
+          "GET",
+          `${path}/status`,
+          undefined,
+          lease,
+        );
+        if (status.ok) {
+          const body = (await status.json()) as { status?: string } | string;
+          const value = typeof body === "string" ? body : body?.status;
+          if (value === "revocation") {
+            already++;
+            continue;
+          }
+        }
+        const response = await issuerFetch("POST", `${path}/revoke`, {}, lease);
+        if (response.ok) revoked++;
+        else failures.push(`${id}: HTTP ${response.status}`);
+      }
+      const summary = `${revoked} revoked, ${already} already revoked of ${ids.length} issued to ${did}`;
+      if (failures.length)
+        return {
+          name,
+          status: "failed",
+          retryable: true,
+          message: `${summary}; failed: ${failures.join(", ")}`,
+        };
+      if (running)
+        return {
+          name,
+          status: "pending",
+          retryable: true,
+          message: `${summary}; ${running} issuance(s) still running, checking again`,
+        };
+      if (!settled)
+        return {
+          name,
+          status: "pending",
+          retryable: true,
+          message: `${summary}; checking again for late issuance`,
+        };
+      return { name, status: "ok", message: summary };
+    } catch (error) {
+      lease?.assertActive();
+      return {
+        name,
+        status: "failed",
+        retryable: true,
+        message: error.message,
+      };
+    }
+  }
+
+  async function removeBdrsEntry(
+    bpn: string,
+    lease?: ParticipantAccessLease,
+  ): Promise<SetupCheck> {
+    const name = "bdrs-removal";
+    try {
+      const response = await fetchWithTimeout(
+        `${bdrsManagementUrl}/bpn-directory/${encodeURIComponent(bpn)}`,
+        { method: "DELETE", headers: { "x-api-key": bdrsApiKey } },
+        lease,
+      );
+      if (response.ok || response.status === 404)
+        return { name, status: "ok", message: `${bpn} removed from BDRS` };
+      return failedResponse(name, response);
+    } catch (error) {
+      lease?.assertActive();
+      return {
+        name,
+        status: "failed",
+        retryable: true,
+        message: error.message,
+      };
+    }
+  }
+
+  function issuerParticipantPath() {
+    return `/v1alpha/participants/${encodeURIComponent(issuerContextPathId)}`;
+  }
+
+  async function failedResponse(
+    name: string,
+    response: Response,
+  ): Promise<SetupCheck> {
+    return {
+      name,
+      status: "failed",
+      retryable: isRetryableStatus(response.status),
+      message: `HTTP ${response.status}: ${(await response.text()) || "<empty>"}`,
+    };
+  }
 
   async function runApprovalSetup(row) {
     const checks: SetupCheck[] = [];
@@ -134,7 +502,7 @@ export function createParticipantApprovalService({
     };
   }
 
-  async function upsertBdrs(row) {
+  async function upsertBdrs(row, lease?: ParticipantAccessLease) {
     try {
       const response = await fetchWithTimeout(
         `${bdrsManagementUrl}/bpn-directory`,
@@ -146,6 +514,7 @@ export function createParticipantApprovalService({
           },
           body: JSON.stringify({ bpn: row.bpn, did: row.did }),
         },
+        lease,
       );
       if (!response.ok && response.status !== 409) {
         return {
@@ -161,6 +530,7 @@ export function createParticipantApprovalService({
         message: `${row.bpn} mapped to ${row.did}`,
       };
     } catch (error) {
+      lease?.assertActive();
       return {
         name: "bdrs-registration",
         status: "failed",
@@ -397,12 +767,12 @@ export function createParticipantApprovalService({
     }
   }
 
-  async function resolveIssuerApiKey() {
+  async function resolveIssuerApiKey(lease?: ParticipantAccessLease) {
     if (cachedIssuerApiKey) return cachedIssuerApiKey;
-    return resolveVaultSecret(issuerApiKeyVaultPath);
+    return resolveVaultSecret(issuerApiKeyVaultPath, lease);
   }
 
-  async function resolveVaultSecret(path) {
+  async function resolveVaultSecret(path, lease?: ParticipantAccessLease) {
     if (!issuerApiKeyVaultUrl || !issuerApiKeyVaultToken || !path) return "";
     const candidates = path.includes("/secret/data/data/")
       ? [path, path.replace("/secret/data/data/", "/secret/data/")]
@@ -414,6 +784,7 @@ export function createParticipantApprovalService({
           {
             headers: { "X-Vault-Token": issuerApiKeyVaultToken },
           },
+          lease,
         );
         if (!response.ok) continue;
         const payload = (await response.json()) as {
@@ -422,22 +793,32 @@ export function createParticipantApprovalService({
         const content = payload?.data?.data?.content;
         if (typeof content === "string" && content) return content;
       } catch {
+        lease?.assertActive();
         // Try the next compatible Vault path shape.
       }
     }
     return "";
   }
 
-  async function issuerFetch(method, path, body) {
-    const apiKey = await resolveIssuerApiKey();
-    return fetchWithTimeout(`${issuerAdminUrl}${path}`, {
-      method,
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": apiKey,
+  async function issuerFetch(
+    method: string,
+    path: string,
+    body?: unknown,
+    lease?: ParticipantAccessLease,
+  ) {
+    const apiKey = await resolveIssuerApiKey(lease);
+    return fetchWithTimeout(
+      `${issuerAdminUrl}${path}`,
+      {
+        method,
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": apiKey,
+        },
+        body: body === undefined ? undefined : JSON.stringify(body),
       },
-      body: body === undefined ? undefined : JSON.stringify(body),
-    });
+      lease,
+    );
   }
 
   async function postIssuer(name, path, body) {

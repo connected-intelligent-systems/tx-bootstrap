@@ -57,7 +57,7 @@ export function createNetworkEnrollmentRepository(db: Kysely<Database>) {
     },
     /**
      * Enrollments to revoke on one Headscale server: unfinished revocations
-     * and issued enrollments of rejected participants.
+     * and issued enrollments of rejected or revoked participants.
      */
     async listPendingRevocations(controlUrl: string) {
       return db
@@ -70,7 +70,7 @@ export function createNetworkEnrollmentRepository(db: Kysely<Database>) {
             eb("e.state", "=", "REVOKING"),
             eb.and([
               eb("e.state", "=", "ISSUED"),
-              eb("p.verification_status", "=", "REJECTED"),
+              eb("p.verification_status", "in", ["REJECTED", "REVOKED"]),
             ]),
           ]),
         )

@@ -26,14 +26,32 @@ export type BusinessPartnerTable = {
   >;
   external_authority: ColumnType<string, string | undefined, string>;
   verification_status: ColumnType<
-    "UNVERIFIED" | "IN_REVIEW" | "VERIFIED" | "REJECTED",
-    "UNVERIFIED" | "IN_REVIEW" | "VERIFIED" | "REJECTED" | undefined,
-    "UNVERIFIED" | "IN_REVIEW" | "VERIFIED" | "REJECTED"
+    "UNVERIFIED" | "IN_REVIEW" | "VERIFIED" | "REJECTED" | "REVOKED",
+    | "UNVERIFIED"
+    | "IN_REVIEW"
+    | "VERIFIED"
+    | "REJECTED"
+    | "REVOKED"
+    | undefined,
+    "UNVERIFIED" | "IN_REVIEW" | "VERIFIED" | "REJECTED" | "REVOKED"
   >;
   verification_notes: ColumnType<string, string | undefined, string>;
   verified_at: ColumnType<
     Date | null,
     Date | string | null | undefined,
+    Date | string | null
+  >;
+  revoked_at: ColumnType<
+    Date | null,
+    Date | string | null | undefined,
+    Date | string | null
+  >;
+  revocation_reason: ColumnType<string, string | undefined, string>;
+  revocation_checks: JsonColumn;
+  access_lease_token: string | null;
+  access_lease_until: ColumnType<
+    Date | null,
+    Date | string | null,
     Date | string | null
   >;
   created_at: TimestampColumn;
@@ -58,12 +76,14 @@ export type OnboardingCaseTable = {
     | "READY_FOR_PARTICIPANT"
     | "CREDENTIALS_REQUESTED"
     | "REJECTED"
+    | "REVOKED"
     | "FAILED",
     | "REQUESTED"
     | "IN_REVIEW"
     | "READY_FOR_PARTICIPANT"
     | "CREDENTIALS_REQUESTED"
     | "REJECTED"
+    | "REVOKED"
     | "FAILED"
     | undefined,
     | "REQUESTED"
@@ -71,6 +91,7 @@ export type OnboardingCaseTable = {
     | "READY_FOR_PARTICIPANT"
     | "CREDENTIALS_REQUESTED"
     | "REJECTED"
+    | "REVOKED"
     | "FAILED"
   >;
   admin_notes: string;

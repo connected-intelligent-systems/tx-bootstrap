@@ -10,6 +10,7 @@ import { createEmailService } from "@tx-bootstrap/core/server/services/email-ser
 import { setupGracefulShutdown } from "@tx-bootstrap/core/server/utils/shutdown.js";
 import { createTechnicalSetupWorker } from "./src/services/technical-setup-worker.js";
 import { createNetworkNameReconciler } from "./src/services/network-name-reconciler.js";
+import { createRevocationReconciler } from "./src/services/revocation-reconciler.js";
 
 const databases = createDatabases(config);
 const repositories = createRepositories(databases.db, databases.issuerClaimsDb);
@@ -48,6 +49,11 @@ const networkNameReconciler = config.headscale.enabled
     })
   : undefined;
 
+const revocationReconciler = createRevocationReconciler({
+  reconcile: controller.reconcileRevocations,
+  logger: app.log,
+});
+
 // Graceful shutdown handling
 setupGracefulShutdown({
   logger: app.log,
@@ -55,6 +61,7 @@ setupGracefulShutdown({
   cleanup: async () => {
     await technicalSetupWorker.stop();
     await networkNameReconciler?.stop();
+    await revocationReconciler.stop();
     await app.close();
     await databases.close();
   },
@@ -69,6 +76,7 @@ try {
   app.log.info(`Admin console listening on ${config.port}`);
   technicalSetupWorker.start();
   networkNameReconciler?.start();
+  revocationReconciler.start();
 } catch (err) {
   app.log.error(err, "Failed to start server");
   process.exit(1);
