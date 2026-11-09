@@ -6,6 +6,7 @@ import { config } from '../config/index.js'
 import { requireScope } from './auth-service.js'
 import { resolveHttpEndpointDataReference, type HttpEndpointDataReference } from './edr-service.js'
 import { requestSafeHttpResponse } from './safe-http-request.js'
+import { UNTRUSTED_CONTENT_HEADERS } from './untrusted-content.js'
 
 export const DATA_PROXY_METHODS = ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE'] as const
 
@@ -43,7 +44,35 @@ const blockedResponseHeaders = new Set([
   'trailer',
   'transfer-encoding',
   'upgrade',
+  // Provider responses are served on the portal origin. They must not be able
+  // to relax its browser security policy or grant other origins access to it.
+  'clear-site-data',
+  'content-security-policy',
+  'content-security-policy-report-only',
+  'cross-origin-embedder-policy',
+  'cross-origin-opener-policy',
+  'cross-origin-resource-policy',
+  'link',
+  'nel',
+  'origin-agent-cluster',
+  'permissions-policy',
+  'refresh',
+  'report-to',
+  'reporting-endpoints',
+  'service-worker-allowed',
+  'set-cookie2',
+  'strict-transport-security',
+  'timing-allow-origin',
+  'x-content-type-options',
+  'x-frame-options',
+  'x-permitted-cross-domain-policies',
+  'x-xss-protection',
 ])
+
+// Browser destinations that cannot execute provider content in the portal
+// origin. Script, style, worker, and frame loads are refused outright, since
+// a portal page could otherwise load provider JavaScript as 'self'.
+const allowedFetchDestinations = new Set(['', 'empty', 'document', 'image', 'audio', 'video'])
 
 type DataProxyParams = { transferProcessId: string; '*': string }
 type RequestStats = { bytes: number }
@@ -58,6 +87,11 @@ export async function proxyTransferData(
       .header('Allow', DATA_PROXY_METHODS.join(', '))
       .code(405)
       .send({ error: 'HTTP method is not supported' })
+  }
+
+  const fetchDestination = String(request.headers['sec-fetch-dest'] ?? '').toLowerCase()
+  if (!allowedFetchDestinations.has(fetchDestination)) {
+    return reply.code(403).send({ error: 'Transfer data cannot be loaded as an active browser resource' })
   }
 
   const principal = await requireScope(request, 'data:proxy')
@@ -276,7 +310,8 @@ function copyResponseHeaders(
       value === undefined ||
       blockedResponseHeaders.has(lowerName) ||
       connectionHeaders.has(lowerName) ||
-      lowerName.startsWith('proxy-')
+      lowerName.startsWith('proxy-') ||
+      lowerName.startsWith('access-control-')
     ) {
       continue
     }
@@ -287,6 +322,8 @@ function copyResponseHeaders(
       reply.header(name, value)
     }
   }
+  // Set last so these replace both upstream values and the portal defaults.
+  reply.headers(UNTRUSTED_CONTENT_HEADERS)
 }
 
 export function rewriteRedirect(location: string, endpoint: URL, target: URL, transferProcessId: string): string {

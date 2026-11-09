@@ -1,6 +1,7 @@
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import { resolveHttpEndpointDataReference } from './edr-service.js'
 import { fetchPublicHttpDownload, fetchPublicHttpPreview } from './public-http-preview.js'
+import { UNTRUSTED_CONTENT_HEADERS } from './untrusted-content.js'
 
 export async function previewHttpPullTransfer(
   request: FastifyRequest<{ Params: { transferId: string } }>,
@@ -26,14 +27,18 @@ export async function downloadHttpPullTransfer(
   const contentLength = firstHeader(response.headers['content-length'])
   const upstreamDisposition = firstHeader(response.headers['content-disposition'])
 
-  reply.code(status).header('Cache-Control', 'no-store').header('Content-Type', contentType)
+  reply
+    .code(status)
+    .header('Cache-Control', 'no-store')
+    .header('Content-Type', contentType)
+    .headers(UNTRUSTED_CONTENT_HEADERS)
   if (contentLength) reply.header('Content-Length', contentLength)
-  if (status >= 200 && status < 300) {
-    reply.header(
-      'Content-Disposition',
-      attachmentDisposition(upstreamDisposition, request.params.transferId, contentType),
-    )
-  }
+  // Always an attachment: error bodies are provider-controlled as well and
+  // must never render as a document on the portal origin.
+  reply.header(
+    'Content-Disposition',
+    attachmentDisposition(upstreamDisposition, request.params.transferId, contentType),
+  )
   return reply.send(response)
 }
 
