@@ -141,8 +141,8 @@ expected ingress traffic; health probes are not counted.
 
 Instead of `ingress.public`, a participant can be published through the
 operator's tunnel (see [Participant tunnel](../../../docs/participant-tunnel.md)).
-The participant then needs no public endpoint, DNS record or certificate of its
-own. Map the operator's tunnel settings to values:
+The participant then needs no public endpoint or DNS record of its own; it
+still terminates TLS itself, with a certificate it obtains through the tunnel. Map the operator's tunnel settings to values:
 
 | Tunnel setting            | Chart value                                                  |
 | ------------------------- | ------------------------------------------------------------ |
@@ -164,9 +164,17 @@ helm upgrade --install participant deploy/helm/participant \
 
 With `tunnel.enabled`, the chart runs a single-replica Tailscale node in
 userspace mode: no capabilities, no TUN device, a read-only root filesystem and
-no Kubernetes API access. It forwards only tailnet TCP 18080 to the public
-gateway Service. The node's outbound connections go to `tunnel.headscaleUrl`
-and Tailscale relay (DERP) servers, so allow them in egress policies.
+no Kubernetes API access. It forwards only tailnet TCP 18443 to a Traefik
+container in the same pod, which terminates TLS for
+`identity.participantPublicHost` and proxies to the public gateway Service.
+Traefik obtains its certificate with ACME TLS-ALPN-01 through the tunnel
+(`tunnel.tls.acmeCaServer`, default Let's Encrypt; optional
+`tunnel.tls.acmeEmail`) and stores it on the node's volume, so the private key
+never leaves the pod. `tunnel.tls.rateLimit` and
+`tunnel.tls.maxConcurrentRequests` limit requests per participant, since the
+operator's ingress cannot see them. The node's outbound connections go to
+`tunnel.headscaleUrl`, Tailscale relay (DERP) servers and the ACME server, so
+allow them in egress policies.
 
 The key is single-use and needed only for the first start. The node identity
 then lives in a PersistentVolumeClaim (`tunnel.persistence`, kept on

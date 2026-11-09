@@ -401,6 +401,7 @@
         "authKeySecretKey",
         "securityContext",
         "image",
+        "tls",
         "persistence",
         "resources"
       ],
@@ -414,6 +415,32 @@
         "authKeySecretKey": { "$ref": "#/definitions/secretKey" },
         "securityContext": { "$ref": "#/definitions/runtimeIdentity" },
         "image": { "$ref": "#/definitions/image" },
+        "tls": {
+          "type": "object",
+          "required": [
+            "acmeCaServer",
+            "acmeEmail",
+            "rateLimit",
+            "maxConcurrentRequests",
+            "image",
+            "resources"
+          ],
+          "properties": {
+            "acmeCaServer": { "type": "string", "pattern": "^https://" },
+            "acmeEmail": { "type": "string" },
+            "rateLimit": {
+              "type": "object",
+              "required": ["average", "burst"],
+              "properties": {
+                "average": { "type": "integer", "minimum": 1 },
+                "burst": { "type": "integer", "minimum": 1 }
+              }
+            },
+            "maxConcurrentRequests": { "type": "integer", "minimum": 1 },
+            "image": { "$ref": "#/definitions/image" },
+            "resources": { "$ref": "#/definitions/resources" }
+          }
+        },
         "persistence": {
           "type": "object",
           "required": ["existingClaim", "storageClassName", "size"],

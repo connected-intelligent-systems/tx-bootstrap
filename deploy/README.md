@@ -9,7 +9,7 @@ this repository.
   participant through the operator's tunnel ingress instead of its own public
   HTTPS proxy; it is published together with the participant as
   `tx-bootstrap-participant-tunnel`. `tunnel.compose.yaml` is the operator side
-  of that tunnel, a wildcard-TLS ingress that joins the operator's own
+  of that tunnel, a TLS-passthrough ingress that joins the operator's own
   Headscale, published as `tx-bootstrap-tunnel` with `tunnel.env.example` as
   its settings template. See
   [Participant tunnel](../docs/participant-tunnel.md).

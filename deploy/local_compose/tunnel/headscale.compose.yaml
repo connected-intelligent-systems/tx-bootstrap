@@ -134,7 +134,7 @@ configs:
           {
             "src": ["tag:txb-ingress"],
             "dst": ["tag:txb-participant"],
-            "ip": ["tcp:18080"]
+            "ip": ["tcp:18443", "tcp:18080"]
           }
         ]
       }

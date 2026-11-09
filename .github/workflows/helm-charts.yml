@@ -164,8 +164,13 @@ jobs:
             --set tunnel.enabled=true \
             --set tunnel.headscaleUrl=https://headscale.tunnel.example.invalid \
             --set tunnel.hostname=bpnl000000000002 \
+            --set identity.participantPublicHost=bpnl000000000002.tunnel.example.invalid \
             > /tmp/participant-tunnel.yaml
           grep -q 'tunnel-tx-bootstrap-participant-public-gateway:80' /tmp/participant-tunnel.yaml
+          # TLS ends in the participant's own pod (passthrough at the ingress).
+          grep -q '"18443": {"TCPForward": "127.0.0.1:8443"}' /tmp/participant-tunnel.yaml
+          grep -q 'rule: Host(`bpnl000000000002.tunnel.example.invalid`)' /tmp/participant-tunnel.yaml
+          grep -q 'acme.tlsChallenge=true' /tmp/participant-tunnel.yaml
           grep -q '^kind: PersistentVolumeClaim$' /tmp/participant-tunnel.yaml
           if grep -q 'tx-bootstrap-participant-tunnel' /tmp/participant-default.yaml; then
             echo "The tunnel rendered while disabled." >&2

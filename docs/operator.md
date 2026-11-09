@@ -81,8 +81,8 @@ request bodies are capped by `OPERATOR_MAX_JSON_BODY_BYTES` and default to
 Participants normally publish their protocol endpoints through their own
 public HTTPS reverse proxy. For participants without one, the operator can
 offer an optional **tunnel**: the participant runs one Tailscale sidecar, and a
-shared ingress terminates TLS for `<bpn>.<participant domain>` and forwards to
-it. Both options give the participant the same kind of public `did:web`, so a
+shared ingress routes `<bpn>.<participant domain>` by TLS server name to it
+without decrypting; the participant terminates TLS itself. Both options give the participant the same kind of public `did:web`, so a
 participant can move between them by changing DNS without changing identity.
 See [Participant tunnel](participant-tunnel.md) for the participant and
 ingress side.
@@ -125,7 +125,7 @@ timestamps. It stores no plaintext join key, and allows only one active
 (`CREATING`, `ISSUED` or `REVOKING`) enrollment per participant.
 
 The Headscale policy must declare the configured participant tag and grant
-only ingress → participant TCP 18080
+only ingress → participant TCP 18443
 ([example](participant-tunnel.md#headscale-requirements)). Participants need no
 grants: their outbound traffic uses the public internet. Peer-to-peer
 participant access, host/LAN routes, exit nodes and Tailscale SSH should have no

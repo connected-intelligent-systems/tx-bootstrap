@@ -3,6 +3,8 @@
 {{- $name := include "tx-bootstrap-participant.componentName" (dict "root" . "component" "tunnel") -}}
 {{- $gateway := include "tx-bootstrap-participant.componentName" (dict "root" . "component" "public-gateway") -}}
 {{- $claim := default $name $tunnel.persistence.existingClaim -}}
+{{- $publicHost := required "identity.participantPublicHost is required with tunnel.enabled" .Values.identity.participantPublicHost -}}
+{{- $healthArgs := list "--ping.entryPoint=health" "--entryPoints.health.address=127.0.0.1:8082" -}}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -11,9 +13,40 @@ metadata:
     {{- include "tx-bootstrap-participant.labels" . | nindent 4 }}
     app.kubernetes.io/component: tunnel
 data:
-  # Raw TCP forward keeps the Host header the operator's ingress sent.
+  # Raw TCP forwards. 18443 carries the still-encrypted public traffic to the
+  # TLS container in this pod; 18080 is plain HTTP for setups without TLS.
   serve.json: |
-    {"TCP": {"18080": {"TCPForward": "{{ $gateway }}:{{ .Values.publicGateway.service.port }}"}}}
+    {"TCP": {
+      "18443": {"TCPForward": "127.0.0.1:8443"},
+      "18080": {"TCPForward": "{{ $gateway }}:{{ .Values.publicGateway.service.port }}"}
+    }}
+  # The participant's own TLS endpoint; the operator's ingress only passes
+  # the encrypted connection through.
+  tls.yaml: |
+    http:
+      routers:
+        public:
+          rule: Host(`{{ $publicHost }}`)
+          entryPoints: [websecure]
+          service: gateway
+          middlewares: [rate, concurrency]
+          tls:
+            certResolver: acme
+      middlewares:
+        rate:
+          rateLimit:
+            average: {{ int64 $tunnel.tls.rateLimit.average }}
+            burst: {{ int64 $tunnel.tls.rateLimit.burst }}
+            period: 1s
+        concurrency:
+          inFlightReq:
+            amount: {{ int64 $tunnel.tls.maxConcurrentRequests }}
+      services:
+        gateway:
+          loadBalancer:
+            passHostHeader: true
+            servers:
+              - url: http://{{ $gateway }}:{{ .Values.publicGateway.service.port }}
 ---
 {{- if not $tunnel.persistence.existingClaim }}
 apiVersion: v1
@@ -61,7 +94,7 @@ spec:
         {{- toYaml . | nindent 8 }}
         {{- end }}
       annotations:
-        checksum/serve: {{ printf "%s:%v" $gateway .Values.publicGateway.service.port | sha256sum }}
+        checksum/serve: {{ printf "%s:%v:%s:%v" $gateway .Values.publicGateway.service.port $publicHost (toJson $tunnel.tls) | sha256sum }}
         {{- with .Values.podAnnotations }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
@@ -110,6 +143,47 @@ spec:
             failureThreshold: 3
           resources:
             {{- toYaml $tunnel.resources | nindent 12 }}
+        - name: tls
+          image: {{ include "tx-bootstrap-participant.image" (dict "root" . "image" $tunnel.tls.image) | quote }}
+          imagePullPolicy: {{ $tunnel.tls.image.pullPolicy }}
+          securityContext:
+            {{- include "tx-bootstrap-participant.containerSecurityContext" (dict "root" . "component" (merge (dict "readOnlyRootFilesystem" true) $tunnel.securityContext)) | nindent 12 }}
+          # Start once the node is on the tailnet, so the first certificate
+          # request can already reach this pod through the operator's ingress.
+          command:
+            - /bin/sh
+            - -c
+            - |
+              until wget -q -O /dev/null http://127.0.0.1:9002/healthz; do sleep 2; done
+              exec traefik "$@"
+            - traefik
+          args:
+            - --log.level=INFO
+            {{- range $healthArgs }}
+            - {{ . }}
+            {{- end }}
+            - --entryPoints.websecure.address=127.0.0.1:8443
+            # Data-plane transfers can be large and slow.
+            - --entryPoints.websecure.transport.respondingTimeouts.readTimeout=0s
+            - --entryPoints.websecure.transport.respondingTimeouts.writeTimeout=0s
+            - --entryPoints.websecure.transport.respondingTimeouts.idleTimeout=180s
+            - --providers.file.filename=/config/tls.yaml
+            - --certificatesResolvers.acme.acme.tlsChallenge=true
+            # Next to the node identity on the same volume.
+            - --certificatesResolvers.acme.acme.storage=/var/lib/tailscale/acme.json
+            - --certificatesResolvers.acme.acme.caServer={{ $tunnel.tls.acmeCaServer }}
+            - --certificatesResolvers.acme.acme.email={{ $tunnel.tls.acmeEmail }}
+          volumeMounts:
+            - { name: state, mountPath: /var/lib/tailscale }
+            - { name: serve, mountPath: /config, readOnly: true }
+          readinessProbe:
+            exec:
+              command: {{ concat (list "traefik" "healthcheck" "--ping") $healthArgs | toJson }}
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            {{- toYaml $tunnel.tls.resources | nindent 12 }}
       volumes:
         - name: state
           persistentVolumeClaim:

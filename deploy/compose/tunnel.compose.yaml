@@ -1,19 +1,19 @@
-# Optional operator tunnel ingress: a public TLS endpoint for participants
-# that cannot run their own public HTTPS endpoint. It joins an existing
-# Headscale server, which the operator runs like Postgres or Vault.
+# Optional operator tunnel ingress: a public endpoint for participants that
+# cannot accept inbound connections. It joins an existing Headscale server,
+# which the operator runs like Postgres or Vault.
 #
-#   https://<name>.${TUNNEL_DOMAIN}  ──▶ traefik (wildcard cert, ACME DNS-01)
-#                                     ──▶ tunnel-router (nginx in tunnel-node)
-#                                     ──▶ <name>.<MagicDNS domain>:18080 over WireGuard
+#   <name>.${TUNNEL_DOMAIN}:443 ──▶ traefik (TLS passthrough, routes by SNI)
+#                                ──▶ tunnel-router (nginx stream in tunnel-node)
+#                                ──▶ <name>.<MagicDNS domain>:18443 over WireGuard
+#                                ──▶ participant's own TLS endpoint
 #
-# Participants only need outbound connectivity; see docs/participant-tunnel.md
-# for the Headscale requirements.
-# Public ports: TCP 80/443 and UDP 41641 (direct WireGuard, announced as
-# TUNNEL_PUBLIC_ENDPOINT).
-# Required: TUNNEL_HEADSCALE_URL, TUNNEL_DOMAIN, TUNNEL_ACME_EMAIL,
-# TUNNEL_ACME_DNS_PROVIDER, the provider's credentials in TUNNEL_ACME_ENV_FILE
-# (Traefik/lego variable names, e.g. HETZNER_API_TOKEN) and a tag:txb-ingress
-# pre-auth key in TUNNEL_INGRESS_AUTHKEY_FILE for the first start.
+# The ingress never decrypts participant traffic and holds no certificates:
+# each participant terminates TLS itself with its own certificate (see
+# participant.tailnet.override.yaml and docs/participant-tunnel.md).
+# Public ports: TCP 80 (redirect to HTTPS), TCP 443 and UDP 41641 (direct
+# WireGuard, announced as TUNNEL_PUBLIC_ENDPOINT).
+# Required: TUNNEL_HEADSCALE_URL, TUNNEL_DOMAIN and a tag:txb-ingress pre-auth
+# key in TUNNEL_INGRESS_AUTHKEY_FILE for the first start.
 
 name: ${COMPOSE_PROJECT_NAME:-tx-bootstrap-tunnel}
 
@@ -86,8 +86,9 @@ services:
     mem_limit: 256m
     cpus: 0.5
 
-  # Maps <name>.${TUNNEL_DOMAIN} to the tailnet node of the same name. Node
-  # names are assigned by the operator console, never by participants.
+  # Maps <name>.${TUNNEL_DOMAIN} to the tailnet node of the same name, by the
+  # TLS server name without decrypting. Node names are assigned by the
+  # operator console, never by participants.
   tunnel-router:
     <<: *runtime-defaults
     image: nginxinc/nginx-unprivileged:1.30.4-alpine3.24@sha256:adf5042a17f4ecdd200c595fa9ffd1be37efb18f89a830bd1a00e4ab4d59d42c
@@ -95,6 +96,8 @@ services:
     cap_drop:
       - ALL
     configs:
+      - source: tunnel-router-nginx
+        target: /etc/nginx/nginx.conf
       - source: tunnel-router
         target: /etc/nginx/conf.d/default.conf
     depends_on:
@@ -124,20 +127,6 @@ services:
       - ALL
     cap_add:
       - NET_BIND_SERVICE
-    # Loads the DNS provider credentials (for example HETZNER_API_TOKEN) from
-    # a secret instead of an env_file, so they never become part of the
-    # published Compose artifact.
-    entrypoint:
-      - /bin/sh
-      - -c
-      - |
-        if [ -s /run/secrets/acme-env ]; then
-          set -a
-          . /run/secrets/acme-env
-          set +a
-        fi
-        exec traefik "$$@"
-      - traefik
     command:
       - --log.level=INFO
       - --ping.entryPoint=health
@@ -145,25 +134,12 @@ services:
       - --entryPoints.web.address=:80
       - --entryPoints.web.http.redirections.entryPoint.to=websecure
       - --entryPoints.websecure.address=:443
-      # Data-plane transfers through the tunnel can be large and slow.
-      - --entryPoints.websecure.transport.respondingTimeouts.readTimeout=0s
-      - --entryPoints.websecure.transport.respondingTimeouts.writeTimeout=0s
-      - --entryPoints.websecure.transport.respondingTimeouts.idleTimeout=180s
       # A directory, so operators can add routes (for example to a Headscale
       # behind the same Traefik) as extra files without replacing these.
       - --providers.file.directory=/etc/traefik/dynamic
-      - --certificatesResolvers.acme.acme.email=${TUNNEL_ACME_EMAIL:?TUNNEL_ACME_EMAIL must be set}
-      - --certificatesResolvers.acme.acme.storage=/acme/acme.json
-      - --certificatesResolvers.acme.acme.caServer=${TUNNEL_ACME_CA_SERVER:-https://acme-v02.api.letsencrypt.org/directory}
-      - --certificatesResolvers.acme.acme.dnsChallenge.provider=${TUNNEL_ACME_DNS_PROVIDER:?TUNNEL_ACME_DNS_PROVIDER must be set}
-      - --certificatesResolvers.acme.acme.dnsChallenge.resolvers=1.1.1.1:53,8.8.8.8:53
-    secrets:
-      - acme-env
     configs:
       - source: traefik-dynamic
         target: /etc/traefik/dynamic/participants.yaml
-    volumes:
-      - traefik-acme:/acme
     ports:
       - target: 80
         published: "${TUNNEL_HTTP_PORT:-80}"
@@ -194,6 +170,52 @@ services:
     cpus: 0.5
 
 configs:
+  # Default nginx.conf of the image plus a stream block for TLS passthrough.
+  tunnel-router-nginx:
+    content: |
+      worker_processes auto;
+      error_log /dev/stderr notice;
+      pid /tmp/nginx.pid;
+
+      events {
+          worker_connections 4096;
+      }
+
+      # Production path: forward the still-encrypted connection to the
+      # participant node chosen by the TLS server name (SNI).
+      stream {
+          resolver 100.100.100.100 valid=10s ipv6=off;
+          resolver_timeout 3s;
+
+          map $$ssl_preread_server_name $$participant {
+              "~^(?<node>[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)\.${TUNNEL_DOMAIN:?TUNNEL_DOMAIN must be set}$$" "$$node.${TUNNEL_MAGICDNS_DOMAIN:-tailnet.internal}:18443";
+              default "";
+          }
+
+          # No per-name connection limit here: nginx applies limit_conn before
+          # it reads the server name. Request limits live at each participant;
+          # Traefik caps connections per client address.
+          server {
+              listen 8443;
+              ssl_preread on;
+              proxy_pass $$participant;
+              proxy_connect_timeout 5s;
+              proxy_timeout 300s;
+          }
+      }
+
+      http {
+          proxy_temp_path /tmp/proxy_temp;
+          client_body_temp_path /tmp/client_temp;
+          fastcgi_temp_path /tmp/fastcgi_temp;
+          uwsgi_temp_path /tmp/uwsgi_temp;
+          scgi_temp_path /tmp/scgi_temp;
+          access_log off;
+          include /etc/nginx/conf.d/*.conf;
+      }
+
+  # Health endpoint, plus a plain-HTTP path (Host header to node:18080) used
+  # only by the local stack, which runs without TLS.
   tunnel-router:
     content: |
       server {
@@ -219,7 +241,6 @@ configs:
               proxy_pass http://$$node.${TUNNEL_MAGICDNS_DOMAIN:-tailnet.internal}:18080;
               proxy_http_version 1.1;
               proxy_set_header Host $$host;
-              proxy_set_header X-Forwarded-Proto https;
               proxy_set_header X-Forwarded-Host $$host;
               proxy_set_header X-Forwarded-For $$proxy_add_x_forwarded_for;
               proxy_connect_timeout 5s;
@@ -229,60 +250,39 @@ configs:
 
   traefik-dynamic:
     content: |
-      http:
+      tcp:
         routers:
+          # TLS passthrough: Traefik reads only the server name and never
+          # decrypts. Clients without SNI are not routed.
           participants:
-            rule: HostRegexp(`^[a-z0-9-]+\.${TUNNEL_DOMAIN:?TUNNEL_DOMAIN must be set}$$`)
+            rule: HostSNIRegexp(`^[a-z0-9-]+\.${TUNNEL_DOMAIN:?TUNNEL_DOMAIN must be set}$$`)
+            priority: 10
             entryPoints: [websecure]
             service: participants
             middlewares:
-              - per-participant-rate
-              - per-participant-concurrency
-              - per-client-concurrency
+              - per-client-connections
             tls:
-              certResolver: acme
-              domains:
-                - main: "${TUNNEL_DOMAIN:?TUNNEL_DOMAIN must be set}"
-                  sans: ["*.${TUNNEL_DOMAIN:?TUNNEL_DOMAIN must be set}"]
-        # One participant, or traffic aimed at one participant, cannot
-        # exhaust the shared ingress. Exceeding a limit returns 429.
+              passthrough: true
         middlewares:
-          per-participant-rate:
-            rateLimit:
-              average: ${TUNNEL_RATE_LIMIT_AVERAGE:-100}
-              burst: ${TUNNEL_RATE_LIMIT_BURST:-200}
-              period: 1s
-              sourceCriterion:
-                requestHost: true
-          per-participant-concurrency:
-            inFlightReq:
-              amount: ${TUNNEL_MAX_CONCURRENT_REQUESTS:-64}
-              sourceCriterion:
-                requestHost: true
-          # Slow clients hold connections open (timeouts are unlimited for
-          # large transfers); cap what a single client address can hold.
-          per-client-concurrency:
-            inFlightReq:
-              amount: ${TUNNEL_MAX_CONCURRENT_REQUESTS_PER_CLIENT:-16}
+          # Slow clients can hold connections open; cap what a single client
+          # address can hold.
+          per-client-connections:
+            inFlightConn:
+              amount: ${TUNNEL_MAX_CONNECTIONS_PER_CLIENT:-16}
         services:
           participants:
             loadBalancer:
-              passHostHeader: true
               servers:
-                - url: http://tunnel-node:8080
+                - address: tunnel-node:8443
 
 networks:
   tunnel:
     name: ${COMPOSE_PROJECT_NAME:-tx-bootstrap-tunnel}
 
 secrets:
-  # KEY=value lines with the DNS provider's credentials for ACME DNS-01.
-  acme-env:
-    file: ${TUNNEL_ACME_ENV_FILE:-./secrets/acme.env}
   # Single-use tag:txb-ingress pre-auth key from the operator's Headscale.
   ingress-authkey:
     file: ${TUNNEL_INGRESS_AUTHKEY_FILE:-./secrets/ingress-authkey}
 
 volumes:
   tunnel-node-state:
-  traefik-acme:

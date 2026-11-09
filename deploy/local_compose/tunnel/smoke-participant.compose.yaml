@@ -1,6 +1,6 @@
 # Stand-in for the participant application: only a public gateway that echoes
-# the Host header, joined to the smoke tunnel network so the sidecar can reach
-# Headscale over HTTP.
+# the Host header, joined to the smoke tunnel network so the sidecars can reach
+# Headscale and the local ACME server.
 name: txb-tunnel-smoke-participant
 services:
   public-gateway:
@@ -13,8 +13,16 @@ services:
       interval: 5s
     networks:
       public:
+        # Not the public host name: on the smoke network that name belongs to
+        # the ingress, as on the internet. tailnet-tls and tailnet reach the
+        # gateway through TAILNET_FORWARD_HOST.
         aliases:
-          - ${PARTICIPANT_PUBLIC_HOST:?PARTICIPANT_PUBLIC_HOST must be set}
+          - smoke-participant-gateway
+
+  # Trusts the local ACME server's TLS certificate.
+  tailnet-tls:
+    volumes:
+      - ${SMOKE_ACME_CA_FILE:?SMOKE_ACME_CA_FILE must be set}:/certs/acme-ca.pem:ro
 configs:
   smoke-gateway:
     content: |

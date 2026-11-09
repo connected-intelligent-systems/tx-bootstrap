@@ -103,11 +103,8 @@ jobs:
       TAILNET_HOSTNAME: bpnl000000000002
       TUNNEL_HEADSCALE_URL: https://headscale.example.invalid
       TUNNEL_DOMAIN: tunnel.example.invalid
-      TUNNEL_ACME_EMAIL: ops@example.invalid
-      TUNNEL_ACME_DNS_PROVIDER: hetzner
       # Compose scans referenced secret files before publishing; their
       # contents and these paths are not part of the artifact.
-      TUNNEL_ACME_ENV_FILE: /tmp/compose-validation/acme.env
       TUNNEL_INGRESS_AUTHKEY_FILE: /tmp/compose-validation/ingress-authkey
       TAILNET_AUTHKEY_FILE: /tmp/compose-validation/tailnet-authkey
     strategy:
@@ -140,7 +137,6 @@ jobs:
           for file in $files; do args="$args -f $file"; done
           printf 'args=%s\n' "${args# }" >> "$GITHUB_OUTPUT"
           install -d /tmp/compose-validation
-          printf '# placeholder\n' > "$TUNNEL_ACME_ENV_FILE"
           printf '# placeholder\n' > "$TUNNEL_INGRESS_AUTHKEY_FILE"
           printf '# placeholder\n' > "$TAILNET_AUTHKEY_FILE"
 

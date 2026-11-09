@@ -1,10 +1,12 @@
 # Optional participant override: expose the public gateway through a
 # Headscale/Tailscale reverse tunnel instead of a self-managed public proxy.
 #
-# Inbound only. The shared ingress terminates TLS for
-# https://${PARTICIPANT_PUBLIC_HOST} and forwards to this node on TCP 18080.
-# Outbound protocol traffic (DIDs, DSP, issuer) uses the normal internet, so
-# tunnelled and directly hosted participants share one public dataspace.
+# Inbound only. The shared ingress forwards https://${PARTICIPANT_PUBLIC_HOST}
+# still encrypted (TLS passthrough) to this node on TCP 18443, where
+# tailnet-tls terminates TLS with the participant's own certificate. The
+# operator cannot read the traffic. Outbound protocol traffic (DIDs, DSP,
+# issuer) uses the normal internet, so tunnelled and directly hosted
+# participants share one public dataspace.
 #
 # Usage (see docs/participant-tunnel.md):
 #   docker compose -f oci://ghcr.io/<owner>/tx-bootstrap-participant:<version> \
@@ -13,9 +15,74 @@
 # The operator's enrollment response provides HEADSCALE_URL, TAILNET_HOSTNAME,
 # PARTICIPANT_PUBLIC_HOST and PARTICIPANT_DID_HOST, plus a single-use key to
 # store in ./secrets/tailnet-authkey (or TAILNET_AUTHKEY_FILE). The key is only
-# needed for the first start; the node identity persists in tailnet-state.
+# needed for the first start; the node identity persists in tailnet-state and
+# the certificate in tailnet-tls-acme.
 
 services:
+  # TLS endpoint for the public host. Obtains its certificate from Let's
+  # Encrypt with TLS-ALPN-01 through the tunnel itself: no DNS credentials and
+  # no further inbound ports.
+  tailnet-tls:
+    image: traefik:v3.7.17@sha256:f4bb143d1135a579b630ed491e17ec50f6f7c9c6a30585ff3d385471d2a86f5a
+    restart: "${RESTART_POLICY:-unless-stopped}"
+    init: true
+    stop_grace_period: 30s
+    logging:
+      driver: "${LOG_DRIVER:-json-file}"
+      options:
+        max-size: "${LOG_MAX_SIZE:-10m}"
+        max-file: "${LOG_MAX_FILES:-3}"
+    command:
+      - --log.level=INFO
+      - --ping.entryPoint=health
+      - --entryPoints.health.address=127.0.0.1:8082
+      - --entryPoints.websecure.address=:8443
+      # Data-plane transfers can be large and slow.
+      - --entryPoints.websecure.transport.respondingTimeouts.readTimeout=0s
+      - --entryPoints.websecure.transport.respondingTimeouts.writeTimeout=0s
+      - --entryPoints.websecure.transport.respondingTimeouts.idleTimeout=180s
+      - --providers.file.filename=/etc/traefik/dynamic.yaml
+      - --certificatesResolvers.acme.acme.tlsChallenge=true
+      - --certificatesResolvers.acme.acme.storage=/acme/acme.json
+      - --certificatesResolvers.acme.acme.caServer=${TAILNET_ACME_CA_SERVER:-https://acme-v02.api.letsencrypt.org/directory}
+      - --certificatesResolvers.acme.acme.email=${TAILNET_ACME_EMAIL:-}
+    environment:
+      # Extra CA bundle for a private ACME server (tests only).
+      LEGO_CA_CERTIFICATES: ${TAILNET_ACME_CA_CERTIFICATES:-}
+    configs:
+      - source: tailnet-tls
+        target: /etc/traefik/dynamic.yaml
+    volumes:
+      - tailnet-tls-acme:/acme
+    networks:
+      - public
+    # Starts once the node is on the tailnet, so the first certificate request
+    # can already reach it through the ingress.
+    depends_on:
+      public-gateway:
+        condition: service_healthy
+      tailnet:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "traefik",
+          "healthcheck",
+          "--ping",
+          "--ping.entryPoint=health",
+          "--entryPoints.health.address=127.0.0.1:8082",
+        ]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 256m
+    cpus: 0.5
+    pids_limit: 256
+
   tailnet:
     image: tailscale/tailscale:v1.104.4@sha256:ed6480b33c6eb67c9cbd203ed42b9fb57e361986725b6856def71b7a3d9e276c
     hostname: ${TAILNET_HOSTNAME:?TAILNET_HOSTNAME must be set}
@@ -73,10 +140,44 @@ services:
 
 configs:
   tailnet-serve:
-    # Raw TCP forward keeps the Host header the ingress sent. TAILNET_FORWARD_HOST
-    # overrides the target when the public host name is ambiguous on a network.
+    # Raw TCP forwards. 18443 carries the still-encrypted public traffic to
+    # tailnet-tls; 18080 is plain HTTP for setups without TLS (the local
+    # stack). TAILNET_FORWARD_HOST overrides the gateway target when the public
+    # host name is ambiguous on a network.
     content: |
-      {"TCP": {"18080": {"TCPForward": "${TAILNET_FORWARD_HOST:-${PARTICIPANT_PUBLIC_HOST}}:80"}}}
+      {"TCP": {
+        "18443": {"TCPForward": "tailnet-tls:8443"},
+        "18080": {"TCPForward": "${TAILNET_FORWARD_HOST:-${PARTICIPANT_PUBLIC_HOST}}:80"}
+      }}
+
+  tailnet-tls:
+    content: |
+      http:
+        routers:
+          public:
+            rule: Host(`${PARTICIPANT_PUBLIC_HOST:?PARTICIPANT_PUBLIC_HOST must be set}`)
+            entryPoints: [websecure]
+            service: gateway
+            middlewares: [rate, concurrency]
+            tls:
+              certResolver: acme
+        middlewares:
+          # All requests arrive from the operator's ingress, so these limit
+          # the participant's total load. Exceeding a limit returns 429.
+          rate:
+            rateLimit:
+              average: ${TAILNET_RATE_LIMIT_AVERAGE:-100}
+              burst: ${TAILNET_RATE_LIMIT_BURST:-200}
+              period: 1s
+          concurrency:
+            inFlightReq:
+              amount: ${TAILNET_MAX_CONCURRENT_REQUESTS:-64}
+        services:
+          gateway:
+            loadBalancer:
+              passHostHeader: true
+              servers:
+                - url: http://${TAILNET_FORWARD_HOST:-${PARTICIPANT_PUBLIC_HOST}}:80
 
 secrets:
   tailnet-authkey:
@@ -84,3 +185,4 @@ secrets:
 
 volumes:
   tailnet-state:
+  tailnet-tls-acme:

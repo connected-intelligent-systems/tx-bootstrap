@@ -192,9 +192,21 @@ DID_DOCUMENT_WAIT_SECONDS="${DID_DOCUMENT_WAIT_SECONDS:-15}"
 
 create_participant_context() {
     log "Creating IdentityHub participant context ${IDENTITYHUB_CONTEXT_ID}"
-    result="$(http_status_with_body POST "${IDENTITYHUB_IDENTITY_URL}/v1alpha/participants/" "$manifest")"
-    status="$(printf '%s' "$result" | sed -n '1p')"
-    body="$(printf '%s' "$result" | sed '1d')"
+    # Readiness (port 8081) can report healthy before the identity API has
+    # registered its routes; until then Jetty answers 404/405. Retry briefly.
+    attempt=0
+    while :; do
+        result="$(http_status_with_body POST "${IDENTITYHUB_IDENTITY_URL}/v1alpha/participants/" "$manifest")"
+        status="$(printf '%s' "$result" | sed -n '1p')"
+        body="$(printf '%s' "$result" | sed '1d')"
+        case "$status" in
+            000|404|405|502|503) ;;
+            *) break ;;
+        esac
+        attempt=$((attempt + 1))
+        [ "$attempt" -lt 30 ] || break
+        sleep 2
+    done
     case "$status" in
         200|201|204) log "IdentityHub participant context created" ;;
         409) log "IdentityHub participant context already exists" ;;

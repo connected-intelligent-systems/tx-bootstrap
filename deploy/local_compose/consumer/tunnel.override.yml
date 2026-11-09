@@ -6,6 +6,10 @@ services:
         aliases:
           - consumer-tunnel-gateway
 
+  # The local stack uses plain HTTP (port 18080); no TLS endpoint.
+  tailnet-tls:
+    profiles: [tls]
+
   tailnet:
     # Started by bootstrap.sh once the console has issued an enrollment key.
     profiles: [tunnel]
