@@ -41,7 +41,7 @@ nav:
       - Local Compose: local-deployment.md
       - Local Kubernetes: deployment/local-kubernetes.md
   - Deployment:
-      - Artifacts and lifecycle: deployment/index.md
+      - Deployment options: deployment/index.md
       - PostgreSQL provisioning: deployment/database.md
       - Helm charts: deployment/helm/index.md
       - Operator chart: deployment/helm/operator.md
@@ -52,12 +52,8 @@ nav:
       - Participant tunnel: participant-tunnel.md
       - S3 HTTP-pull: s3-http-pull.md
   - Development:
-      - Contributing: development.md
-      - Operator console: applications/operator-console.md
-      - Federated catalog: applications/federated-catalog.md
-      - Data-plane image: applications/edc-dataplane.md
-      - Participant API: applications/participant-api.md
-      - Documentation site: documentation.md
+      - Development guide: development.md
+      - Editing the documentation: documentation.md
   - Releases:
       - Versioning and releases: versioning.md
       - "0.2.1": releases/0.2.1.md

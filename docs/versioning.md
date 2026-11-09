@@ -1,72 +1,50 @@
 # Versioning and releases
 
-tx-bootstrap uses one semantic version for every repository-owned component and
-deployment artifact. [`VERSION`](../VERSION) is the source of truth. Package
-metadata and Helm chart metadata are synchronized projections of that value.
+All repository-owned packages, container images, Compose artifacts, and Helm
+charts share the semantic version in [`VERSION`](../VERSION). External
+components keep their upstream versions.
 
-The lockstep version covers:
+## Choose a build
 
-- all `@tx-bootstrap/*` npm workspaces;
-- the federated catalog Python package;
-- the six repository-owned container images, including the optional data-plane image;
-- the operator and participant Compose application artifacts; and
-- the operator and participant Helm charts.
+| Build       | Version format           | Use                              |
+| ----------- | ------------------------ | -------------------------------- |
+| Release     | `0.2.1`                  | A published, fixed stack version |
+| Development | `0.2.1-dev.sha.<commit>` | A specific build from `main`     |
+| Local       | `local`                  | Images built from your checkout  |
 
-External images such as Tractus-X EDC, Identity Hub, BDRS, PostgreSQL, Vault,
-and nginx keep their upstream versions. A tx-bootstrap release identifies the
-tested combination of those dependencies; it does not relabel them.
+Prefer an explicit release, development version, or digest for repeatable
+deployments. Floating aliases such as `latest` can change.
 
-## Changing the version
+## Prepare a release
 
-Set the next stable version from the repository root:
+From the repository root, set the next version and validate it. For example,
+to prepare a patch after `0.2.1`:
 
 ```sh
-npm run version:set -- 0.2.1
+npm run version:set -- 0.2.2
 npm run version:check
 ```
 
-Commit every file changed by `version:set`. CI runs `version:check` and rejects
-partially updated package, lock, chart, or first-party image metadata.
+Commit all files changed by `version:set` through a pull request. The command
+synchronizes package metadata, lock files, charts, and image references.
+Use patch versions for compatible fixes, minor versions for features, and
+major versions for breaking changes. Before `1.0.0`, a minor release may carry
+a documented breaking change.
 
-Use a patch increment for compatible fixes, a minor increment for compatible
-features, and a major increment for breaking API, configuration, or deployment
-changes. While the project remains below `1.0.0`, a minor increment may also
-carry an explicitly documented breaking change.
-
-## Development builds
-
-A push to `main` derives one immutable prerelease identifier from `VERSION` and
-the commit SHA:
-
-```text
-0.2.1-dev.sha.<commit>
-```
-
-CI applies that exact identifier to all published first-party images, Compose
-applications, and Helm chart `version` and `appVersion` fields. The existing
-`sha-<commit>`, `main`, and `latest` aliases may also be published, but they are
-not the canonical stack version.
-
-Local builds continue to use the explicit `local` tag. They are development
-overrides rather than published stack releases.
-
-## Stable releases
-
-Create a stable release only after the version update has reached the target
-commit:
+After the version update is merged, tag the intended release commit using the
+version recorded in that checkout:
 
 ```sh
-git tag v0.2.1
-git push origin v0.2.1
+git tag "v$(cat VERSION)"
+git push origin "v$(cat VERSION)"
 ```
 
-The release workflow first verifies that the tag, `VERSION`, every package,
-both lock files, and both charts agree. It then publishes all first-party
-images and Compose artifacts before publishing the matching Helm charts. Helm
-defaults repository-owned image tags to the chart `appVersion`, while explicit
-tags and immutable digests remain supported for deployment overrides.
+CI checks that the tag and metadata agree, publishes application images and
+Compose artifacts, then publishes the matching Helm charts. Pushes to `main`
+also publish immutable development builds. See the
+[release workflow](../.github/workflows/release.yml) for the publication steps.
 
 ## Release notes
 
-- [0.2.1](releases/0.2.1.md)
-- [0.2.0](releases/0.2.0.md)
+- [0.2.1](releases/0.2.1.md) — S3 secret references in the portal
+- [0.2.0](releases/0.2.0.md) — S3 HTTP-pull and Compose network changes

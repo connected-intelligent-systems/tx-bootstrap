@@ -16,10 +16,6 @@ IMPORTED_PAGES = {
     "deployment/helm/index.md": "deploy/helm/README.md",
     "deployment/helm/operator.md": "deploy/helm/operator/README.md",
     "deployment/helm/participant.md": "deploy/helm/participant/README.md",
-    "applications/operator-console.md": "apps/operator-console/README.md",
-    "applications/federated-catalog.md": "apps/federated-catalog/README.md",
-    "applications/edc-dataplane.md": "apps/edc-dataplane/README.md",
-    "applications/participant-api.md": "apps/participant-portal/server/src/openapi/README.md",
 }
 
 

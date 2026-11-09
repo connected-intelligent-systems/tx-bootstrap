@@ -1,10 +1,11 @@
 # Development
 
-The repository uses Node.js 26 with npm 12 and Python 3.12 with uv. Full
-verification also requires Docker Compose v2 and Helm 4.2.1.
+## Set up
 
-From the repository root, install the locked dependencies and run the quality
-gate used by CI:
+Use Node.js 26, npm 12, Python 3.12, and uv. The complete verification command
+also needs Docker Compose v2 and Helm 4.2.1, matching CI.
+
+Run from the repository root:
 
 ```sh
 nvm use
@@ -13,32 +14,41 @@ uv sync --locked --project apps/federated-catalog
 npm run verify
 ```
 
-`npm run verify` builds, lints, type-checks, and tests the TypeScript and Python
-applications, validates tracked shell scripts, renders the local Compose
-environments, and lints and renders both Helm charts. The
-[documentation workflow](documentation.md) builds the MkDocs site separately.
+`npm run verify` builds and checks the applications, runs their tests,
+validates shell scripts, and checks the Compose and Helm deployments.
+[Documentation builds](documentation.md) run separately.
 
-## Repository layout
+## Work on one application
 
-| Path                                | Contents                                                          |
-| ----------------------------------- | ----------------------------------------------------------------- |
-| `apps/operator-console/`            | Internal operator UI and admin API                                |
-| `apps/operator-onboarding-service/` | Public participant onboarding API                                 |
-| `apps/participant-init/`            | Participant Identity Hub and EDC initialization                   |
-| `apps/edc-dataplane/`               | Optional S3 HTTP-pull data-plane extension image                  |
-| `apps/federated-catalog/`           | Participant-owned catalog snapshot service                        |
-| `apps/participant-portal/`          | Participant UI, onboarding, and backend                           |
-| `packages/core/`                    | Shared domain, API, and database migration code                   |
-| `packages/ui-runtime/`              | Shared runtime support for web applications                       |
-| `deploy/`                           | Compose packages, Helm charts, database tooling, and local stacks |
-| `docs/`                             | Documentation pages and release notes                             |
+Use npm workspaces to run an application's scripts. For example:
 
-## Application guides
+```sh
+npm run build --workspace @tx-bootstrap/operator-console
+npm run test --workspace @tx-bootstrap/operator-console
+```
+
+Use [the local stack](local-deployment.md) to check changes that depend on
+PostgreSQL, Vault, or other dataspace services. Its startup script builds the
+local application images from your checkout.
+
+Application-specific notes:
 
 - [Operator console](../apps/operator-console/README.md)
 - [Federated catalog](../apps/federated-catalog/README.md)
 - [Optional S3 data-plane image](../apps/edc-dataplane/README.md)
 - [Participant API generation](../apps/participant-portal/server/src/openapi/README.md)
 
-Individual applications expose workspace-specific build and test commands.
-Before preparing a release, follow [Versioning and releases](versioning.md).
+## Repository layout
+
+| Directory                                    | Contents                                                                         |
+| -------------------------------------------- | -------------------------------------------------------------------------------- |
+| `apps/`                                      | Operator console, onboarding API, participant portal, catalog, and helper images |
+| `packages/`                                  | Shared domain code, migrations, and UI runtime support                           |
+| `deploy/compose/`                            | Reusable Compose applications                                                    |
+| `deploy/helm/`                               | Operator and participant Helm charts                                             |
+| `deploy/database/`                           | Database provisioning scripts                                                    |
+| `deploy/local_compose/`, `deploy/local_k8s/` | Local reference environments                                                     |
+| `docs/`                                      | User guides and release notes                                                    |
+
+Keep related documentation changes with the code. Before preparing a release,
+follow [Versioning and releases](versioning.md).

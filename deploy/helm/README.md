@@ -1,51 +1,60 @@
-# Helm deployments
+# Helm charts
 
-Helm charts are the production-oriented deployment format. They deliberately do
-not install PostgreSQL or Vault: those services and the Kubernetes Secret named
-by each chart must exist before installation.
+The charts deploy operator and participant applications to Kubernetes 1.27 or
+newer. They require externally managed PostgreSQL and Vault.
 
-Available charts:
+| Chart       | Guide                                      | Published OCI reference                                                                    |
+| ----------- | ------------------------------------------ | ------------------------------------------------------------------------------------------ |
+| Operator    | [Operator chart](operator/README.md)       | `oci://ghcr.io/connected-intelligent-systems/tx-bootstrap-charts/tx-bootstrap-operator`    |
+| Participant | [Participant chart](participant/README.md) | `oci://ghcr.io/connected-intelligent-systems/tx-bootstrap-charts/tx-bootstrap-participant` |
 
-- [`operator`](operator/README.md) – operator console, onboarding service,
-  Identity Hub, Issuer Service, BDRS, DID gateway, and database lifecycle Jobs.
-- [`participant`](participant/README.md) – participant Identity Hub, EDC control
-  and data planes, participant-local federated catalog, scoped portal gateway,
-  public/internal gateways, and initialization Jobs.
+For a complete local installation, use
+[Local Kubernetes](../local_k8s/README.md).
 
-Published OCI references:
+## Before installation
 
-- `oci://ghcr.io/connected-intelligent-systems/tx-bootstrap-charts/tx-bootstrap-operator`
-- `oci://ghcr.io/connected-intelligent-systems/tx-bootstrap-charts/tx-bootstrap-participant`
+1. [Provision PostgreSQL databases](../database/README.md) and Vault secrets.
+2. Create the namespace and the existing Kubernetes Secret required by the
+   chart. Secrets must exist before the migration hooks run.
+3. Prepare an environment-owned values file with identity, public endpoints,
+   authentication, ingress, TLS, and storage settings.
+4. Review image versions, resources, and network policies for your platform.
 
-Select an explicit chart version when pulling or installing. For example:
+The chart-specific guides list required Secret keys. Their `values.yaml`
+files provide the complete settings reference. Do not commit real credentials.
+
+Both charts use non-root containers with restricted security contexts. When
+replacing an image, check that its user and group match the configured
+`securityContext`.
+
+## Versions
+
+Charts and repository-owned images share the stack version in
+[`VERSION`](../../VERSION). Use an explicitly published release or immutable
+development version; see [Versioning](../../docs/versioning.md).
+
+For example, inspect a published chart matching your checkout:
 
 ```sh
 helm show chart \
   oci://ghcr.io/connected-intelligent-systems/tx-bootstrap-charts/tx-bootstrap-operator \
-  --version 0.1.2
+  --version "$(cat VERSION)"
 ```
 
-The chart workflow publishes validated packages from `main` with an immutable
-development version such as `0.1.2-dev.sha.<commit>`. The exact same version is
-used for the chart `appVersion` and all repository-owned image tags. A Git tag
-such as `v0.1.2` publishes the stable `0.1.2` chart only when it matches the
-repository [`VERSION`](../../VERSION); its default images use the matching
-`0.1.2` release tag. Rerunning an unchanged version is safe, while
-attempting to replace an existing version with different contents fails.
+Run from the repository root and confirm that version has been published.
+When installing from OCI, add the same `--version` option. If packages are
+private, authenticate to GHCR or make them public for anonymous installation.
 
-GitHub Container Registry creates new packages as private by default. After the
-first publication, the package owner must make both chart packages public once
-if anonymous installation is required.
+Repository-owned images default to the chart's `appVersion`. Override with a
+published tag or digest when needed; floating tags are rejected for those
+images. Local reference values use locally built images.
 
-Both charts can be rendered and packaged without a cluster. The
-[`local_k8s`](../local_k8s/README.md) environment deploys both charts to Rancher
-Desktop, enforces the Restricted Pod Security Standard for application
-namespaces, and runs operator/provider/consumer smoke checks. A consuming
-project must still validate its environment-specific ingress, TLS, secrets,
-network policy, storage, and external service integration.
+## Helm compatibility
 
-Repo-owned images default to the chart `appVersion`, and chart schemas reject
-floating `latest`, `main`, and `master` tags for those components. Consuming
-projects should replace defaults with a published release tag or, preferably,
-a `sha256:` digest. Local reference values use the explicit `local` tag and
-never pull from a registry.
+The installation commands in these guides target Helm 4.2.1, matching CI.
+They use `--wait=legacy` because completed migration hooks are removed after
+success. With Helm 3, replace `--rollback-on-failure --wait=legacy` with
+`--atomic --wait`.
+
+Network policies, availability, and scaling depend on your cluster and external
+services. Validate them for your environment before increasing replica counts.

@@ -1,60 +1,44 @@
 # tx-bootstrap
 
-Bootstrap, deploy, and operate a Tractus-X-style dataspace from one repository.
-tx-bootstrap combines operator and participant applications with reusable
-Docker Compose packages, Kubernetes Helm charts, database provisioning, and
-complete local demo environments for development and research.
+Build a Tractus-X-style dataspace with operator services, participant
+connectors, and web portals. tx-bootstrap provides a complete local demo and
+reusable deployment packages for development and research.
 
-## Start a local dataspace
+## Start here
 
-With Docker and Compose v2 installed, run these commands from the repository
-root to start an operator, a provider, and a consumer, onboard the demo
-participants, and verify a data exchange:
+The [Local Compose guide](local-deployment.md) starts an operator, a provider,
+and a consumer, then verifies a data exchange. It is the quickest way to try
+the project. Use [Local Kubernetes](../deploy/local_k8s/README.md) to run the
+same roles on Rancher Desktop.
 
-```sh
-deploy/local_compose/scripts/up.sh
-deploy/local_compose/scripts/bootstrap.sh
-deploy/local_compose/scripts/e2e.sh
-```
+## How it fits together
 
-The startup script builds the repository-owned images and prints the service
-URLs. Follow the [Local Compose guide](local-deployment.md) for configuration,
-authentication, persistence, and shutdown. For Rancher Desktop, use the
-[Local Kubernetes guide](../deploy/local_k8s/README.md).
+The **operator** manages participant invitations, credential issuance, and the
+Business Partner DID Resolution Service (BDRS), which maps participant
+identifiers to their DIDs. A DID is the public identity used by a connector.
 
-## Choose your next step
+Each **participant** runs its own identity wallet, Tractus-X EDC connector,
+catalog, and portal. The portal handles onboarding and data exchange.
+Provider and consumer are two participants in the local demo; each keeps its
+own identity, credentials, and data.
 
-| Goal                                            | Guide                                                   |
-| ----------------------------------------------- | ------------------------------------------------------- |
-| Understand deployment packages and lifecycle    | [Deployment artifacts](../deploy/README.md)             |
-| Deploy to Kubernetes                            | [Helm charts](../deploy/helm/README.md)                 |
-| Prepare isolated PostgreSQL databases and roles | [PostgreSQL provisioning](../deploy/database/README.md) |
-| Run issuer, onboarding, and directory services  | [Operator services](operator.md)                        |
-| Configure a participant connector and portal    | [Participant runtime](participant.md)                   |
-| Expose a participant through an operator tunnel | [Participant tunnel](participant-tunnel.md)             |
-| Transfer S3 data over authenticated HTTP-pull   | [S3 HTTP-pull](s3-http-pull.md)                         |
-| Build and verify the applications               | [Development](development.md)                           |
+Local environments include PostgreSQL and Vault. Reusable Compose applications
+and Helm charts connect to PostgreSQL and Vault supplied by your platform.
 
-## Architecture and ownership
+## Guides
 
-The **operator** owns the console, public onboarding service, issuer Identity
-Hub, Issuer Service, BDRS, and operator DID gateway. Each **participant** owns its
-Identity Hub, EDC control and data planes, participant portal, federated
-catalog, and public and internal gateways.
+| Goal                                         | Guide                                                   |
+| -------------------------------------------- | ------------------------------------------------------- |
+| Choose a deployment format                   | [Deployment options](../deploy/README.md)               |
+| Deploy to Kubernetes                         | [Helm charts](../deploy/helm/README.md)                 |
+| Prepare databases                            | [PostgreSQL provisioning](../deploy/database/README.md) |
+| Manage participants and invitations          | [Operator services](operator.md)                        |
+| Onboard and use a connector                  | [Participant runtime](participant.md)                   |
+| Connect a participant without public ingress | [Participant tunnel](participant-tunnel.md)             |
+| Share objects from S3 storage                | [S3 HTTP-pull](s3-http-pull.md)                         |
+| Build or change the project                  | [Development](development.md)                           |
 
-The coordinated local environments provide one operator and two isolated
-participants. They supply development infrastructure for PostgreSQL and Vault.
-Reusable Compose applications and Helm charts require externally provisioned
-PostgreSQL and Vault, with credentials injected by the deployment platform.
-
-Database provisioning and application schema migration are separate lifecycle
-steps. Read the [database guide](../deploy/database/README.md) before deploying
-the reusable packages.
-
-## Releases and source
-
-All repository-owned components share a stack version. See
-[Versioning and releases](versioning.md) for stable releases and development
-artifacts. The source is available on
+See [Versioning and releases](versioning.md) for release notes and artifact
+versions. Source code is available on
 [GitHub](https://github.com/connected-intelligent-systems/tx-bootstrap) under
 the [MIT License](../LICENSE).
