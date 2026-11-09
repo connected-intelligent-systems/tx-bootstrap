@@ -168,6 +168,7 @@ spec:
             - --entryPoints.websecure.transport.respondingTimeouts.writeTimeout=0s
             - --entryPoints.websecure.transport.respondingTimeouts.idleTimeout=180s
             - --providers.file.filename=/config/tls.yaml
+            - --providers.file.watch=false
             - --certificatesResolvers.acme.acme.tlsChallenge=true
             # Next to the node identity on the same volume.
             - --certificatesResolvers.acme.acme.storage=/var/lib/tailscale/acme.json

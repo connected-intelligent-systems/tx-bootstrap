@@ -59,6 +59,8 @@ tunnel exec -T headscale headscale preauthkeys create \
   --tags tag:txb-participant --expiration 15m --output json |
   sed -n 's/.*"key": *"\([^"]*\)".*/\1/p' | head -n 1 | tr -d '\n' >"$work/authkey"
 test -s "$work/authkey"
+# As documented for participants; on Linux the sidecar must still read it.
+chmod 600 "$work/authkey"
 participant up -d --wait --wait-timeout 180
 
 # TLS ends at the participant: the certificate clients see is the one the

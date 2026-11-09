@@ -42,6 +42,8 @@ services:
       - --entryPoints.websecure.transport.respondingTimeouts.writeTimeout=0s
       - --entryPoints.websecure.transport.respondingTimeouts.idleTimeout=180s
       - --providers.file.filename=/etc/traefik/dynamic.yaml
+      # Static configuration: no file watcher (and no inotify instance).
+      - --providers.file.watch=false
       - --certificatesResolvers.acme.acme.tlsChallenge=true
       - --certificatesResolvers.acme.acme.storage=/acme/acme.json
       - --certificatesResolvers.acme.acme.caServer=${TAILNET_ACME_CA_SERVER:-https://acme-v02.api.letsencrypt.org/directory}
@@ -133,6 +135,9 @@ services:
       retries: 30
       start_period: 15s
     cap_drop: [ALL]
+    # Read-only bypass of file permissions, so root in the container can read
+    # the key file (mode 600) when it belongs to a non-root host user.
+    cap_add: [DAC_READ_SEARCH]
     security_opt: [no-new-privileges:true]
     mem_limit: 256m
     cpus: 0.5
