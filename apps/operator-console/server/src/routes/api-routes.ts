@@ -11,9 +11,13 @@ export const createApiRoutes: FastifyPluginAsync<{
   healthService: HealthService;
 }> = async (app, { controller, auth, healthService }) => {
   await app.register(createHealthRoutes, { healthService });
+  // The tunnel ingress polls this every five seconds from one address and
+  // treats any failure as "no routes", so the global per-IP limit (100 per 15
+  // minutes) would unpublish every participant. Requests without the routing
+  // token are rejected with a constant-time comparison before any lookup.
   app.get(
     "/network/tunnel-routes",
-    { schema: { hide: true } },
+    { schema: { hide: true }, config: { rateLimit: false } },
     async (request, reply) => {
       reply
         .header("Cache-Control", "no-store")

@@ -19,6 +19,18 @@
 # the certificate in tailnet-tls-acme.
 
 services:
+  # On the public network the gateway keeps only its role-scoped aliases. The
+  # participant's public host name must resolve to the operator's ingress
+  # there, as on the internet: tailnet-tls connects to it to detect that the
+  # ingress routes the host, and would otherwise reach this gateway and wait
+  # forever. The private participant network keeps the public host aliases.
+  public-gateway:
+    networks:
+      public: !override
+        aliases:
+          - ${PARTICIPANT_ROLE:?PARTICIPANT_ROLE must be set}-did
+          - ${PARTICIPANT_ROLE:?PARTICIPANT_ROLE must be set}-public
+
   # TLS endpoint for the public host. Obtains its certificate from Let's
   # Encrypt with TLS-ALPN-01 through the tunnel itself: no DNS credentials and
   # no further inbound ports.
@@ -156,12 +168,13 @@ configs:
   tailnet-serve:
     # Raw TCP forwards. 18443 carries the still-encrypted public traffic to
     # tailnet-tls; 18080 is plain HTTP for setups without TLS (the local
-    # stack). TAILNET_FORWARD_HOST overrides the gateway target when the public
-    # host name is ambiguous on a network.
+    # stack). The gateway is reached by its role-scoped alias;
+    # TAILNET_FORWARD_HOST overrides it, for example with a network alias of
+    # your own.
     content: |
       {"TCP": {
         "18443": {"TCPForward": "tailnet-tls:8443"},
-        "18080": {"TCPForward": "${TAILNET_FORWARD_HOST:-${PARTICIPANT_PUBLIC_HOST}}:80"}
+        "18080": {"TCPForward": "${TAILNET_FORWARD_HOST:-${PARTICIPANT_ROLE:?PARTICIPANT_ROLE must be set}-public}:80"}
       }}
 
   tailnet-tls:
@@ -191,7 +204,7 @@ configs:
             loadBalancer:
               passHostHeader: true
               servers:
-                - url: http://${TAILNET_FORWARD_HOST:-${PARTICIPANT_PUBLIC_HOST}}:80
+                - url: http://${TAILNET_FORWARD_HOST:-${PARTICIPANT_ROLE:?PARTICIPANT_ROLE must be set}-public}:80
 
   # Keep in sync with tls-start.sh in the participant Helm chart's tunnel.yaml.
   tailnet-tls-start:
