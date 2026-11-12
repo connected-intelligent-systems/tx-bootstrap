@@ -246,6 +246,40 @@ describe("operator console routes", () => {
     expect(first.statusCode).toBe(200);
     expect(second.statusCode).toBe(200);
   });
+
+  it("keeps tunnel route polling outside the global rate limit", async () => {
+    const getTunnelRoutes = vi.fn().mockResolvedValue("");
+    const app = fastify({ logger: false });
+    await app.register(rateLimit, {
+      global: true,
+      max: 1,
+      timeWindow: "1 minute",
+    });
+    await app.register(createApiRoutes, {
+      prefix: "/api",
+      auth: fakeAuth(),
+      controller: { getTunnelRoutes } as unknown as OperatorController,
+      healthService: fakeHealthService(),
+    });
+
+    const statuses: number[] = [];
+    for (let i = 0; i < 3; i++) {
+      const response = await app.inject({
+        url: "/api/network/tunnel-routes",
+        headers: { authorization: "Bearer routing-token" },
+      });
+      statuses.push(response.statusCode);
+    }
+    const admin = await app.inject({ url: "/api/admin/network" });
+    const limited = await app.inject({ url: "/api/admin/network" });
+    await app.close();
+
+    expect(statuses).toEqual([200, 200, 200]);
+    expect(getTunnelRoutes).toHaveBeenCalledTimes(3);
+    // Other API routes stay limited.
+    expect(admin.statusCode).not.toBe(429);
+    expect(limited.statusCode).toBe(429);
+  });
 });
 
 function fakeAuth(): Auth {

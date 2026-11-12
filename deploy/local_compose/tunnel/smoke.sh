@@ -22,7 +22,7 @@ tunnel() {
 participant() {
   PARTICIPANT_PUBLIC_HOST="$host" HEADSCALE_URL=http://headscale:8080 \
     TAILNET_HOSTNAME=bpnl000000000001 TAILNET_AUTHKEY_FILE="$work/authkey" \
-    TAILNET_FORWARD_HOST=smoke-participant-gateway \
+    PARTICIPANT_ROLE=smoke-participant \
     TAILNET_ACME_CA_SERVER=https://pebble:14000/dir \
     TAILNET_ACME_CA_CERTIFICATES=/certs/acme-ca.pem \
     SMOKE_ACME_CA_FILE="$work/acme-ca.pem" \
@@ -62,6 +62,17 @@ test -s "$work/authkey"
 # As documented for participants; on Linux the sidecar must still read it.
 chmod 600 "$work/authkey"
 participant up -d --wait --wait-timeout 180
+
+# On the participant's public network its public host name must belong to the
+# ingress alone, as on the internet: tailnet-tls connects to that name to see
+# whether the ingress routes it. Here the ingress shares the network, so a
+# gateway alias would only make the check flaky; in a real deployment it
+# never succeeds.
+if docker inspect --format '{{json .NetworkSettings.Networks}}' \
+  "$(participant ps -q public-gateway)" | grep -q "\"$host\""; then
+  echo "The participant gateway claims $host on the public network" >&2
+  exit 1
+fi
 
 # A client-chosen hostname alone must never publish the node.
 [ "$(request "$host")" != 200 ] || { echo "An unapproved node was publicly routed" >&2; exit 1; }

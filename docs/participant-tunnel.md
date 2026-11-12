@@ -60,6 +60,13 @@ connects to its own public host name on port 443, so the participant needs
 outbound access to the operator's ingress. Once a certificate is stored, later
 restarts start immediately.
 
+In Compose, the tunnel package therefore keeps only the role-scoped aliases
+(`<role>-did`, `<role>-public`) for the public gateway on the `public`
+network, so that the public host name resolves to the ingress there, and the
+tunnel sidecars reach the gateway as `<role>-public`. Set
+`TAILNET_FORWARD_HOST` to use another alias. Do not give any container on that
+network the public host name as an alias.
+
 The portal, management APIs, Vault, and PostgreSQL remain private.
 
 ## Operator
@@ -141,7 +148,8 @@ revoked enrollments have no route. If the routing endpoint is unavailable or
 returns invalid configuration, the ingress blocks new connections until a
 valid response arrives. Existing TCP connections may finish during a router
 reload. Keep the console routing endpoint reachable independently of the
-participant tunnel. Plain HTTP requires `TUNNEL_ROUTING_ALLOW_INSECURE_HTTP=true`
+participant tunnel. The console exempts this endpoint from its request rate
+limit; requests without the routing token are rejected. Plain HTTP requires `TUNNEL_ROUTING_ALLOW_INSECURE_HTTP=true`
 and is only intended for isolated local tests.
 
 When upgrading an existing ingress, configure these routing settings before
