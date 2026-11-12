@@ -83,6 +83,20 @@ jobs:
           for name in $(docker ps -a --format '{{.Names}}'); do
             docker logs --tail 500 "$name" > "/tmp/e2e-logs/$name.log" 2>&1 || true
           done
+          # EDC logs failed health checks only at debug level: keep Docker's
+          # health history and the readiness report naming the failing check.
+          for name in $(docker ps -a --filter health=unhealthy --format '{{.Names}}'); do
+            {
+              docker inspect --format '{{json .State.Health}}' "$name"
+              echo
+              for url in http://localhost:8080/api/check/readiness \
+                http://localhost:8081/api/check/readiness; do
+                echo "== $url"
+                docker exec "$name" wget -qO- "$url" 2>&1
+                echo
+              done
+            } > "/tmp/e2e-logs/$name.health.txt" 2>&1 || true
+          done
 
       - name: Upload container logs
         if: failure()
