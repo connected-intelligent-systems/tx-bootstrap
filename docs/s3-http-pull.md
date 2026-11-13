@@ -30,7 +30,7 @@ dataPlane:
     pullPolicy: IfNotPresent
 ```
 
-The optional image pins its runtime to `0.12.2`; changing `TRACTUSX_EDC_TAG`
+The optional image pins its runtime to `0.13.0`; changing `TRACTUSX_EDC_TAG`
 does not change that base. See the [image README](../apps/edc-dataplane/README.md)
 for manual builds.
 

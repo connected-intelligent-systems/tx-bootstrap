@@ -8,7 +8,7 @@ const scriptDirectory = dirname(fileURLToPath(import.meta.url))
 const manifestPath = resolve(scriptDirectory, '../server/src/openapi/gateway-operations.json')
 const outputPath = resolve(scriptDirectory, '../server/src/openapi/participant-api.openapi.json')
 const upstreamUrl =
-  'https://eclipse-tractusx.github.io/tractusx-edc/openapi/control-plane-api/0.12.1/control-plane.yaml'
+  'https://eclipse-tractusx.github.io/tractusx-edc/openapi/control-plane-api/0.13.0/control-plane.yaml'
 
 const manifest = JSON.parse(await readFile(manifestPath, 'utf8'))
 const upstreamResponse = await fetch(upstreamUrl)
@@ -16,8 +16,8 @@ if (!upstreamResponse.ok) {
   throw new Error(`Could not download Tractus-X EDC OpenAPI: ${upstreamResponse.status} ${upstreamResponse.statusText}`)
 }
 const upstream = parse(await upstreamResponse.text())
-if (upstream.info?.version !== '0.12.1') {
-  throw new Error(`Expected Tractus-X EDC OpenAPI 0.12.1, received ${upstream.info?.version ?? 'unknown'}`)
+if (upstream.info?.version !== '0.13.0') {
+  throw new Error(`Expected Tractus-X EDC OpenAPI 0.13.0, received ${upstream.info?.version ?? 'unknown'}`)
 }
 
 const paths = {}
@@ -50,8 +50,8 @@ const document = {
     license: upstream.info.license,
   },
   externalDocs: {
-    description: 'Tractus-X EDC 0.12.1 control-plane API documentation',
-    url: 'https://eclipse-tractusx.github.io/tractusx-edc/openapi/control-plane-api/0.12.1/',
+    description: 'Tractus-X EDC 0.13.0 control-plane API documentation',
+    url: 'https://eclipse-tractusx.github.io/tractusx-edc/openapi/control-plane-api/0.13.0/',
   },
   servers: [{ url: '/', description: 'This participant' }],
   tags: [
@@ -87,8 +87,8 @@ const document = {
   'x-api-client-scopes': scopes,
   'x-upstream': {
     distribution: 'Tractus-X EDC',
-    distributionVersion: '0.12.1',
-    eclipseEdcManagementApiVersion: '3.1.4',
+    distributionVersion: '0.13.0',
+    eclipseEdcManagementApiVersion: '3.1.6',
     openApi: upstreamUrl,
   },
 }

@@ -162,10 +162,25 @@ const parseRule = (rule: any) => {
 const parseRuleArray = (policy: Record<string, any>, ruleKey: string) =>
   asArray(getJsonLdField(policy, ruleKey)).map(parseRule)
 
+// End dates must be timestamps (Tractus-X EDC 0.13); a picked day ends at
+// 23:59:59 UTC.
+const END_DATE_OPERANDS = new Set(['DataUsageEndDate', 'DataProvisioningEndDate'])
+
+const toEndDateTimestamp = (value: unknown) =>
+  typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) ? `${value}T23:59:59Z` : value
+
+// Numbers go out as strings: the EDC 0.13 management API v3 validator fails
+// with HTTP 500 on numeric right operands; the constraints parse strings.
+const toRightOperand = (constraint: PolicyConstraint) => {
+  const value = constraint.rightOperand
+  if (END_DATE_OPERANDS.has(constraint.leftOperand)) return toEndDateTimestamp(value)
+  return typeof value === 'number' ? String(value) : value
+}
+
 const buildTractusXConstraint = (constraint: PolicyConstraint) => ({
   leftOperand: constraint.leftOperand,
   operator: constraint.operator,
-  rightOperand: constraint.rightOperand,
+  rightOperand: toRightOperand(constraint),
 })
 
 const buildTractusXRule = (rule: any) => {

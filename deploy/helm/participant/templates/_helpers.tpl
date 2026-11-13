@@ -61,7 +61,7 @@ app.kubernetes.io/component: {{ .component }}
 {{- end }}
 
 {{- define "tx-bootstrap-participant.credentialServiceEndpoint" -}}
-{{- default (printf "https://%s/api/credentials/v1/participants/%s" .Values.identity.participantPublicHost .Values.identity.participantBpnBase64) .Values.publicEndpoints.credentialServiceEndpoint }}
+{{- default (printf "https://%s/api/credentials/v1/participants/%s" .Values.identity.participantPublicHost .Values.identity.identityHubParticipantContextId) .Values.publicEndpoints.credentialServiceEndpoint }}
 {{- end }}
 
 {{- define "tx-bootstrap-participant.dataPlaneBaseUrl" -}}

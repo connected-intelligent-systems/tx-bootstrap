@@ -68,7 +68,6 @@ spec:
           ports:
             - { name: default, containerPort: 8080 }
             - { name: management, containerPort: 8081 }
-            - { name: catalog, containerPort: 8082 }
             - { name: control, containerPort: 8083 }
             - { name: protocol, containerPort: 8084 }
             - { name: version, containerPort: 8085 }
@@ -92,19 +91,19 @@ spec:
             - name: EDC_IAM_STS_OAUTH_CLIENT_ID
               value: {{ include "tx-bootstrap-participant.participantDid" . | quote }}
             - { name: EDC_IAM_STS_OAUTH_CLIENT_SECRET_ALIAS, value: sts-oauth-client-secret }
-            - name: TX_EDC_IAM_IATP_CREDENTIALSERVICE_URL
-              value: "http://{{ include "tx-bootstrap-participant.componentName" (dict "root" . "component" "identityhub") }}:8083/api/credentials/v1/participants/{{ .Values.identity.participantBpnBase64 }}"
-            - { name: TX_EDC_IAM_IATP_DEFAULT_SCOPES_MEMBERSHIP_ALIAS, value: org.eclipse.tractusx.vc.type }
-            - { name: TX_EDC_IAM_IATP_DEFAULT_SCOPES_MEMBERSHIP_TYPE, value: MembershipCredential }
-            - { name: TX_EDC_IAM_IATP_DEFAULT_SCOPES_MEMBERSHIP_OPERATION, value: read }
-            - { name: TX_EDC_IAM_IATP_DEFAULT_SCOPES_DATAEXCHANGE_ALIAS, value: org.eclipse.tractusx.vc.type }
-            - { name: TX_EDC_IAM_IATP_DEFAULT_SCOPES_DATAEXCHANGE_TYPE, value: DataExchangeGovernanceCredential }
-            - { name: TX_EDC_IAM_IATP_DEFAULT_SCOPES_DATAEXCHANGE_OPERATION, value: read }
+            - name: TX_EDC_IAM_DCP_CREDENTIALSERVICE_URL
+              value: "http://{{ include "tx-bootstrap-participant.componentName" (dict "root" . "component" "identityhub") }}:8083/api/credentials/v1/participants/{{ .Values.identity.identityHubParticipantContextId }}"
+            - { name: TX_EDC_IAM_DCP_DEFAULT_SCOPES_MEMBERSHIP_ALIAS, value: org.eclipse.tractusx.vc.type }
+            - { name: TX_EDC_IAM_DCP_DEFAULT_SCOPES_MEMBERSHIP_TYPE, value: MembershipCredential }
+            - { name: TX_EDC_IAM_DCP_DEFAULT_SCOPES_MEMBERSHIP_OPERATION, value: read }
+            - { name: TX_EDC_IAM_DCP_DEFAULT_SCOPES_DATAEXCHANGE_ALIAS, value: org.eclipse.tractusx.vc.type }
+            - { name: TX_EDC_IAM_DCP_DEFAULT_SCOPES_DATAEXCHANGE_TYPE, value: DataExchangeGovernanceCredential }
+            - { name: TX_EDC_IAM_DCP_DEFAULT_SCOPES_DATAEXCHANGE_OPERATION, value: read }
             - name: EDC_DSP_CALLBACK_ADDRESS
               value: {{ include "tx-bootstrap-participant.dspCallbackAddress" . | quote }}
-            - name: TX_EDC_IAM_IATP_BDRS_SERVER_URL
+            - name: TX_EDC_IAM_DCP_BDRS_SERVER_URL
               value: {{ .Values.publicEndpoints.bdrsServerUrl | quote }}
-            - name: TX_EDC_IAM_IATP_BDRS_CACHE_VALIDITY
+            - name: TX_EDC_IAM_DCP_BDRS_CACHE_VALIDITY
               value: {{ .Values.controlPlane.bdrsCacheValiditySeconds | quote }}
             - { name: TX_EDC_DID_SERVICE_SELF_REGISTRATION_ENABLED, value: "false" }
             - name: EDC_IAM_TRUSTED-ISSUER_0-ISSUER_ID
@@ -117,8 +116,6 @@ spec:
             - { name: WEB_HTTP_MANAGEMENT_PATH, value: /management }
             - name: WEB_HTTP_MANAGEMENT_AUTH_KEY
               {{- include "tx-bootstrap-participant.secretValue" (dict "root" . "key" "edcApiKey") | nindent 14 }}
-            - { name: WEB_HTTP_CATALOG_PORT, value: "8082" }
-            - { name: WEB_HTTP_CATALOG_PATH, value: /catalog }
             - { name: WEB_HTTP_CONTROL_PORT, value: "8083" }
             - { name: WEB_HTTP_CONTROL_PATH, value: /control }
             - { name: WEB_HTTP_PROTOCOL_PORT, value: "8084" }
@@ -180,7 +177,6 @@ spec:
   ports:
     - { name: default, port: 8080, targetPort: default }
     - { name: management, port: 8081, targetPort: management }
-    - { name: catalog, port: 8082, targetPort: catalog }
     - { name: control, port: 8083, targetPort: control }
     - { name: protocol, port: 8084, targetPort: protocol }
     - { name: version, port: 8085, targetPort: version }

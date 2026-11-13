@@ -10,8 +10,8 @@
     }
   },
   "externalDocs": {
-    "description": "Tractus-X EDC 0.12.1 control-plane API documentation",
-    "url": "https://eclipse-tractusx.github.io/tractusx-edc/openapi/control-plane-api/0.12.1/"
+    "description": "Tractus-X EDC 0.13.0 control-plane API documentation",
+    "url": "https://eclipse-tractusx.github.io/tractusx-edc/openapi/control-plane-api/0.13.0/"
   },
   "servers": [{ "url": "/", "description": "This participant" }],
   "tags": [
@@ -74,6 +74,94 @@
             }
           }
         },
+        "deprecated": true,
+        "security": [{ "apiClientToken": [] }],
+        "x-required-scope": "catalog:read"
+      }
+    },
+    "/api/management/v3/connectordiscovery/dspversionparams": {
+      "post": {
+        "tags": ["Connector Discovery"],
+        "description": "Discover supported connector parameters for a given connector endpoint.",
+        "operationId": "discoverDspVersionParamsV3",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConnectorParamsDiscoveryRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "A list of connector parameters for the DSP version to use with the given connector.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConnectorParamsDiscoveryResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request body was malformed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/ApiErrorDetail_1" }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A valid API-client token is required.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "403": {
+            "description": "The API client does not have the required scope.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "404": {
+            "description": "The operation or resource is not exposed by this participant.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "500": {
+            "description": "Discovery failed due to an internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/ApiErrorDetail_1" }
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Discovery failed due to connection issues to counter party",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/ApiErrorDetail_1" }
+                }
+              }
+            }
+          }
+        },
         "security": [{ "apiClientToken": [] }],
         "x-required-scope": "catalog:read"
       }
@@ -123,6 +211,7 @@
             }
           }
         },
+        "deprecated": true,
         "security": [{ "apiClientToken": [] }],
         "x-required-scope": "catalog:read"
       }
@@ -187,6 +276,7 @@
             }
           }
         },
+        "deprecated": true,
         "security": [{ "apiClientToken": [] }],
         "x-required-scope": "assets:read"
       }
@@ -251,6 +341,7 @@
             }
           }
         },
+        "deprecated": true,
         "security": [{ "apiClientToken": [] }],
         "x-required-scope": "assets:read"
       },
@@ -317,6 +408,7 @@
             }
           }
         },
+        "deprecated": true,
         "security": [{ "apiClientToken": [] }],
         "x-required-scope": "assets:write"
       }
@@ -389,6 +481,7 @@
             }
           }
         },
+        "deprecated": true,
         "security": [{ "apiClientToken": [] }],
         "x-required-scope": "assets:write"
       },
@@ -441,6 +534,7 @@
             }
           }
         },
+        "deprecated": true,
         "security": [{ "apiClientToken": [] }],
         "x-required-scope": "assets:write"
       }
@@ -507,6 +601,7 @@
             }
           }
         },
+        "deprecated": true,
         "security": [{ "apiClientToken": [] }],
         "x-required-scope": "policies:read"
       }
@@ -573,6 +668,7 @@
             }
           }
         },
+        "deprecated": true,
         "security": [{ "apiClientToken": [] }],
         "x-required-scope": "policies:read"
       },
@@ -639,6 +735,7 @@
             }
           }
         },
+        "deprecated": true,
         "security": [{ "apiClientToken": [] }],
         "x-required-scope": "policies:write"
       },
@@ -707,6 +804,7 @@
             }
           }
         },
+        "deprecated": true,
         "security": [{ "apiClientToken": [] }],
         "x-required-scope": "policies:write"
       }
@@ -781,6 +879,7 @@
             }
           }
         },
+        "deprecated": true,
         "security": [{ "apiClientToken": [] }],
         "x-required-scope": "policies:write"
       }
@@ -1179,6 +1278,7 @@
             }
           }
         },
+        "deprecated": true,
         "security": [{ "apiClientToken": [] }],
         "x-required-scope": "contract-definitions:read"
       }
@@ -1245,6 +1345,7 @@
             }
           }
         },
+        "deprecated": true,
         "security": [{ "apiClientToken": [] }],
         "x-required-scope": "contract-definitions:read"
       },
@@ -1302,6 +1403,7 @@
             }
           }
         },
+        "deprecated": true,
         "security": [{ "apiClientToken": [] }],
         "x-required-scope": "contract-definitions:write"
       }
@@ -1376,6 +1478,7 @@
             }
           }
         },
+        "deprecated": true,
         "security": [{ "apiClientToken": [] }],
         "x-required-scope": "contract-definitions:write"
       },
@@ -1432,6 +1535,7 @@
             }
           }
         },
+        "deprecated": true,
         "security": [{ "apiClientToken": [] }],
         "x-required-scope": "contract-definitions:write"
       }
@@ -1498,6 +1602,7 @@
             }
           }
         },
+        "deprecated": true,
         "security": [{ "apiClientToken": [] }],
         "x-required-scope": "contract-negotiations:read"
       }
@@ -1562,6 +1667,7 @@
             }
           }
         },
+        "deprecated": true,
         "security": [{ "apiClientToken": [] }],
         "x-required-scope": "contract-negotiations:read"
       }
@@ -1629,6 +1735,7 @@
             }
           }
         },
+        "deprecated": true,
         "security": [{ "apiClientToken": [] }],
         "x-required-scope": "contract-negotiations:write"
       }
@@ -1700,6 +1807,7 @@
             }
           }
         },
+        "deprecated": true,
         "security": [{ "apiClientToken": [] }],
         "x-required-scope": "contract-negotiations:write"
       }
@@ -1766,6 +1874,7 @@
             }
           }
         },
+        "deprecated": true,
         "security": [{ "apiClientToken": [] }],
         "x-required-scope": "contract-agreements:read"
       }
@@ -1830,6 +1939,7 @@
             }
           }
         },
+        "deprecated": true,
         "security": [{ "apiClientToken": [] }],
         "x-required-scope": "contract-agreements:read"
       }
@@ -1894,6 +2004,7 @@
             }
           }
         },
+        "deprecated": true,
         "security": [{ "apiClientToken": [] }],
         "x-required-scope": "contract-agreements:read"
       }
@@ -2120,6 +2231,7 @@
             }
           }
         },
+        "deprecated": true,
         "security": [{ "apiClientToken": [] }],
         "x-required-scope": "transfers:read"
       }
@@ -2184,6 +2296,7 @@
             }
           }
         },
+        "deprecated": true,
         "security": [{ "apiClientToken": [] }],
         "x-required-scope": "transfers:read"
       }
@@ -2251,6 +2364,7 @@
             }
           }
         },
+        "deprecated": true,
         "security": [{ "apiClientToken": [] }],
         "x-required-scope": "transfers:write"
       }
@@ -2331,6 +2445,7 @@
             }
           }
         },
+        "deprecated": true,
         "security": [{ "apiClientToken": [] }],
         "x-required-scope": "transfers:write"
       }
@@ -3954,10 +4069,10 @@
           "@type": "CatalogRequest",
           "counterPartyAddress": "http://provider-address",
           "counterPartyId": "providerId",
-          "protocol": "dataspace-protocol-http",
+          "protocol": "dataspace-protocol-http:2025-1",
           "additionalScopes": [
-            "org.eclipse.edc.vc.type:SomeCredential:read",
-            "org.eclipse.edc.vc.type:AnotherCredential:write"
+            "org.eclipse.dspace.dcp.vc.type:SomeCredential:read",
+            "org.eclipse.dspace.dcp.vc.type:AnotherCredential:write"
           ],
           "querySpec": {
             "offset": 0,
@@ -4026,8 +4141,61 @@
             "edc": "https://w3id.org/edc/v0.0.1/ns/",
             "dcat": "http://www.w3.org/ns/dcat#",
             "odrl": "http://www.w3.org/ns/odrl/2/",
-            "dspace": "https://w3id.org/dspace/v0.8/"
+            "dspace": "https://w3id.org/dspace/2025/1/"
           }
+        }
+      },
+      "ConnectorParamsDiscoveryRequest": {
+        "required": ["@context", "counterPartyAddress", "counterPartyId"],
+        "type": "object",
+        "properties": {
+          "@context": { "type": "object" },
+          "@type": {
+            "type": "string",
+            "example": "https://w3id.org/tractusx/v0.0.1/ns/ConnectorParamsDiscoveryRequest"
+          },
+          "counterPartyAddress": { "type": "string" },
+          "counterPartyId": { "type": "string" }
+        },
+        "description": "Note: In former versions, the property 'counterPartyId' was named 'bpnl', for convenience this value is still allowed",
+        "example": {
+          "@context": {
+            "edc": "https://w3id.org/edc/v0.0.1/ns/",
+            "tx": "https://w3id.org/tractusx/v0.0.1/ns/"
+          },
+          "@type": "tx:ConnectorParamsDiscoveryRequest",
+          "edc:counterPartyId": "BPNL1234567890",
+          "edc:counterPartyAddress": "https://provider.domain.com/api/dsp"
+        }
+      },
+      "ConnectorParamsDiscoveryResponse": {
+        "type": "object",
+        "properties": {
+          "context": { "type": "object" },
+          "counterPartyAddress": { "type": "string" },
+          "counterPartyId": { "type": "string" },
+          "protocol": { "type": "string" }
+        },
+        "example": {
+          "@context": { "edc": "https://w3id.org/edc/v0.0.1/ns/" },
+          "edc:counterPartyId": "did:web:one-example.com",
+          "edc:counterPartyAddress": "https://provider.domain.com/api/dsp/2025-1",
+          "edc:protocol": "dataspace-protocol-http:2025-1"
+        }
+      },
+      "ApiErrorDetail_1": {
+        "type": "object",
+        "properties": {
+          "invalidValue": { "type": "object" },
+          "message": { "type": "string" },
+          "path": { "type": "string" },
+          "type": { "type": "string" }
+        },
+        "example": {
+          "path": "path",
+          "message": "message",
+          "type": "type",
+          "invalidValue": "{}"
         }
       },
       "DatasetRequestV3": {
@@ -4048,7 +4216,7 @@
           "@id": "dataset-id",
           "counterPartyAddress": "http://counter-party-address",
           "counterPartyId": "counter-party-id",
-          "protocol": "dataspace-protocol-http"
+          "protocol": "dataspace-protocol-http:2025-1"
         }
       },
       "DatasetV3": {
@@ -4097,7 +4265,7 @@
             "edc": "https://w3id.org/edc/v0.0.1/ns/",
             "dcat": "http://www.w3.org/ns/dcat#",
             "odrl": "http://www.w3.org/ns/odrl/2/",
-            "dspace": "https://w3id.org/dspace/v0.8/"
+            "dspace": "https://w3id.org/dspace/2025/1/"
           }
         }
       },
@@ -4137,8 +4305,11 @@
           },
           "createdAt": { "type": "integer", "format": "int64" },
           "dataAddress": { "$ref": "#/components/schemas/DataAddress" },
-          "privateProperties": { "type": "object" },
-          "properties": { "type": "object" }
+          "privateProperties": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "properties": { "type": "object", "additionalProperties": true }
         },
         "example": {
           "@context": { "@vocab": "https://w3id.org/edc/v0.0.1/ns/" },
@@ -4178,8 +4349,11 @@
             "example": "https://w3id.org/edc/v0.0.1/ns/Asset"
           },
           "dataAddress": { "$ref": "#/components/schemas/DataAddress" },
-          "privateProperties": { "type": "object" },
-          "properties": { "type": "object" }
+          "privateProperties": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "properties": { "type": "object", "additionalProperties": true }
         },
         "example": {
           "@context": { "@vocab": "https://w3id.org/edc/v0.0.1/ns/" },
@@ -4193,15 +4367,23 @@
         }
       },
       "IdResponse": {
+        "required": ["@context", "@id", "@type", "createdAt"],
         "type": "object",
         "properties": {
+          "@context": {
+            "title": "ContextSchema",
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "@type": { "type": "string" },
           "@id": { "type": "string" },
-          "createdAt": { "type": "integer", "format": "int64" }
+          "createdAt": { "type": "number" }
         },
         "example": {
-          "@context": { "@vocab": "https://w3id.org/edc/v0.0.1/ns/" },
-          "@id": "id-value",
-          "createdAt": 1688465655
+          "createdAt": 0.8008281904610115,
+          "@type": "@type",
+          "@id": "@id",
+          "@context": ["@context", "@context"]
         }
       },
       "PolicyDefinitionOutputV3": {
@@ -4314,21 +4496,6 @@
           }
         }
       },
-      "ApiErrorDetail_1": {
-        "type": "object",
-        "properties": {
-          "invalidValue": { "type": "object" },
-          "message": { "type": "string" },
-          "path": { "type": "string" },
-          "type": { "type": "string" }
-        },
-        "example": {
-          "path": "path",
-          "message": "message",
-          "type": "type",
-          "invalidValue": "{}"
-        }
-      },
       "List": {
         "type": "object",
         "properties": {
@@ -4405,7 +4572,7 @@
           },
           "callbackAddresses": {
             "type": "array",
-            "items": { "$ref": "#/components/schemas/CallbackAddress" }
+            "items": { "$ref": "#/components/schemas/CallbackAddress_1" }
           },
           "contractAgreementId": { "type": "string" },
           "counterPartyAddress": { "type": "string" },
@@ -4420,7 +4587,7 @@
           "@type": "https://w3id.org/edc/v0.0.1/ns/ContractNegotiation",
           "@id": "negotiation-id",
           "type": "PROVIDER",
-          "protocol": "dataspace-protocol-http",
+          "protocol": "dataspace-protocol-http:2025-1",
           "counterPartyId": "counter-party-id",
           "counterPartyAddress": "http://counter/party/address",
           "state": "VERIFIED",
@@ -4449,7 +4616,7 @@
           },
           "callbackAddresses": {
             "type": "array",
-            "items": { "$ref": "#/components/schemas/CallbackAddress" }
+            "items": { "$ref": "#/components/schemas/CallbackAddress_1" }
           },
           "counterPartyAddress": { "type": "string" },
           "policy": { "$ref": "#/components/schemas/OfferV3" },
@@ -4459,7 +4626,7 @@
           "@context": { "@vocab": "https://w3id.org/edc/v0.0.1/ns/" },
           "@type": "https://w3id.org/edc/v0.0.1/ns/ContractRequest",
           "counterPartyAddress": "http://provider-address",
-          "protocol": "dataspace-protocol-http",
+          "protocol": "dataspace-protocol-http:2025-1",
           "policy": {
             "@context": "http://www.w3.org/ns/odrl.jsonld",
             "@type": "odrl:Offer",
@@ -4621,14 +4788,17 @@
           },
           "callbackAddresses": {
             "type": "array",
-            "items": { "$ref": "#/components/schemas/CallbackAddress" }
+            "items": { "$ref": "#/components/schemas/CallbackAddress_1" }
           },
           "contractAgreementId": { "type": "string" },
           "counterPartyAddress": { "type": "string" },
           "counterPartyId": { "type": "string" },
           "dataDestination": { "$ref": "#/components/schemas/DataAddress" },
           "errorDetail": { "type": "string" },
-          "privateProperties": { "type": "object" },
+          "privateProperties": {
+            "type": "object",
+            "additionalProperties": true
+          },
           "protocol": { "type": "string" },
           "state": { "type": "string" },
           "type": { "type": "string", "enum": ["CONSUMER", "PROVIDER"] }
@@ -4670,19 +4840,22 @@
           "assetId": { "type": "string", "deprecated": true },
           "callbackAddresses": {
             "type": "array",
-            "items": { "$ref": "#/components/schemas/CallbackAddress" }
+            "items": { "$ref": "#/components/schemas/CallbackAddress_1" }
           },
           "contractId": { "type": "string" },
           "counterPartyAddress": { "type": "string" },
           "dataDestination": { "$ref": "#/components/schemas/DataAddress" },
-          "privateProperties": { "type": "object" },
+          "privateProperties": {
+            "type": "object",
+            "additionalProperties": true
+          },
           "protocol": { "type": "string" },
           "transferType": { "type": "string" }
         },
         "example": {
           "@context": { "@vocab": "https://w3id.org/edc/v0.0.1/ns/" },
           "@type": "https://w3id.org/edc/v0.0.1/ns/TransferRequest",
-          "protocol": "dataspace-protocol-http",
+          "protocol": "dataspace-protocol-http:2025-1",
           "counterPartyAddress": "http://provider-address",
           "contractId": "contract-id",
           "transferType": "transferType",
@@ -4723,6 +4896,7 @@
           },
           "type": { "type": "string" }
         },
+        "additionalProperties": true,
         "example": {
           "@type": "https://w3id.org/edc/v0.0.1/ns/DataAddress",
           "type": "type"
@@ -4748,7 +4922,7 @@
           "operandRight": "some value"
         }
       },
-      "CallbackAddress": {
+      "CallbackAddress_1": {
         "type": "object",
         "properties": {
           "@type": {
@@ -4932,8 +5106,8 @@
   ],
   "x-upstream": {
     "distribution": "Tractus-X EDC",
-    "distributionVersion": "0.12.1",
-    "eclipseEdcManagementApiVersion": "3.1.4",
-    "openApi": "https://eclipse-tractusx.github.io/tractusx-edc/openapi/control-plane-api/0.12.1/control-plane.yaml"
+    "distributionVersion": "0.13.0",
+    "eclipseEdcManagementApiVersion": "3.1.6",
+    "openApi": "https://eclipse-tractusx.github.io/tractusx-edc/openapi/control-plane-api/0.13.0/control-plane.yaml"
   }
 }

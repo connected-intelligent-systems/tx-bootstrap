@@ -1,6 +1,6 @@
 import { GetListParams, GetOneParams, DeleteParams, CreateParams, UpdateParams, GetManyParams } from 'react-admin'
 import { httpClient } from '../../shared/httpClient'
-import { buildQuerySpec } from '../../shared/helpers'
+import { buildQuerySpec, randomId } from '../../shared/helpers'
 import { parsePolicyFromJsonLd, parsePolicyFromJsonLdArray, serializePolicyToJsonLd } from './transformer'
 
 export async function getList(params: GetListParams) {
@@ -48,7 +48,9 @@ export async function remove(params: DeleteParams) {
 }
 
 export async function create(params: CreateParams) {
-  const jsonLdPolicy = await serializePolicyToJsonLd(params.data)
+  // Tractus-X EDC 0.13 fails with HTTP 500 on a policy definition without an
+  // ID instead of generating one.
+  const jsonLdPolicy = await serializePolicyToJsonLd({ ...params.data, id: params.data.id || randomId() })
   const response = await httpClient(`/api/management/v3/policydefinitions`, {
     method: 'POST',
     body: JSON.stringify(jsonLdPolicy),

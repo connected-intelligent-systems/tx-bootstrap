@@ -33,7 +33,6 @@ javaRuntime:
 
 identity:
   issuerBpn: BPNL000000000001
-  issuerBpnBase64: "QlBOTDAwMDAwMDAwMDAwMQ=="
   issuerDidHost: issuer.example.invalid
   useHttpsDidWeb: true
 
@@ -102,7 +101,7 @@ issuerIdentityHub:
     runAsGroup: 101
   image:
     repository: tractusx/identityhub
-    tag: 0.3.2
+    tag: 0.4.1
     digest: ""
     pullPolicy: IfNotPresent
   jtiValidation: true
@@ -125,7 +124,7 @@ issuerService:
     runAsGroup: 101
   image:
     repository: tractusx/issuerservice
-    tag: 0.3.2
+    tag: 0.4.1
     digest: ""
     pullPolicy: IfNotPresent
   jtiValidation: true
@@ -148,7 +147,7 @@ bdrs:
     runAsGroup: 101
   image:
     repository: tractusx/bdrs-server
-    tag: 0.5.7
+    tag: 0.6.0
     digest: ""
     pullPolicy: IfNotPresent
   service:

@@ -2,11 +2,14 @@ import { CreateBase, SaveButton, SimpleForm, Toolbar, useNotify, useTranslate } 
 import { Dialog, DialogContent, DialogTitle, DialogProps, Button as MuiButton } from '@mui/material'
 import { ComponentProps } from 'react'
 import { useFormState } from 'react-hook-form'
+import PlayArrowIcon from '@mui/icons-material/PlayArrow'
 import TransferProcessFormFields from './TransferProcessFormFields'
 
 interface TransferProcessDialogProps extends Pick<DialogProps, 'open' | 'onClose'> {
   defaultValues: Record<string, unknown>
   onSuccess?: (data: any) => void
+  title?: string
+  transferTypes?: string[]
 }
 
 type RAToolbarProps = ComponentProps<typeof Toolbar>
@@ -17,7 +20,12 @@ const TransferProcessDialogToolbar = ({ onCancel, ...toolbarProps }: RAToolbarPr
   return (
     <Toolbar {...toolbarProps} sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
       <MuiButton onClick={onCancel}>{translate('ra.action.cancel')}</MuiButton>
-      <SaveButton type="submit" disabled={isSubmitting} />
+      <SaveButton
+        type="submit"
+        disabled={isSubmitting}
+        label={translate('resources.transferprocesses.actions.startTransfer')}
+        icon={<PlayArrowIcon />}
+      />
     </Toolbar>
   )
 }
@@ -89,14 +97,21 @@ export const sanitizeTransferProcessPayload = (values: any) => {
   return payload
 }
 
-export const TransferProcessDialog = ({ open, onClose, defaultValues, onSuccess }: TransferProcessDialogProps) => {
+export const TransferProcessDialog = ({
+  open,
+  onClose,
+  defaultValues,
+  onSuccess,
+  title,
+  transferTypes,
+}: TransferProcessDialogProps) => {
   const translate = useTranslate()
   const notify = useNotify()
   const handleClose = () => onClose?.({}, 'escapeKeyDown')
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
-      <DialogTitle>{translate('resources.contractagreements.actions.transferDataset')}</DialogTitle>
+      <DialogTitle>{title || translate('resources.contractagreements.actions.transferDataset')}</DialogTitle>
       <DialogContent dividers>
         <CreateBase
           resource="transferprocesses"
@@ -124,7 +139,7 @@ export const TransferProcessDialog = ({ open, onClose, defaultValues, onSuccess 
             mode="onChange"
             reValidateMode="onChange"
           >
-            <TransferProcessFormFields lockCoreFields hideCoreFields />
+            <TransferProcessFormFields lockCoreFields hideCoreFields transferTypes={transferTypes} />
           </SimpleForm>
         </CreateBase>
       </DialogContent>

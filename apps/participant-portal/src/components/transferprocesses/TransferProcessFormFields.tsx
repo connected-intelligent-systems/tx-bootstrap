@@ -163,11 +163,13 @@ const AzureStoragePush = () => {
 interface TransferProcessFormFieldsProps {
   lockCoreFields?: boolean
   hideCoreFields?: boolean
+  transferTypes?: string[]
 }
 
 export const TransferProcessFormFields = ({
   lockCoreFields = false,
   hideCoreFields = false,
+  transferTypes,
 }: TransferProcessFormFieldsProps) => {
   const translate = useTranslate()
   const [showCoreFields, setShowCoreFields] = useState(!hideCoreFields)
@@ -205,7 +207,6 @@ export const TransferProcessFormFields = ({
       <TextInput
         label={translate('resources.transferprocesses.fields.protocol')}
         source="protocol"
-        defaultValue="dataspace-protocol-http"
         helperText={translate('resources.transferprocesses.create.fields.protocolHelper')}
         fullWidth
         readOnly={lockCoreFields}
@@ -243,7 +244,7 @@ export const TransferProcessFormFields = ({
           { id: 'HttpData-PUSH', name: translate('resources.transferprocesses.create.types.httpPush') },
           { id: 'AmazonS3-PUSH', name: translate('resources.transferprocesses.create.types.amazonS3Push') },
           { id: 'AzureStorage-PUSH', name: translate('resources.transferprocesses.create.types.azureStoragePush') },
-        ]}
+        ].filter((choice) => !transferTypes || transferTypes.includes(choice.id))}
         helperText={translate('resources.transferprocesses.create.fields.transferTypeHelper')}
       />
       <TransferTypeHandler />

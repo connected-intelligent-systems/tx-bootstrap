@@ -137,9 +137,8 @@ VAULT_ADDR="${VAULT_ADDR:-http://vault:8200}"
 VAULT_SECRET_PATH="${VAULT_SECRET_PATH:-/v1/secret}"
 VAULT_TOKEN="${VAULT_DEV_ROOT_TOKEN_ID:-${VAULT_TOKEN:-root}}"
 
-PARTICIPANT_BPN_BASE64="${PARTICIPANT_BPN_BASE64:-$(printf '%s' "$PARTICIPANT_BPN" | base64 | tr -d '\n')}"
 PUBLIC_DSP_CALLBACK_ADDRESS="${PUBLIC_DSP_CALLBACK_ADDRESS:-https://${PARTICIPANT_PUBLIC_HOST}/api/v1/dsp}"
-PUBLIC_CREDENTIAL_SERVICE_ENDPOINT="${PUBLIC_CREDENTIAL_SERVICE_ENDPOINT:-https://${PARTICIPANT_PUBLIC_HOST}/api/credentials/v1/participants/${PARTICIPANT_BPN_BASE64}}"
+PUBLIC_CREDENTIAL_SERVICE_ENDPOINT="${PUBLIC_CREDENTIAL_SERVICE_ENDPOINT:-https://${PARTICIPANT_PUBLIC_HOST}/api/credentials/v1/participants/${IDENTITYHUB_CONTEXT_ID}}"
 
 wait_for_http "IdentityHub" "$IDENTITYHUB_HEALTH_URL"
 
@@ -185,8 +184,8 @@ manifest="$(jq -n \
         }
     }')"
 
-IDENTITYHUB_CONTEXT_B64="$(printf '%s' "$IDENTITYHUB_CONTEXT_ID" | base64 | tr -d '\n')"
-IDENTITYHUB_CONTEXT_URL="${IDENTITYHUB_IDENTITY_URL}/v1alpha/participants/${IDENTITYHUB_CONTEXT_B64}"
+# IdentityHub 0.4 (EDC 0.17) takes the context ID unencoded in URLs.
+IDENTITYHUB_CONTEXT_URL="${IDENTITYHUB_IDENTITY_URL}/v1alpha/participants/${IDENTITYHUB_CONTEXT_ID}"
 DID_DOCUMENT_ATTEMPTS="${DID_DOCUMENT_ATTEMPTS:-3}"
 DID_DOCUMENT_WAIT_SECONDS="${DID_DOCUMENT_WAIT_SECONDS:-15}"
 
@@ -194,7 +193,7 @@ create_participant_context() {
     log "Creating IdentityHub participant context ${IDENTITYHUB_CONTEXT_ID}"
     # Readiness (port 8081) can report healthy before the identity API has
     # registered its routes; until then Jetty answers 404/405. Retry briefly.
-    attempt=0
+    route_attempt=0
     while :; do
         result="$(http_status_with_body POST "${IDENTITYHUB_IDENTITY_URL}/v1alpha/participants/" "$manifest")"
         status="$(printf '%s' "$result" | sed -n '1p')"
@@ -203,8 +202,8 @@ create_participant_context() {
             000|404|405|502|503) ;;
             *) break ;;
         esac
-        attempt=$((attempt + 1))
-        [ "$attempt" -lt 30 ] || break
+        route_attempt=$((route_attempt + 1))
+        [ "$route_attempt" -lt 30 ] || break
         sleep 2
     done
     case "$status" in
@@ -258,6 +257,40 @@ while :; do
     esac
     attempt=$((attempt + 1))
 done
+
+# An existing context keeps the service endpoints it was created with, which
+# go stale when the public host changes or after upgrading from IdentityHub
+# 0.3 (base64-encoded context IDs in URLs). Replace any that differ.
+reconcile_service_endpoints() {
+    result="$(http_status_with_body POST "${IDENTITYHUB_CONTEXT_URL}/dids/query" '{}')"
+    [ "$(printf '%s' "$result" | sed -n '1p')" = "200" ] ||
+        fail "DID document query failed with HTTP $(printf '%s' "$result" | sed -n '1p')"
+    published="$(printf '%s' "$result" | sed '1d' | jq -c --arg did "$PARTICIPANT_DID" \
+        '[.[] | select(.id == $did) | .service[]?]')"
+    did_path="$(printf '%s' "$PARTICIPANT_DID" | base64 | tr -d '\n=' | tr '+/' '-_')"
+    printf '%s' "$manifest" | jq -c '.serviceEndpoints[]' | while IFS= read -r wanted; do
+        id="$(printf '%s' "$wanted" | jq -r .id)"
+        current="$(printf '%s' "$published" | jq -c --arg id "$id" \
+            '[.[] | select(.id == $id) | {id, type, serviceEndpoint}]')"
+        [ "$current" = "[$(printf '%s' "$wanted" | jq -c '{id, type, serviceEndpoint}')]" ] && continue
+        log "Updating DID service endpoint ${id}"
+        if [ "$current" != "[]" ]; then
+            status="$(http_status_with_body DELETE \
+                "${IDENTITYHUB_CONTEXT_URL}/dids/${did_path}/endpoints?serviceId=$(printf '%s' "$id" | jq -sRr @uri)" | sed -n '1p')"
+            case "$status" in
+                200|204) ;;
+                *) fail "DID service endpoint ${id} removal failed with HTTP ${status}" ;;
+            esac
+        fi
+        status="$(http_status_with_body POST \
+            "${IDENTITYHUB_CONTEXT_URL}/dids/${did_path}/endpoints?autoPublish=true" "$wanted" | sed -n '1p')"
+        case "$status" in
+            200|204) ;;
+            *) fail "DID service endpoint ${id} update failed with HTTP ${status}" ;;
+        esac
+    done || exit 1
+}
+reconcile_service_endpoints
 
 log "IdentityHub participant context requested as active"
 

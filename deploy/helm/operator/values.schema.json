@@ -59,20 +59,11 @@
     },
     "identity": {
       "type": "object",
-      "required": [
-        "issuerBpn",
-        "issuerBpnBase64",
-        "issuerDidHost",
-        "useHttpsDidWeb"
-      ],
+      "required": ["issuerBpn", "issuerDidHost", "useHttpsDidWeb"],
       "properties": {
         "issuerBpn": {
           "type": "string",
           "pattern": "^BPN[LSA][A-Z0-9]{12}$"
-        },
-        "issuerBpnBase64": {
-          "type": "string",
-          "pattern": "^[A-Za-z0-9_-]+={0,2}$"
         },
         "issuerDidHost": {
           "type": "string",

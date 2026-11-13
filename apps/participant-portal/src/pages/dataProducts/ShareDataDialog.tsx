@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { useDataProvider, useGetList, useNotify, useTranslate } from 'react-admin'
 import {
   Alert,
+  AlertTitle,
+  Autocomplete,
   Box,
   Button,
   Dialog,
@@ -25,6 +27,7 @@ import type { Asset } from '../../types/asset'
 import type { BusinessPartnerGroup } from '../../types/businessPartnerGroup'
 import type { DataProductOffer } from '../../types/dataProduct'
 import { createDataProductOffer, OfferCreationError } from '../../services/dataProductOfferService'
+import { connectorErrorReasons } from '../../services/dataProductViewModels'
 import { ParticipantMultiSelect } from '../../components/portal/ParticipantMultiSelect'
 import {
   buildAccessConstraints,
@@ -32,10 +35,14 @@ import {
   DEFAULT_USAGE_PURPOSE,
   FRAMEWORK_AGREEMENT,
   invalidBpns,
+  isFutureEndDate,
+  isValidDurationDays,
   isValidUsagePurpose,
   type OfferAudience,
   parseBpns,
   toDateInputValue,
+  USAGE_PURPOSES,
+  type UsageEnd,
 } from './offerPolicy'
 
 type Draft = {
@@ -43,14 +50,18 @@ type Draft = {
   partners: string
   group: string
   purpose: string
+  usageEnd: UsageEnd
   endDate: string
+  durationDays: string
 }
 const initialDraft: Draft = {
   audience: 'members',
   partners: '',
   group: '',
   purpose: DEFAULT_USAGE_PURPOSE,
+  usageEnd: 'none',
   endDate: '',
+  durationDays: '30',
 }
 
 const draftFromOffer = (offer?: DataProductOffer): Draft => {
@@ -61,6 +72,7 @@ const draftFromOffer = (offer?: DataProductOffer): Draft => {
   const group = access.find((item) => item.leftOperand === 'BusinessPartnerGroup')
   const purpose = usage.find((item) => item.leftOperand === 'UsagePurpose')
   const end = usage.find((item) => item.leftOperand === 'DataUsageEndDate')
+  const duration = usage.find((item) => item.leftOperand === 'DataUsageEndDurationDays')
   return {
     audience: partner ? 'partners' : group ? 'group' : 'members',
     partners: Array.isArray(partner?.rightOperand)
@@ -70,7 +82,9 @@ const draftFromOffer = (offer?: DataProductOffer): Draft => {
     purpose: Array.isArray(purpose?.rightOperand)
       ? String(purpose.rightOperand[0] || initialDraft.purpose)
       : String(purpose?.rightOperand || initialDraft.purpose),
+    usageEnd: end ? 'date' : duration ? 'duration' : 'none',
     endDate: toDateInputValue(end?.rightOperand),
+    durationDays: duration ? String(duration.rightOperand) : initialDraft.durationDays,
   }
 }
 
@@ -93,6 +107,12 @@ export const ShareDataDialog = ({
   const [step, setStep] = useState(0)
   const [draft, setDraft] = useState<Draft>(initialDraft)
   const [saving, setSaving] = useState(false)
+  const [saveErrors, setSaveErrors] = useState<string[]>([])
+  const [orphanedPolicyIds, setOrphanedPolicyIds] = useState<string[]>([])
+  const clearSaveErrors = () => {
+    setSaveErrors([])
+    setOrphanedPolicyIds([])
+  }
   const { data: groupEntries, isLoading: groupsLoading } = useGetList<BusinessPartnerGroup>(
     'businesspartnergroups',
     {
@@ -105,9 +125,15 @@ export const ShareDataDialog = ({
     if (open) {
       setDraft(draftFromOffer(offer))
       setStep(0)
+      setSaveErrors([])
+      setOrphanedPolicyIds([])
     }
   }, [offer, open])
-  const set = <K extends keyof Draft>(key: K, value: Draft[K]) => setDraft((current) => ({ ...current, [key]: value }))
+  // A changed draft makes the reasons of the last failed attempt stale.
+  const set = <K extends keyof Draft>(key: K, value: Draft[K]) => {
+    setDraft((current) => ({ ...current, [key]: value }))
+    clearSaveErrors()
+  }
   const steps = [
     translate('portalUx.share.audienceStep'),
     translate('portalUx.share.usageStep'),
@@ -123,6 +149,15 @@ export const ShareDataDialog = ({
   const parsedBpns = parseBpns(draft.partners)
   const invalidPartnerBpns = invalidBpns(draft.partners)
   const purposeValid = isValidUsagePurpose(draft.purpose)
+  const endDateValid = isFutureEndDate(draft.endDate)
+  const durationValid = isValidDurationDays(draft.durationDays)
+  const usageEndValid = draft.usageEnd === 'date' ? endDateValid : draft.usageEnd === 'duration' ? durationValid : true
+  // Grouped by namespace (cx.<namespace>.…); groups must be contiguous.
+  const purposeGroup = (purpose: string) => purpose.match(/^cx\.([^.:]+)/)?.[1] ?? ''
+  const purposeOptions = (
+    USAGE_PURPOSES.includes(draft.purpose) ? [...USAGE_PURPOSES] : [draft.purpose, ...USAGE_PURPOSES]
+  ).sort((left, right) => purposeGroup(left).localeCompare(purposeGroup(right)) || left.localeCompare(right))
+  const today = new Date().toISOString().slice(0, 10)
   const valid =
     step === 0
       ? draft.audience === 'partners'
@@ -131,7 +166,7 @@ export const ShareDataDialog = ({
           ? Boolean(draft.group.trim() && !groupsLoading && groupChoices.includes(draft.group))
           : true
       : step === 1
-        ? purposeValid
+        ? purposeValid && usageEndValid
         : true
   const restrictionSummary =
     draft.audience === 'partners'
@@ -147,7 +182,16 @@ export const ShareDataDialog = ({
     { label: translate('portalUx.share.restrictionSummary'), value: restrictionSummary },
     { label: translate('portalUx.share.framework'), value: FRAMEWORK_AGREEMENT },
     { label: translate('portalUx.share.purpose'), value: draft.purpose },
-    ...(draft.endDate ? [{ label: translate('portalUx.share.endDateSummary'), value: draft.endDate }] : []),
+    ...(draft.usageEnd === 'date'
+      ? [{ label: translate('portalUx.share.endDateSummary'), value: draft.endDate }]
+      : draft.usageEnd === 'duration'
+        ? [
+            {
+              label: translate('portalUx.share.durationSummary'),
+              value: translate('portalUx.share.durationSummaryValue', { days: draft.durationDays.trim() }),
+            },
+          ]
+        : []),
   ]
 
   const policyData = (kind: 'access' | 'usage') => ({
@@ -167,6 +211,7 @@ export const ShareDataDialog = ({
   })
   const save = async () => {
     setSaving(true)
+    clearSaveErrors()
     try {
       if (offer?.accessPolicyId && offer.contractPolicyId && offer.accessPolicy && offer.contractPolicy) {
         await dataProvider.update('policies', {
@@ -197,10 +242,8 @@ export const ShareDataDialog = ({
       onSuccess?.()
       onClose()
     } catch (error: any) {
-      const orphaned = error instanceof OfferCreationError ? error.orphanedPolicyIds : []
-      notify(error?.message || translate('portalUx.share.failed'), { type: 'error' })
-      if (orphaned.length)
-        notify(translate('portalUx.share.orphaned', { ids: orphaned.join(', ') }), { type: 'warning' })
+      setSaveErrors(connectorErrorReasons(error))
+      setOrphanedPolicyIds(error instanceof OfferCreationError ? error.orphanedPolicyIds : [])
     } finally {
       setSaving(false)
     }
@@ -302,26 +345,77 @@ export const ShareDataDialog = ({
               helperText={translate('portalUx.share.frameworkHelp')}
               slotProps={{ input: { readOnly: true } }}
             />
-            <TextField
-              label={translate('portalUx.share.purpose')}
+            <Autocomplete
+              options={purposeOptions}
+              groupBy={purposeGroup}
               value={draft.purpose}
-              onChange={(event) => set('purpose', event.target.value)}
-              error={Boolean(draft.purpose) && !purposeValid}
-              helperText={
-                draft.purpose && !purposeValid
-                  ? translate('portalUx.share.purposeInvalid')
-                  : translate('portalUx.share.purposeHelp')
-              }
+              disableClearable
+              onChange={(_, value) => set('purpose', value)}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label={translate('portalUx.share.purpose')}
+                  error={!purposeValid}
+                  helperText={translate(purposeValid ? 'portalUx.share.purposeHelp' : 'portalUx.share.purposeInvalid')}
+                />
+              )}
             />
-            <TextField
-              label={translate('portalUx.share.endDate')}
-              type="date"
-              value={draft.endDate}
-              onChange={(event) => set('endDate', event.target.value)}
-              slotProps={{ inputLabel: { shrink: true } }}
-              helperText={translate('portalUx.share.endDateHelp')}
-            />
+            <FormControl fullWidth>
+              <InputLabel id="offer-usage-end-label">{translate('portalUx.share.usageEnd')}</InputLabel>
+              <Select
+                labelId="offer-usage-end-label"
+                label={translate('portalUx.share.usageEnd')}
+                value={draft.usageEnd}
+                onChange={(event) => set('usageEnd', event.target.value as UsageEnd)}
+              >
+                <MenuItem value="none">{translate('portalUx.share.usageEndNone')}</MenuItem>
+                <MenuItem value="date">{translate('portalUx.share.usageEndDate')}</MenuItem>
+                <MenuItem value="duration">{translate('portalUx.share.usageEndDuration')}</MenuItem>
+              </Select>
+            </FormControl>
+            {draft.usageEnd === 'date' && (
+              <TextField
+                label={translate('portalUx.share.endDate')}
+                type="date"
+                required
+                value={draft.endDate}
+                onChange={(event) => set('endDate', event.target.value)}
+                error={Boolean(draft.endDate) && !endDateValid}
+                slotProps={{ inputLabel: { shrink: true }, htmlInput: { min: today } }}
+                helperText={translate(
+                  draft.endDate && !endDateValid ? 'portalUx.share.endDateInvalid' : 'portalUx.share.endDateHelp',
+                )}
+              />
+            )}
+            {draft.usageEnd === 'duration' && (
+              <TextField
+                label={translate('portalUx.share.durationDays')}
+                type="number"
+                value={draft.durationDays}
+                onChange={(event) => set('durationDays', event.target.value)}
+                error={!durationValid}
+                slotProps={{ htmlInput: { min: 1, step: 1 } }}
+                helperText={translate(
+                  durationValid ? 'portalUx.share.durationDaysHelp' : 'portalUx.share.durationDaysInvalid',
+                )}
+              />
+            )}
           </Box>
+        )}
+        {step === 2 && saveErrors.length > 0 && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            <AlertTitle>{translate('portalUx.share.failed')}</AlertTitle>
+            {saveErrors.map((reason) => (
+              <Typography key={reason} variant="body2">
+                {reason.startsWith('i18n:') ? translate(reason.slice(5)) : reason}
+              </Typography>
+            ))}
+            {orphanedPolicyIds.length > 0 && (
+              <Typography variant="body2" sx={{ mt: 1 }}>
+                {translate('portalUx.share.orphaned', { ids: orphanedPolicyIds.join(', ') })}
+              </Typography>
+            )}
+          </Alert>
         )}
         {step === 2 && (
           <Alert severity="info">
@@ -338,6 +432,9 @@ export const ShareDataDialog = ({
                 </Box>
               ))}
             </Box>
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1.5 }}>
+              {translate('portalUx.share.catalogDelay')}
+            </Typography>
           </Alert>
         )}
       </DialogContent>

@@ -213,6 +213,49 @@ export const buildDashboardSummary = (
   }
 }
 
+// EDC stores a counterparty's DSP error as JSON; show its reason.
+export const edcErrorReason = (detail: string) => {
+  try {
+    const parsed = JSON.parse(detail)
+    const reason = Array.isArray(parsed?.reason) ? parsed.reason.join(' ') : parsed?.reason
+    return typeof reason === 'string' && reason ? reason : detail
+  } catch {
+    return detail
+  }
+}
+
+// The reasons a connector gave for rejecting a management API request:
+// EDC answers validation failures with a list of messages. Known messages
+// are returned as i18n keys (prefixed with "i18n:").
+const KNOWN_CONNECTOR_ERRORS: Array<[RegExp, string]> = [
+  [/right operand must match pattern '\^\(\\d\{4\}/, 'i18n:portalUx.connectorErrors.dateFormat'],
+  [/already exists/i, 'i18n:portalUx.connectorErrors.exists'],
+]
+
+export const connectorErrorReasons = (error: unknown): string[] => {
+  const source = (error as { cause?: unknown })?.cause ?? error
+  const { status, body, message } = (source || {}) as { status?: number; body?: unknown; message?: string }
+  if (typeof status === 'number' && status >= 500) return ['i18n:portalUx.connectorErrors.internal']
+  const messages = Array.isArray(body)
+    ? body.map((item) => (item && typeof item === 'object' ? (item as { message?: unknown }).message : undefined))
+    : []
+  const texts = messages.filter((item): item is string => typeof item === 'string' && item.length > 0)
+  if (!texts.length && message) texts.push(message)
+  const reasons = texts.map((text) => KNOWN_CONNECTOR_ERRORS.find(([pattern]) => pattern.test(text))?.[1] ?? text)
+  return [...new Set(reasons)]
+}
+
+// A DataUsageEndDate that has passed: the provider concludes the contract but
+// refuses every transfer under it.
+export const passedUsageEndDate = (policy?: DatasetPolicy, now = Date.now()) => {
+  const ends = (policy?.permissions || [])
+    .flatMap((rule: any) => rule.constraints || [])
+    .filter((constraint: any) => String(constraint.leftOperand).split(/[:/#]/).at(-1) === 'DataUsageEndDate')
+    .map((constraint: any) => Date.parse(String(constraint.rightOperand)))
+    .filter((end: number) => !Number.isNaN(end) && end <= now)
+  return ends.length ? new Date(Math.min(...ends)).toISOString() : undefined
+}
+
 export const policySummary = (policy?: Policy | DatasetPolicy) => {
   if (!policy) return 'policy.none'
   const rules = 'rules' in policy ? policy.rules?.permissions || [] : policy.permissions || []

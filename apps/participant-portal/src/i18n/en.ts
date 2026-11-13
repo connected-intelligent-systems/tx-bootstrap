@@ -590,6 +590,7 @@ const englishMessages: Partial<TranslationMessages> = {
         businessPartnerNumber: 'Business partner number',
         businessPartnerGroup: 'Business partner group',
         dataExchange: 'Data exchange usage',
+        usagePeriod: 'Usage period (ends after 30 days)',
       },
     },
     list: {
@@ -796,6 +797,9 @@ const englishMessages: Partial<TranslationMessages> = {
     },
     actions: {
       terminate: 'Terminate',
+      startTransfer: 'Start transfer',
+      showCoreFields: 'Show transfer details',
+      hideCoreFields: 'Hide transfer details',
       download: 'Download Data',
       downloading: 'Downloading...',
     },
@@ -815,7 +819,7 @@ const englishMessages: Partial<TranslationMessages> = {
         counterPartyAddressHelper: 'The address of the counter party',
         contractIdHelper: 'The contract agreement id',
         assetIdHelper: 'The asset id',
-        protocolHelper: 'The dataspace protocol to use',
+        protocolHelper: 'Leave empty to use the newest protocol version both connectors support',
         transferTypeHelper:
           'Choose whether to access the data through the connector or deliver it to your destination.',
         baseUrlHelper: 'The base URL where the data will be pushed',

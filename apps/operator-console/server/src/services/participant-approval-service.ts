@@ -47,7 +47,6 @@ export function createParticipantApprovalService({
   const issuerIssuanceUrl = config.issuer.issuanceUrl;
   const issuerDid = config.issuer.did;
   const issuerContext = config.issuer.context;
-  const issuerContextPathId = config.issuer.contextPathId;
   const issuerApiKeyAlias = config.issuer.apiKeyAlias;
   const issuerApiKeyVaultUrl = config.issuer.apiKeyVaultUrl;
   const issuerApiKeyVaultToken = config.issuer.apiKeyVaultToken;
@@ -57,6 +56,13 @@ export function createParticipantApprovalService({
   const policyClaimsAttestationId = config.issuer.policyClaimsAttestationId;
   const credentialDefinitions = config.issuer.credentialDefinitions;
   let cachedIssuerApiKey = config.issuer.apiKey;
+  const issuerServiceEndpoint = {
+    id: `${issuerDid}#credential-service`,
+    type: "IssuerService",
+    serviceEndpoint: `${issuerIssuanceUrl}/v1alpha/participants/${encodeURIComponent(
+      issuerContext,
+    )}`,
+  };
 
   return {
     buildCredentialRequest,
@@ -398,7 +404,7 @@ export function createParticipantApprovalService({
   }
 
   function issuerParticipantPath() {
-    return `/v1alpha/participants/${encodeURIComponent(issuerContextPathId)}`;
+    return `/v1alpha/participants/${encodeURIComponent(issuerContext)}`;
   }
 
   async function failedResponse(
@@ -546,7 +552,7 @@ export function createParticipantApprovalService({
       return [apiKeyResult.check];
     }
 
-    const encodedIssuerContext = encodeURIComponent(issuerContextPathId);
+    const encodedIssuerContext = encodeURIComponent(issuerContext);
     const checks = [apiKeyResult.check];
     checks.push(
       await postIssuer(
@@ -693,15 +699,7 @@ export function createParticipantApprovalService({
             participantContextId: issuerContext,
             participantId: issuerContext,
             roles: ["ROLE_ADMIN", "admin"],
-            serviceEndpoints: [
-              {
-                id: `${issuerDid}#credential-service`,
-                type: "IssuerService",
-                serviceEndpoint: `${issuerIssuanceUrl}/v1alpha/participants/${encodeURIComponent(
-                  issuerContextPathId,
-                )}`,
-              },
-            ],
+            serviceEndpoints: [issuerServiceEndpoint],
             apiKeyAlias: issuerApiKeyAlias,
             key: {
               keyId: `${issuerDid}#key-1`,

@@ -1,7 +1,6 @@
 identity:
   participantRole: provider
   participantBpn: __BPN_PROVIDER__
-  participantBpnBase64: __BPN_PROVIDER_BASE64__
   participantContextId: __PROVIDER_CONTEXT_ID__
   identityHubParticipantContextId: __BPN_PROVIDER__
   participantDidHost: provider.__INGRESS_IP__.nip.io
@@ -12,7 +11,7 @@ identity:
 
 publicEndpoints:
   dspCallbackAddress: http://provider.__INGRESS_IP__.nip.io/api/v1/dsp
-  credentialServiceEndpoint: http://provider.__INGRESS_IP__.nip.io/api/credentials/v1/participants/__BPN_PROVIDER_BASE64__
+  credentialServiceEndpoint: http://provider.__INGRESS_IP__.nip.io/api/credentials/v1/participants/__BPN_PROVIDER__
   dataPlaneBaseUrl: http://provider.__INGRESS_IP__.nip.io/api/public/
   dataPlaneTokenRefreshEndpoint: http://provider.__INGRESS_IP__.nip.io/api/public
   bdrsServerUrl: http://issuer.__INGRESS_IP__.nip.io/api/directory

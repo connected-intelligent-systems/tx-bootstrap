@@ -102,7 +102,6 @@ export const ContractNegotiationDialog: React.FC<ContractNegotiationDialogProps>
           },
           counterPartyAddress,
           counterPartyId,
-          protocol: 'dataspace-protocol-http',
         },
       })
       const negotiationId = response.data?.id

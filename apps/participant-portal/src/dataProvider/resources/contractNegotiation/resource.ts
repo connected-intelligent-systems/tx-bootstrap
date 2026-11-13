@@ -8,6 +8,7 @@ import {
   GetManyReferenceParams,
 } from 'react-admin'
 import { httpClient } from '../../shared/httpClient'
+import { DSP_2025_1, resolveDspParams } from '../../../services/dspProtocolService'
 import { buildQuerySpec, compactJsonLd, compactJsonLdArray } from '../../shared/helpers'
 import {
   parseContractNegotiationFromJsonLd,
@@ -117,7 +118,16 @@ export async function remove(params: DeleteParams) {
 }
 
 export async function create(params: CreateParams) {
-  const jsonLdNegotiation = await serializeContractNegotiationToJsonLd(params.data)
+  const { counterPartyId, policy } = params.data
+  const dsp = await resolveDspParams(params.data.counterPartyAddress, counterPartyId, params.data.protocol)
+  // The connector takes the counterparty from the offer's assigner, and DSP
+  // 2025-1 identifies participants by DID; 0.8 keeps the BPN.
+  const assigner = dsp.protocol === DSP_2025_1 && counterPartyId?.startsWith('did:') ? counterPartyId : policy?.assigner
+  const jsonLdNegotiation = await serializeContractNegotiationToJsonLd({
+    ...params.data,
+    ...dsp,
+    policy: policy && { ...policy, assigner },
+  })
   const response = await httpClient(`/api/management/v3/contractnegotiations`, {
     method: 'POST',
     body: JSON.stringify(jsonLdNegotiation),

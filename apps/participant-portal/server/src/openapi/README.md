@@ -9,7 +9,7 @@ data proxy, bearer-token authentication, and required scopes. See
 
 Edit `gateway-operations.json` when changing the allowed API operations.
 When upgrading EDC, update the pinned upstream version in the generator too;
-it currently uses the Tractus-X EDC `0.12.1` control-plane specification.
+it currently uses the Tractus-X EDC `0.13.0` control-plane specification.
 
 From the repository root:
 

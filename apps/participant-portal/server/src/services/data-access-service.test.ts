@@ -156,4 +156,154 @@ describe('consumer data access lifecycles', () => {
       await app.close()
     }
   })
+
+  it('marks access as expired after the usage period of its agreement', async () => {
+    config.edc.managementApiUrl = 'http://controlplane.test/management/'
+    config.edc.apiKey = 'test-key'
+    const agreement = (id: string, constraint: Record<string, unknown>) => ({
+      '@id': id,
+      assetId: id,
+      providerId: 'did:web:provider.test:BPNL00000003AYRE',
+      contractSigningDate: 1_752_148_800,
+      policy: {
+        '@type': 'odrl:Agreement',
+        'odrl:permission': {
+          'odrl:action': { '@id': 'odrl:use' },
+          'odrl:constraint': {
+            'odrl:and': [
+              {
+                'odrl:leftOperand': { '@id': 'cx-policy:FrameworkAgreement' },
+                'odrl:operator': { '@id': 'odrl:eq' },
+                'odrl:rightOperand': 'DataExchangeGovernance:1.0',
+              },
+              constraint,
+            ],
+          },
+        },
+      },
+    })
+    const endDate = (value: string) => ({
+      'odrl:leftOperand': { '@id': 'cx-policy:DataUsageEndDate' },
+      'odrl:operator': { '@id': 'odrl:eq' },
+      'odrl:rightOperand': value,
+    })
+    const agreements = [
+      agreement('ended', endDate('2020-01-01T00:00:00Z')),
+      agreement('running', endDate('2999-01-01T00:00:00Z')),
+      agreement('duration', {
+        'odrl:leftOperand': { '@id': 'cx-policy:DataUsageEndDurationDays' },
+        'odrl:operator': { '@id': 'odrl:eq' },
+        'odrl:rightOperand': '30',
+      }),
+    ]
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: URL | RequestInfo) => {
+        const path = new URL(String(input)).pathname
+        const upstream = path.endsWith('/contractnegotiations/request')
+          ? agreements.map((item) => ({
+              '@id': `negotiation-${item['@id']}`,
+              type: 'CONSUMER',
+              assetId: item.assetId,
+              counterPartyId: 'did:web:provider.test:BPNL00000003AYRE',
+              counterPartyAddress: 'http://provider.test/protocol',
+              contractAgreementId: item['@id'],
+              state: 'FINALIZED',
+            }))
+          : path.endsWith('/contractagreements/request')
+            ? agreements
+            : []
+        return new Response(JSON.stringify(upstream), { status: 200 })
+      }),
+    )
+    const app = createApp()
+
+    try {
+      const response = await app.inject({ method: 'GET', url: '/api/portal/data-access?limit=10' })
+      const byAsset = Object.fromEntries(
+        (response.json().data as Array<Record<string, unknown>>).map((item) => [item.assetId, item]),
+      )
+
+      expect(byAsset.ended).toMatchObject({
+        status: 'expired',
+        usageEndsAt: '2020-01-01T00:00:00.000Z',
+        canUseData: false,
+      })
+      expect(byAsset.running).toMatchObject({
+        status: 'active',
+        usageEndsAt: '2999-01-01T00:00:00.000Z',
+        canUseData: true,
+      })
+      expect(byAsset.duration).toMatchObject({
+        status: 'expired',
+        usageEndsAt: new Date((1_752_148_800 + 30 * 24 * 60 * 60) * 1000).toISOString(),
+      })
+
+      const filtered = await app.inject({ method: 'GET', url: '/api/portal/data-access?status=expired' })
+      expect(filtered.json().total).toBe(2)
+    } finally {
+      await app.close()
+    }
+  })
+
+  it('reports the HTTP-pull transfer of the current agreement as access transfer', async () => {
+    config.edc.managementApiUrl = 'http://controlplane.test/management/'
+    config.edc.apiKey = 'test-key'
+    const transfer = (id: string, transferType: string, updatedAt: string, contractId = 'agreement-2') => ({
+      '@id': id,
+      type: 'CONSUMER',
+      contractId,
+      assetId: 'asset-a',
+      transferType,
+      state: 'STARTED',
+      updatedAt,
+    })
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: URL | RequestInfo) => {
+        const path = new URL(String(input)).pathname
+        const upstream = path.endsWith('/contractnegotiations/request')
+          ? ['agreement-1', 'agreement-2'].map((agreement, index) => ({
+              '@id': `negotiation-${index}`,
+              type: 'CONSUMER',
+              assetId: 'asset-a',
+              counterPartyId: 'provider-a',
+              counterPartyAddress: 'http://provider.test/protocol',
+              contractAgreementId: agreement,
+              state: 'FINALIZED',
+              updatedAt: `2026-07-1${index}T12:00:00.000Z`,
+            }))
+          : path.endsWith('/contractagreements/request')
+            ? [
+                { '@id': 'agreement-1', assetId: 'asset-a', contractSigningDate: 1_752_148_800 },
+                { '@id': 'agreement-2', assetId: 'asset-a', contractSigningDate: 1_752_235_200 },
+              ]
+            : path.endsWith('/transferprocesses/request')
+              ? [
+                  transfer('old-agreement', 'HttpData-PULL', '2026-07-12T12:00:00.000Z', 'agreement-1'),
+                  transfer('push', 'AmazonS3-PUSH', '2026-07-12T13:00:00.000Z'),
+                  transfer('access', 'HttpData-PULL', '2026-07-12T11:00:00.000Z'),
+                ]
+              : []
+        return new Response(JSON.stringify(upstream), { status: 200 })
+      }),
+    )
+    const app = createApp()
+
+    try {
+      const response = await app.inject({ method: 'GET', url: '/api/portal/data-access/provider-a%7Casset-a' })
+
+      expect(response.json().data).toMatchObject({
+        agreementId: 'agreement-2',
+        accessTransfer: {
+          id: 'access',
+          state: 'STARTED',
+          transferType: 'HttpData-PULL',
+          transferDirection: 'CONSUMER',
+        },
+      })
+    } finally {
+      await app.close()
+    }
+  })
 })

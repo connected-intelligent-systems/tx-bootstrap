@@ -117,7 +117,7 @@ export function parseCatalogFromJsonLd(jsonLdCatalog: any, catalogId: string): C
       id: catalogId,
       title: parsed['dct:title'],
       description: parsed['dct:description'],
-      participantId: parsed['dspace:participantId'],
+      participantId: participantIdOf(parsed['dspace:participantId']) ?? parsed['dspace08:participantId'],
       datasets: datasetsWithApiDescriptions,
     }
     return stripUndefinedValues(catalog)
@@ -125,4 +125,8 @@ export function parseCatalogFromJsonLd(jsonLdCatalog: any, catalogId: string): C
     const errorMessage = error instanceof Error ? error.message : String(error)
     throw new Error(`Failed to transform JSON-LD catalog: ${errorMessage}`, { cause: error })
   }
+}
+
+function participantIdOf(value: string | { '@id': string } | undefined): string | undefined {
+  return typeof value === 'object' ? value['@id'] : value
 }

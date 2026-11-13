@@ -26,14 +26,23 @@ export async function resolveHttpEndpointDataReference(
   )
   if (!forceRefresh) url.searchParams.set('auto_refresh', 'true')
 
-  const response = await fetchUpstream(
-    url,
-    {
-      method: forceRefresh ? 'POST' : 'GET',
-      headers: { accept: 'application/json', 'x-api-key': config.edc.apiKey },
-    },
-    { upstreamName: 'EDC' },
-  )
+  const request = () =>
+    fetchUpstream(
+      url,
+      {
+        method: forceRefresh ? 'POST' : 'GET',
+        headers: { accept: 'application/json', 'x-api-key': config.edc.apiKey },
+      },
+      { upstreamName: 'EDC' },
+    )
+  let response = await request()
+  // A refresh whose response was lost (provider unreachable or slow) can be
+  // repeated: since Tractus-X EDC 0.13 the provider accepts the superseded
+  // refresh token until the consumer has used the new one.
+  if (forceRefresh && response.status >= 500) {
+    await response.body?.cancel()
+    response = await request()
+  }
   if (!response.ok) {
     if (response.status === 404) throw httpError(404, 'Access details are not available for this transfer')
     throw httpError(502, 'Could not resolve transfer access details')

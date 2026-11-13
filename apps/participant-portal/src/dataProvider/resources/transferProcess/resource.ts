@@ -1,5 +1,6 @@
 import { GetListParams, GetOneParams, DeleteParams, CreateParams, UpdateParams, GetManyParams } from 'react-admin'
 import { httpClient } from '../../shared/httpClient'
+import { resolveDspParams } from '../../../services/dspProtocolService'
 import { buildQuerySpec, compactJsonLd, compactJsonLdArray } from '../../shared/helpers'
 import { parseTransferProcessFromJsonLd, parseTransferProcessFromJsonLdArray } from './transformer'
 
@@ -133,15 +134,16 @@ export async function remove(params: DeleteParams) {
 }
 
 export async function create(params: CreateParams) {
+  const dsp = await resolveDspParams(params.data.counterPartyAddress, params.data.counterPartyId, params.data.protocol)
   const requestDto: any = {
     '@context': {
       '@vocab': 'https://w3id.org/edc/v0.0.1/ns/',
     },
     '@type': 'TransferRequestDto',
-    counterPartyAddress: params.data.counterPartyAddress,
+    counterPartyAddress: dsp.counterPartyAddress,
     contractId: params.data.contractId,
     assetId: params.data.assetId,
-    protocol: params.data.protocol || 'dataspace-protocol-http',
+    protocol: dsp.protocol,
     transferType: params.data.transferType,
   }
 

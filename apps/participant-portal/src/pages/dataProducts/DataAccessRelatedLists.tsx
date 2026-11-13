@@ -1,13 +1,13 @@
 import type { ReactNode } from 'react'
 import { DataTable, DateField, ListBase, Pagination, useListContext, useRecordContext, useTranslate } from 'react-admin'
-import { Alert, Chip } from '@mui/material'
+import { Alert, Box, Chip, Typography } from '@mui/material'
 import type { ContractAgreement } from '../../types/contractAgreement'
 import type { ContractNegotiation } from '../../types/contractNegotiation'
 import type { Dataset } from '../../types/catalog'
 import type { TransferProcess } from '../../types/transferProcess'
-import { getAccessRequestStatus } from '../../services/dataProductViewModels'
+import { edcErrorReason, getAccessRequestStatus } from '../../services/dataProductViewModels'
 import { FriendlyStatusChip, LoadingState, ResourceError } from '../../components/portal/PortalPage'
-import { TransferAccessDetailsAction } from './TransferAccessDetailsDialog'
+import { TransferAccessDetailsAction, transferFailed } from './TransferAccessDetailsDialog'
 
 const RelatedList = ({ children, emptyText }: { children: ReactNode; emptyText: string }) => {
   const translate = useTranslate()
@@ -110,7 +110,21 @@ export const DataAccessTransfersList = ({ lifecycleId, dataset }: { lifecycleId:
         <DataTable.Col<TransferProcess>
           source="state"
           label={t('portalUx.product.state')}
-          render={(record) => <Chip size="small" variant="outlined" label={record.state} />}
+          render={(record) => (
+            <Box>
+              <Chip
+                size="small"
+                variant="outlined"
+                color={transferFailed(record) ? 'error' : 'default'}
+                label={record.state}
+              />
+              {transferFailed(record) && record.errorDetail && (
+                <Typography variant="caption" color="error" sx={{ display: 'block', mt: 0.5, maxWidth: 360 }}>
+                  {edcErrorReason(record.errorDetail)}
+                </Typography>
+              )}
+            </Box>
+          )}
           disableSort
         />
         <DataTable.Col<TransferProcess>

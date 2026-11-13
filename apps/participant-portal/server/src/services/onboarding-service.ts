@@ -2,7 +2,7 @@ import { config, onboardingDefaults } from '../config/index.js'
 import { dataspaceFetch } from '../clients/dataspace-admin-client.js'
 import {
   assertIdentityHubConfigured,
-  getIdentityHubParticipantContextPathId,
+  getIdentityHubParticipantContextId,
   identityHubFetch,
 } from '../clients/identityhub-client.js'
 import { ensureDb, loadStateRow, patchState, requireStateRow, upsertState } from '../db/state-repository.js'
@@ -241,7 +241,7 @@ async function checkOperatorAccess(row: StateRow): Promise<boolean> {
 
 async function removeIssuerCredentials(issuerDid: string): Promise<void> {
   if (!issuerDid) return
-  const base = '/v1alpha/participants/' + encodeURIComponent(getIdentityHubParticipantContextPathId()) + '/credentials'
+  const base = '/v1alpha/participants/' + encodeURIComponent(getIdentityHubParticipantContextId()) + '/credentials'
   const credentials = extractCredentials(await identityHubFetch(base))
   for (const credential of credentials.filter((item) => item.issuer === issuerDid)) {
     await identityHubFetch(base + '/' + encodeURIComponent(credential.id), { method: 'DELETE' })
@@ -260,9 +260,7 @@ async function requestCredentialsForRow(row: StateRow, options: RequestCredentia
     let alreadyQueued = false
     try {
       await identityHubFetch(
-        '/v1alpha/participants/' +
-          encodeURIComponent(getIdentityHubParticipantContextPathId()) +
-          '/credentials/request',
+        '/v1alpha/participants/' + encodeURIComponent(getIdentityHubParticipantContextId()) + '/credentials/request',
         { method: 'POST', body: credentialRequest },
       )
     } catch (error) {
@@ -348,7 +346,7 @@ async function refreshOnboardingForRow(row: StateRow): Promise<JsonRecord> {
           try {
             credentialRequestStatus = await identityHubFetch<JsonRecord>(
               '/v1alpha/participants/' +
-                encodeURIComponent(getIdentityHubParticipantContextPathId()) +
+                encodeURIComponent(getIdentityHubParticipantContextId()) +
                 '/credentials/request/' +
                 encodeURIComponent(holderPid),
             )
@@ -365,7 +363,7 @@ async function refreshOnboardingForRow(row: StateRow): Promise<JsonRecord> {
         }
 
         const identityHubResponse = await identityHubFetch(
-          '/v1alpha/participants/' + encodeURIComponent(getIdentityHubParticipantContextPathId()) + '/credentials',
+          '/v1alpha/participants/' + encodeURIComponent(getIdentityHubParticipantContextId()) + '/credentials',
         )
         credentials = extractCredentials(identityHubResponse)
         issued = hasExpectedCredentials(

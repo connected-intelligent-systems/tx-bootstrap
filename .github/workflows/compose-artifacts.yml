@@ -69,13 +69,11 @@ jobs:
       OPERATOR_CONSOLE_API_KEY: compose-validation-console-key
       OPERATOR_ONBOARDING_SERVICE_ALLOWED_ORIGINS: https://operator.example.invalid
       BPN_ISSUER: BPNL000000000001
-      BPN_ISSUER_BASE64: QlBOTDAwMDAwMDAwMDAwMQ==
       ISSUER_DID_HOST: issuer.example.invalid
       ISSUER_IDENTITYHUB_ENCRYPTION_KEY_ALIAS: issuer-identityhub-encryption-key
       ISSUER_SERVICE_ENCRYPTION_KEY_ALIAS: issuer-service-encryption-key
       PARTICIPANT_ROLE: participant
       PARTICIPANT_BPN: BPNL000000000002
-      PARTICIPANT_BPN_BASE64: QlBOTDAwMDAwMDAwMDAwMg==
       PARTICIPANT_CONTEXT_ID: 00000000-0000-0000-0000-000000000002
       PARTICIPANT_DID_HOST: participant.example.invalid
       PARTICIPANT_PUBLIC_HOST: participant.example.invalid

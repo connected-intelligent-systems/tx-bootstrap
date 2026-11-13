@@ -119,8 +119,6 @@ spec:
               value: "http://{{ include "tx-bootstrap-participant.componentName" (dict "root" . "component" "identityhub") }}:8082/api/identity"
             - name: IDENTITYHUB_PARTICIPANT_CONTEXT_ID
               value: {{ .Values.identity.identityHubParticipantContextId | quote }}
-            - name: IDENTITYHUB_PARTICIPANT_CONTEXT_PATH_ID
-              value: {{ .Values.identity.participantBpnBase64 | quote }}
             - name: IDENTITYHUB_API_KEY
               {{- if .Values.existingSecret.keys.identityHubApiKey }}
               {{- include "tx-bootstrap-participant.secretValue" (dict "root" . "key" "identityHubApiKey") | nindent 14 }}

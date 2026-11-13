@@ -45,7 +45,7 @@ x-gateway-runtime: &gateway-runtime
 services:
   identityhub:
     <<: *java-runtime
-    image: tractusx/identityhub:${IDENTITYHUB_TAG:-0.3.2}
+    image: tractusx/identityhub:${IDENTITYHUB_TAG:-0.4.1}
     configs:
       - source: ih-logging
         target: /app/logging.properties
@@ -138,12 +138,11 @@ services:
     environment:
       PARTICIPANT_ROLE: ${PARTICIPANT_ROLE:?PARTICIPANT_ROLE must be set}
       PARTICIPANT_BPN: ${PARTICIPANT_BPN:?PARTICIPANT_BPN must be set}
-      PARTICIPANT_BPN_BASE64: ${PARTICIPANT_BPN_BASE64:?PARTICIPANT_BPN_BASE64 must be set}
       IDENTITYHUB_PARTICIPANT_CONTEXT_ID: ${IDENTITYHUB_PARTICIPANT_CONTEXT_ID:-${PARTICIPANT_BPN:?PARTICIPANT_BPN must be set}}
       PARTICIPANT_DID_HOST: ${PARTICIPANT_DID_HOST:?PARTICIPANT_DID_HOST must be set}
       PARTICIPANT_PUBLIC_HOST: ${PARTICIPANT_PUBLIC_HOST:?PARTICIPANT_PUBLIC_HOST must be set}
       PUBLIC_DSP_CALLBACK_ADDRESS: ${PUBLIC_DSP_CALLBACK_ADDRESS:-https://${PARTICIPANT_PUBLIC_HOST:?PARTICIPANT_PUBLIC_HOST must be set}/api/v1/dsp}
-      PUBLIC_CREDENTIAL_SERVICE_ENDPOINT: ${PUBLIC_CREDENTIAL_SERVICE_ENDPOINT:-https://${PARTICIPANT_PUBLIC_HOST:?PARTICIPANT_PUBLIC_HOST must be set}/api/credentials/v1/participants/${PARTICIPANT_BPN_BASE64:?PARTICIPANT_BPN_BASE64 must be set}}
+      PUBLIC_CREDENTIAL_SERVICE_ENDPOINT: ${PUBLIC_CREDENTIAL_SERVICE_ENDPOINT:-https://${PARTICIPANT_PUBLIC_HOST:?PARTICIPANT_PUBLIC_HOST must be set}/api/credentials/v1/participants/${PARTICIPANT_BPN:?PARTICIPANT_BPN must be set}}
       IDENTITYHUB_API_KEY: ${IDENTITYHUB_API_KEY:-}
       IDENTITYHUB_SUPERUSER_API_KEY_ALIAS: ${IDENTITYHUB_SUPERUSER_API_KEY_ALIAS:-super-user-apikey}
       VAULT_TOKEN: "${VAULT_TOKEN:?VAULT_TOKEN must be set}"
@@ -163,7 +162,7 @@ services:
 
   controlplane:
     <<: *java-runtime
-    image: tractusx/edc-controlplane-postgresql-hashicorp-vault:${TRACTUSX_EDC_TAG:-0.12.1}
+    image: tractusx/edc-controlplane-postgresql-hashicorp-vault:${TRACTUSX_EDC_TAG:-0.13.0}
     configs:
       - source: edc-logging
         target: /app/logging.properties
@@ -181,16 +180,16 @@ services:
       EDC_IAM_STS_OAUTH_TOKEN_URL: "http://identityhub:8087/api/sts/token"
       EDC_IAM_STS_OAUTH_CLIENT_ID: "did:web:${PARTICIPANT_DID_HOST:?PARTICIPANT_DID_HOST must be set}:${PARTICIPANT_BPN:?PARTICIPANT_BPN must be set}"
       EDC_IAM_STS_OAUTH_CLIENT_SECRET_ALIAS: "sts-oauth-client-secret"
-      TX_EDC_IAM_IATP_CREDENTIALSERVICE_URL: "http://identityhub:8083/api/credentials/v1/participants/${PARTICIPANT_BPN_BASE64:?PARTICIPANT_BPN_BASE64 must be set}"
-      TX_EDC_IAM_IATP_DEFAULT_SCOPES_MEMBERSHIP_ALIAS: "org.eclipse.tractusx.vc.type"
-      TX_EDC_IAM_IATP_DEFAULT_SCOPES_MEMBERSHIP_TYPE: "MembershipCredential"
-      TX_EDC_IAM_IATP_DEFAULT_SCOPES_MEMBERSHIP_OPERATION: "read"
-      TX_EDC_IAM_IATP_DEFAULT_SCOPES_DATAEXCHANGE_ALIAS: "org.eclipse.tractusx.vc.type"
-      TX_EDC_IAM_IATP_DEFAULT_SCOPES_DATAEXCHANGE_TYPE: "DataExchangeGovernanceCredential"
-      TX_EDC_IAM_IATP_DEFAULT_SCOPES_DATAEXCHANGE_OPERATION: "read"
+      TX_EDC_IAM_DCP_CREDENTIALSERVICE_URL: "http://identityhub:8083/api/credentials/v1/participants/${PARTICIPANT_BPN:?PARTICIPANT_BPN must be set}"
+      TX_EDC_IAM_DCP_DEFAULT_SCOPES_MEMBERSHIP_ALIAS: "org.eclipse.tractusx.vc.type"
+      TX_EDC_IAM_DCP_DEFAULT_SCOPES_MEMBERSHIP_TYPE: "MembershipCredential"
+      TX_EDC_IAM_DCP_DEFAULT_SCOPES_MEMBERSHIP_OPERATION: "read"
+      TX_EDC_IAM_DCP_DEFAULT_SCOPES_DATAEXCHANGE_ALIAS: "org.eclipse.tractusx.vc.type"
+      TX_EDC_IAM_DCP_DEFAULT_SCOPES_DATAEXCHANGE_TYPE: "DataExchangeGovernanceCredential"
+      TX_EDC_IAM_DCP_DEFAULT_SCOPES_DATAEXCHANGE_OPERATION: "read"
       EDC_DSP_CALLBACK_ADDRESS: "${PUBLIC_DSP_CALLBACK_ADDRESS:-https://${PARTICIPANT_PUBLIC_HOST:?PARTICIPANT_PUBLIC_HOST must be set}/api/v1/dsp}"
-      TX_EDC_IAM_IATP_BDRS_SERVER_URL: "${BDRS_SERVER_URL:?BDRS_SERVER_URL must be set}"
-      TX_EDC_IAM_IATP_BDRS_CACHE_VALIDITY: "600"
+      TX_EDC_IAM_DCP_BDRS_SERVER_URL: "${BDRS_SERVER_URL:?BDRS_SERVER_URL must be set}"
+      TX_EDC_IAM_DCP_BDRS_CACHE_VALIDITY: "600"
       TX_EDC_DID_SERVICE_SELF_REGISTRATION_ENABLED: "false"
       "EDC_IAM_TRUSTED-ISSUER_0-ISSUER_ID": "did:web:${ISSUER_DID_HOST:?ISSUER_DID_HOST must be set}:${BPN_ISSUER:?BPN_ISSUER must be set}"
       "EDC_IAM_TRUSTED-ISSUER_0-ISSUER_SUPPORTEDTYPES": '["MembershipCredential","FrameworkCredential","BpnCredential","DataExchangeGovernanceCredential","DismantlerCredential"]'
@@ -199,8 +198,6 @@ services:
       WEB_HTTP_MANAGEMENT_PORT: "8081"
       WEB_HTTP_MANAGEMENT_PATH: "/management"
       WEB_HTTP_MANAGEMENT_AUTH_KEY: "${EDC_API_KEY:?EDC_API_KEY must be set}"
-      WEB_HTTP_CATALOG_PORT: "8082"
-      WEB_HTTP_CATALOG_PATH: "/catalog"
       WEB_HTTP_CONTROL_PORT: "8083"
       WEB_HTTP_CONTROL_PATH: "/control"
       WEB_HTTP_PROTOCOL_PORT: "8084"
@@ -237,14 +234,14 @@ services:
 
   dataplane:
     <<: *java-runtime
-    image: ${EDC_DATAPLANE_IMAGE:-tractusx/edc-dataplane-hashicorp-vault:${TRACTUSX_EDC_TAG:-0.12.1}}
+    image: ${EDC_DATAPLANE_IMAGE:-tractusx/edc-dataplane-hashicorp-vault:${TRACTUSX_EDC_TAG:-0.13.0}}
     configs:
       - source: opentelemetry
         target: /app/opentelemetry.properties
     environment:
       <<: *java-env
       EDC_HOSTNAME: "dataplane"
-      EDC_PARTICIPANT_ID: "${PARTICIPANT_BPN:?PARTICIPANT_BPN must be set}"
+      EDC_PARTICIPANT_ID: "did:web:${PARTICIPANT_DID_HOST:?PARTICIPANT_DID_HOST must be set}:${PARTICIPANT_BPN:?PARTICIPANT_BPN must be set}"
       EDC_PARTICIPANT_CONTEXT_ID: "${PARTICIPANT_CONTEXT_ID:?PARTICIPANT_CONTEXT_ID must be set}"
       EDC_IAM_ISSUER_ID: "did:web:${PARTICIPANT_DID_HOST:?PARTICIPANT_DID_HOST must be set}:${PARTICIPANT_BPN:?PARTICIPANT_BPN must be set}"
       EDC_IAM_DID_WEB_USE_HTTPS: "${USE_HTTPS_DID_WEB:-true}"
@@ -382,7 +379,6 @@ services:
       ONBOARDING_CREDENTIAL_SERVICE_ENDPOINT: "${ONBOARDING_CREDENTIAL_SERVICE_ENDPOINT:-https://${PARTICIPANT_PUBLIC_HOST:?PARTICIPANT_PUBLIC_HOST must be set}/api/credentials}"
       IDENTITYHUB_IDENTITY_API_URL: "http://identityhub:8082/api/identity"
       IDENTITYHUB_PARTICIPANT_CONTEXT_ID: "${IDENTITYHUB_PARTICIPANT_CONTEXT_ID:-${PARTICIPANT_BPN:?PARTICIPANT_BPN must be set}}"
-      IDENTITYHUB_PARTICIPANT_CONTEXT_PATH_ID: "${PARTICIPANT_BPN_BASE64:?PARTICIPANT_BPN_BASE64 must be set}"
       IDENTITYHUB_API_KEY: "${IDENTITYHUB_API_KEY:-}"
       IDENTITYHUB_VAULT_URL: "${VAULT_URL:?VAULT_URL must be set}"
       IDENTITYHUB_VAULT_TOKEN: "${VAULT_TOKEN:?VAULT_TOKEN must be set}"

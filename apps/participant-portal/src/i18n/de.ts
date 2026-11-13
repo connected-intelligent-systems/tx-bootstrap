@@ -588,6 +588,7 @@ const germanMessages: Partial<TranslationMessages> = {
           businessPartnerNumber: 'Geschäftspartnernummer',
           businessPartnerGroup: 'Geschäftspartnergruppe',
           dataExchange: 'Data-Exchange-Nutzung',
+          usagePeriod: 'Nutzungsdauer (endet nach 30 Tagen)',
         },
       },
       list: {
@@ -769,6 +770,9 @@ const germanMessages: Partial<TranslationMessages> = {
       },
       actions: {
         terminate: 'Beenden',
+        startTransfer: 'Transfer starten',
+        showCoreFields: 'Transferdetails anzeigen',
+        hideCoreFields: 'Transferdetails ausblenden',
         download: 'Daten herunterladen',
         downloading: 'Lädt herunter...',
       },
@@ -788,7 +792,8 @@ const germanMessages: Partial<TranslationMessages> = {
           counterPartyAddressHelper: 'Die Adresse der Gegenpartei',
           contractIdHelper: 'Die Vertragsvereinbarungs-ID',
           assetIdHelper: 'Die Asset-ID',
-          protocolHelper: 'Das zu verwendende Dataspace-Protokoll',
+          protocolHelper:
+            'Leer lassen, um die neueste von beiden Konnektoren unterstützte Protokollversion zu verwenden',
           transferTypeHelper:
             'Wählen Sie, ob Sie die Daten über den Connector nutzen oder an ein Ziel übertragen möchten.',
           baseUrlHelper: 'Die Basis-URL, zu der die Daten übertragen werden',

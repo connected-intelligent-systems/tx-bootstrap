@@ -2,10 +2,10 @@ import { useEffect } from 'react'
 import {
   ArrayInput,
   FormDataConsumer,
+  SelectArrayInput,
   SelectInput,
   SimpleFormIterator,
   TextInput,
-  BooleanInput,
   NumberInput,
   DateInput,
   required,
@@ -47,6 +47,30 @@ const RightOperandInput = ({ scopedFormData }: any) => {
   const leftOperand = scopedFormData?.leftOperand
   const operator = scopedFormData?.operator
   const constraint = getTractusXConstraint(leftOperand)
+  const valueChoices = (constraint?.values || []).map((value) => ({ id: value, name: value }))
+
+  if (constraint?.valueType === 'choice') {
+    return (
+      <SelectInput
+        source="rightOperand"
+        label={translate('resources.policies.create.permissions.value')}
+        choices={valueChoices}
+        defaultValue={valueChoices.length === 1 ? valueChoices[0].id : undefined}
+        validate={[required()]}
+      />
+    )
+  }
+
+  if (constraint?.valueType === 'choice-list') {
+    return (
+      <SelectArrayInput
+        source="rightOperand"
+        label={translate('resources.policies.create.permissions.values')}
+        choices={valueChoices}
+        validate={[required()]}
+      />
+    )
+  }
 
   if (usesListValue(operator)) {
     return (
@@ -87,10 +111,6 @@ const RightOperandInput = ({ scopedFormData }: any) => {
         validate={[required()]}
       />
     )
-  }
-
-  if (constraint?.valueType === 'boolean') {
-    return <BooleanInput source="rightOperand" label={translate('resources.policies.create.permissions.value')} />
   }
 
   return (
@@ -166,6 +186,9 @@ export const TractusXPermission = ({ ruleType = 'permission' }: { ruleType?: Tra
                     source="operator"
                     label={translate('resources.policies.create.permissions.operator')}
                     choices={operatorChoices(leftOperand)}
+                    defaultValue={
+                      operatorChoices(leftOperand).length === 1 ? operatorChoices(leftOperand)[0].id : undefined
+                    }
                     validate={[required()]}
                   />
                   <RightOperandInput scopedFormData={scopedFormData} />

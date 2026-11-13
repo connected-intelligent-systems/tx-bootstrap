@@ -84,12 +84,30 @@ PROVIDER_DSP="$(jq -r '.participants[0].dspEndpoint' "$TMPDIR/consumer_network.j
 PROVIDER_DID="$(jq -r '.participants[0].did' "$TMPDIR/consumer_network.json")"
 ok "consumer automatically discovered provider ${PROVIDER_DID} at ${PROVIDER_DSP}"
 
-step "Catalog request"
+step "Dataspace protocol version"
 jq -n --arg dsp "$PROVIDER_DSP" --arg did "$PROVIDER_DID" '{
   "@context": {"@vocab": "https://w3id.org/edc/v0.0.1/ns/"},
   counterPartyAddress: $dsp,
+  counterPartyId: $did
+}' > "$TMPDIR/dsp_version_request.json"
+curl -s -X POST "$CONSUMER_MGMT/v3/connectordiscovery/dspversionparams" \
+    -H "Content-Type: application/json" \
+    -H "X-Api-Key: $EDC_API_KEY" \
+    -d @"$TMPDIR/dsp_version_request.json" > "$TMPDIR/dsp_version.json"
+PROTOCOL="$(jq -r '.protocol // empty' "$TMPDIR/dsp_version.json")"
+PROVIDER_DSP_ADDRESS="$(jq -r '.counterPartyAddress // empty' "$TMPDIR/dsp_version.json")"
+[ "$PROTOCOL" = "dataspace-protocol-http:2025-1" ] && [ "$PROVIDER_DSP_ADDRESS" = "${PROVIDER_DSP%/}/2025-1" ] || {
+    jq . "$TMPDIR/dsp_version.json"
+    fail "connector discovery did not select DSP 2025-1"
+}
+ok "connector discovery selected ${PROTOCOL} at ${PROVIDER_DSP_ADDRESS}"
+
+step "Catalog request"
+jq -n --arg dsp "$PROVIDER_DSP_ADDRESS" --arg did "$PROVIDER_DID" --arg protocol "$PROTOCOL" '{
+  "@context": {"@vocab": "https://w3id.org/edc/v0.0.1/ns/"},
+  counterPartyAddress: $dsp,
   counterPartyId: $did,
-  protocol: "dataspace-protocol-http"
+  protocol: $protocol
 }' > "$TMPDIR/catalog_request.json"
 curl -s -X POST "$CONSUMER_MGMT/v3/catalog/request" \
     -H "Content-Type: application/json" \
@@ -100,15 +118,26 @@ if jq -e 'if type == "array" then .[0] else . end | .["@type"]' "$TMPDIR/catalog
     jq . "$TMPDIR/catalog.json"
     fail "catalog request failed"
 fi
-jq 'if type == "array" then .[0] else . end | if .["dcat:dataset"] | type == "array" then .["dcat:dataset"][0] else .["dcat:dataset"] end' "$TMPDIR/catalog.json" > "$TMPDIR/dataset.json"
-if [ "$(jq -r 'type' "$TMPDIR/dataset.json")" = "null" ]; then
+jq -e --arg did "$PROVIDER_DID" '(.participantId // .["dspace:participantId"]) == $did' "$TMPDIR/catalog.json" >/dev/null || {
     jq . "$TMPDIR/catalog.json"
-    fail "no dataset in catalog"
-fi
-ASSET_ID="$(jq -r '.["@id"]' "$TMPDIR/dataset.json")"
-jq 'if .["odrl:hasPolicy"] | type == "array" then .["odrl:hasPolicy"][0] else .["odrl:hasPolicy"] end' \
-    "$TMPDIR/dataset.json" > "$TMPDIR/offer.json"
-OFFER_ID="$(jq -r '.["@id"]' "$TMPDIR/offer.json")"
+    fail "catalog does not name the provider DID as participant"
+}
+# DSP 2025-1 catalogs use unprefixed terms (dataset, hasPolicy).
+catalog_offer() {
+    jq --arg asset "$1" '
+      [.["dcat:dataset"] // .dataset] | flatten | map(select(.["@id"] == $asset)) | .[0]
+      | [.["odrl:hasPolicy"] // .hasPolicy] | flatten | .[0]
+    ' "$TMPDIR/catalog.json"
+}
+ASSET_ID="test-asset-1"
+catalog_offer "$ASSET_ID" > "$TMPDIR/offer.json"
+OFFER_ID="$(jq -r '.["@id"] // empty' "$TMPDIR/offer.json")"
+[ -n "$OFFER_ID" ] || {
+    jq . "$TMPDIR/catalog.json"
+    fail "no offer for ${ASSET_ID} in catalog"
+}
+catalog_offer "test-asset-expired" > "$TMPDIR/expired_offer.json"
+jq -e '.["@id"]' "$TMPDIR/expired_offer.json" >/dev/null || fail "no offer for test-asset-expired in catalog"
 ok "asset ${ASSET_ID}, offer ${OFFER_ID}"
 
 step "Participant-local federated catalog"
@@ -181,106 +210,112 @@ catalog_bypass_status="$(curl -s -o /dev/null -w '%{http_code}' "$CONSUMER_API/c
 [ "$catalog_bypass_status" = "404" ] || fail "direct /catalog bypass returned HTTP ${catalog_bypass_status}"
 ok "direct EDC management and catalog bypass routes are unavailable"
 
-step "Contract negotiation"
-jq --arg target "$ASSET_ID" --arg assigner "$BPN_PROVIDER" \
-    '. + {"odrl:target": {"@id": $target}, "odrl:assigner": {"@id": $assigner}}' \
-    "$TMPDIR/offer.json" > "$TMPDIR/negotiation_policy.json"
-jq -n --slurpfile policy "$TMPDIR/negotiation_policy.json" --arg dsp "$PROVIDER_DSP" --arg did "$PROVIDER_DID" '{
-  "@context": [
-    "https://w3id.org/dspace/2025/1/odrl-profile.jsonld",
-    "https://w3id.org/catenax/2025/9/policy/context.jsonld",
-    {"@vocab": "https://w3id.org/edc/v0.0.1/ns/"}
-  ],
-  "@type": "ContractRequest",
-  counterPartyAddress: $dsp,
-  counterPartyId: $did,
-  protocol: "dataspace-protocol-http",
-  policy: $policy[0]
-}' > "$TMPDIR/negotiation_request.json"
 # EDC can terminate a negotiation when the consumer's verification reaches the
 # provider while the provider still holds the negotiation lease ("is currently
 # leased"). That is a connector timing race, not a dataspace failure, so such a
 # negotiation is started again; any other termination fails the run.
 NEGOTIATION_ATTEMPTS="${NEGOTIATION_ATTEMPTS:-3}"
-attempt=1
-CONTRACT_AGREEMENT_ID=""
-while [ -z "$CONTRACT_AGREEMENT_ID" ]; do
-    curl -s -X POST "$CONSUMER_MGMT/v3/contractnegotiations" \
+
+# negotiate <offer file> <asset id>: sets CONTRACT_AGREEMENT_ID.
+negotiate() {
+    local offer_file="$1" asset="$2" attempt=1 elapsed state negotiation_id
+    jq --arg target "$asset" --arg assigner "$PROVIDER_DID" '. + {target: $target, assigner: $assigner}' \
+        "$offer_file" > "$TMPDIR/negotiation_policy.json"
+    jq -n --slurpfile policy "$TMPDIR/negotiation_policy.json" --arg dsp "$PROVIDER_DSP_ADDRESS" \
+        --arg did "$PROVIDER_DID" --arg protocol "$PROTOCOL" '{
+      "@context": [
+        "https://w3id.org/dspace/2025/1/odrl-profile.jsonld",
+        "https://w3id.org/catenax/2025/9/policy/context.jsonld",
+        {"@vocab": "https://w3id.org/edc/v0.0.1/ns/"}
+      ],
+      "@type": "ContractRequest",
+      counterPartyAddress: $dsp,
+      counterPartyId: $did,
+      protocol: $protocol,
+      policy: $policy[0]
+    }' > "$TMPDIR/negotiation_request.json"
+    CONTRACT_AGREEMENT_ID=""
+    while :; do
+        curl -s -X POST "$CONSUMER_MGMT/v3/contractnegotiations" \
+            -H "Content-Type: application/json" \
+            -H "X-Api-Key: $EDC_API_KEY" \
+            -d @"$TMPDIR/negotiation_request.json" > "$TMPDIR/negotiation_response.json"
+        negotiation_id="$(jq -r '.["@id"] // .id' "$TMPDIR/negotiation_response.json")"
+        [ "$negotiation_id" != "null" ] && [ -n "$negotiation_id" ] || { jq . "$TMPDIR/negotiation_response.json"; fail "negotiation not started"; }
+
+        elapsed=0
+        state=""
+        while [ "$elapsed" -lt "$POLL_TIMEOUT" ]; do
+            curl -s "$CONSUMER_MGMT/v3/contractnegotiations/$negotiation_id" \
+                -H "X-Api-Key: $EDC_API_KEY" > "$TMPDIR/negotiation_status.json"
+            state="$(jq -r '.state // .["edc:state"]' "$TMPDIR/negotiation_status.json")"
+            case "$state" in
+                FINALIZED)
+                    CONTRACT_AGREEMENT_ID="$(jq -r '.contractAgreementId // .["edc:contractAgreementId"]' "$TMPDIR/negotiation_status.json")"
+                    return 0
+                    ;;
+                TERMINATED|ERROR) break ;;
+            esac
+            sleep "$POLL_INTERVAL"
+            elapsed=$((elapsed + POLL_INTERVAL))
+        done
+        case "$state" in
+            TERMINATED|ERROR) ;;
+            *) fail "negotiation timed out" ;;
+        esac
+        if [ "$attempt" -lt "$NEGOTIATION_ATTEMPTS" ] &&
+            jq -r '.errorDetail // .["edc:errorDetail"] // ""' "$TMPDIR/negotiation_status.json" | grep -q "is currently leased"; then
+            warn "negotiation ${negotiation_id} hit an EDC lease conflict; retrying (attempt $((attempt + 1)) of ${NEGOTIATION_ATTEMPTS})"
+            attempt=$((attempt + 1))
+            continue
+        fi
+        jq . "$TMPDIR/negotiation_status.json"
+        fail "negotiation failed"
+    done
+}
+
+# transfer <agreement id>: sets TRANSFER_ID and STATE (STARTED, COMPLETED or TERMINATED).
+transfer() {
+    local elapsed=0
+    jq -n --arg dsp "$PROVIDER_DSP_ADDRESS" --arg did "$PROVIDER_DID" --arg protocol "$PROTOCOL" --arg contract "$1" '{
+      "@context": {"@vocab": "https://w3id.org/edc/v0.0.1/ns/"},
+      "@type": "TransferRequest",
+      counterPartyAddress: $dsp,
+      counterPartyId: $did,
+      protocol: $protocol,
+      contractId: $contract,
+      transferType: "HttpData-PULL"
+    }' > "$TMPDIR/transfer_request.json"
+    curl -s -X POST "$CONSUMER_MGMT/v3/transferprocesses" \
         -H "Content-Type: application/json" \
         -H "X-Api-Key: $EDC_API_KEY" \
-        -d @"$TMPDIR/negotiation_request.json" > "$TMPDIR/negotiation_response.json"
-    NEGOTIATION_ID="$(jq -r '.["@id"] // .id' "$TMPDIR/negotiation_response.json")"
-    [ "$NEGOTIATION_ID" != "null" ] && [ -n "$NEGOTIATION_ID" ] || { jq . "$TMPDIR/negotiation_response.json"; fail "negotiation not started"; }
-
-    ELAPSED=0
+        -d @"$TMPDIR/transfer_request.json" > "$TMPDIR/transfer_response.json"
+    TRANSFER_ID="$(jq -r '.["@id"] // .id' "$TMPDIR/transfer_response.json")"
+    [ "$TRANSFER_ID" != "null" ] && [ -n "$TRANSFER_ID" ] || { jq . "$TMPDIR/transfer_response.json"; fail "transfer not started"; }
     STATE=""
-    while [ "$ELAPSED" -lt "$POLL_TIMEOUT" ]; do
-        curl -s "$CONSUMER_MGMT/v3/contractnegotiations/$NEGOTIATION_ID" \
-            -H "X-Api-Key: $EDC_API_KEY" > "$TMPDIR/negotiation_status.json"
-        STATE="$(jq -r '.state // .["edc:state"]' "$TMPDIR/negotiation_status.json")"
+    while [ "$elapsed" -lt "$POLL_TIMEOUT" ]; do
+        curl -s "$CONSUMER_MGMT/v3/transferprocesses/$TRANSFER_ID" \
+            -H "X-Api-Key: $EDC_API_KEY" > "$TMPDIR/transfer_status.json"
+        STATE="$(jq -r '.state // .["edc:state"]' "$TMPDIR/transfer_status.json")"
         case "$STATE" in
-            FINALIZED)
-                CONTRACT_AGREEMENT_ID="$(jq -r '.contractAgreementId // .["edc:contractAgreementId"]' "$TMPDIR/negotiation_status.json")"
-                ok "agreement ${CONTRACT_AGREEMENT_ID}"
-                break
-                ;;
-            TERMINATED|ERROR) break ;;
+            STARTED|COMPLETED|TERMINATED|ERROR) return 0 ;;
         esac
         sleep "$POLL_INTERVAL"
-        ELAPSED=$((ELAPSED + POLL_INTERVAL))
+        elapsed=$((elapsed + POLL_INTERVAL))
     done
-    [ -n "$CONTRACT_AGREEMENT_ID" ] && break
-    case "$STATE" in
-        TERMINATED|ERROR) ;;
-        *) fail "negotiation timed out" ;;
-    esac
-    if [ "$attempt" -lt "$NEGOTIATION_ATTEMPTS" ] &&
-        jq -r '.errorDetail // .["edc:errorDetail"] // ""' "$TMPDIR/negotiation_status.json" | grep -q "is currently leased"; then
-        warn "negotiation ${NEGOTIATION_ID} hit an EDC lease conflict; retrying (attempt $((attempt + 1)) of ${NEGOTIATION_ATTEMPTS})"
-        attempt=$((attempt + 1))
-        continue
-    fi
-    jq . "$TMPDIR/negotiation_status.json"
-    fail "negotiation failed"
-done
-[ "${CONTRACT_AGREEMENT_ID:-}" ] || fail "negotiation timed out"
+    fail "transfer timed out"
+}
+
+step "Contract negotiation"
+negotiate "$TMPDIR/offer.json" "$ASSET_ID"
+ok "agreement ${CONTRACT_AGREEMENT_ID}"
 
 step "Transfer process"
-jq -n --arg dsp "$PROVIDER_DSP" --arg did "$PROVIDER_DID" --arg contract "$CONTRACT_AGREEMENT_ID" '{
-  "@context": {"@vocab": "https://w3id.org/edc/v0.0.1/ns/"},
-  "@type": "TransferRequest",
-  counterPartyAddress: $dsp,
-  counterPartyId: $did,
-  protocol: "dataspace-protocol-http",
-  contractId: $contract,
-  transferType: "HttpData-PULL"
-}' > "$TMPDIR/transfer_request.json"
-curl -s -X POST "$CONSUMER_MGMT/v3/transferprocesses" \
-    -H "Content-Type: application/json" \
-    -H "X-Api-Key: $EDC_API_KEY" \
-    -d @"$TMPDIR/transfer_request.json" > "$TMPDIR/transfer_response.json"
-TRANSFER_ID="$(jq -r '.["@id"] // .id' "$TMPDIR/transfer_response.json")"
-[ "$TRANSFER_ID" != "null" ] && [ -n "$TRANSFER_ID" ] || { jq . "$TMPDIR/transfer_response.json"; fail "transfer not started"; }
-
-ELAPSED=0
-while [ "$ELAPSED" -lt "$POLL_TIMEOUT" ]; do
-    curl -s "$CONSUMER_MGMT/v3/transferprocesses/$TRANSFER_ID" \
-        -H "X-Api-Key: $EDC_API_KEY" > "$TMPDIR/transfer_status.json"
-    STATE="$(jq -r '.state // .["edc:state"]' "$TMPDIR/transfer_status.json")"
-    case "$STATE" in
-        STARTED|COMPLETED)
-            ok "transfer ${TRANSFER_ID} ${STATE}"
-            break
-            ;;
-        TERMINATED|ERROR)
-            jq . "$TMPDIR/transfer_status.json"
-            fail "transfer failed"
-            ;;
-    esac
-    sleep "$POLL_INTERVAL"
-    ELAPSED=$((ELAPSED + POLL_INTERVAL))
-done
-[ "$STATE" = "STARTED" ] || [ "$STATE" = "COMPLETED" ] || fail "transfer timed out"
+transfer "$CONTRACT_AGREEMENT_ID"
+case "$STATE" in
+    STARTED|COMPLETED) ok "transfer ${TRANSFER_ID} ${STATE}" ;;
+    *) jq . "$TMPDIR/transfer_status.json"; fail "transfer failed" ;;
+esac
 
 step "EDR and data access"
 sleep 2
@@ -347,4 +382,27 @@ jq -e '
 }
 ok "valid JSON data received directly, through portal preview/download, and through the application data proxy"
 
-printf "\nE2E complete: asset=%s agreement=%s transfer=%s\n" "$ASSET_ID" "$CONTRACT_AGREEMENT_ID" "$TRANSFER_ID"
+step "EDR refresh"
+curl -s -X POST "$CONSUMER_MGMT/v3/edrs/$TRANSFER_ID/refresh" \
+    -H "X-Api-Key: $EDC_API_KEY" > "$TMPDIR/edr_refreshed.json"
+REFRESHED_AUTHORIZATION="$(jq -r '.authorization // .["edc:authorization"] // empty' "$TMPDIR/edr_refreshed.json")"
+[ -n "$REFRESHED_AUTHORIZATION" ] && [ "$REFRESHED_AUTHORIZATION" != "$AUTHORIZATION" ] || {
+    jq . "$TMPDIR/edr_refreshed.json"
+    fail "EDR refresh did not issue a new access token"
+}
+curl -fsS "$ENDPOINT" -H "Authorization: $REFRESHED_AUTHORIZATION" | jq . >/dev/null ||
+    fail "refreshed access token cannot read the data"
+ok "refreshed access token reads the data"
+
+step "Expired usage period"
+MAIN_AGREEMENT_ID="$CONTRACT_AGREEMENT_ID"
+MAIN_TRANSFER_ID="$TRANSFER_ID"
+negotiate "$TMPDIR/expired_offer.json" "test-asset-expired"
+transfer "$CONTRACT_AGREEMENT_ID"
+[ "$STATE" = "TERMINATED" ] || {
+    jq . "$TMPDIR/transfer_status.json"
+    fail "transfer under an expired DataUsageEndDate was not refused (state ${STATE})"
+}
+ok "contract ${CONTRACT_AGREEMENT_ID} concluded, transfer refused after its usage end date"
+
+printf "\nE2E complete: asset=%s agreement=%s transfer=%s\n" "$ASSET_ID" "$MAIN_AGREEMENT_ID" "$MAIN_TRANSFER_ID"

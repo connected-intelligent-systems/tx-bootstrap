@@ -35,8 +35,7 @@ export const dataProductUxEnglish = {
       supportedMethods: 'Supported methods and required scope',
       proxyCurlCommand: 'Application curl template',
       proxyCurlHelp: 'Set the participant API gateway base URL and an API-client token before running this command.',
-      previewProxyDescription:
-        'Preview and download are performed by the participant backend. The browser does not receive the EDR authorization token.',
+      previewProxyDescription: 'Load a preview to check what the provider delivers.',
       directEdrWarning:
         'Advanced compatibility access. These provider endpoint and authorization values are credentials; prefer the application proxy and do not place them in application configuration or logs.',
       accessDetailsUnavailable: 'Access details are not available yet. The transfer may still be provisioning them.',
@@ -99,8 +98,7 @@ export const dataProductUxGerman = {
       proxyCurlCommand: 'curl-Vorlage für Anwendungen',
       proxyCurlHelp:
         'Setzen Sie die Basis-URL des Teilnehmer-API-Gateways und ein API-Client-Token, bevor Sie diesen Befehl ausführen.',
-      previewProxyDescription:
-        'Vorschau und Download werden vom Teilnehmer-Backend ausgeführt. Der Browser erhält das EDR-Autorisierungstoken nicht.',
+      previewProxyDescription: 'Laden Sie eine Vorschau, um zu prüfen, was der Anbieter liefert.',
       directEdrWarning:
         'Erweiterter Kompatibilitätszugriff. Anbieter-Endpunkt und Autorisierungswerte sind Zugangsdaten; verwenden Sie bevorzugt den Anwendungs-Proxy und übernehmen Sie diese Werte nicht in Anwendungskonfigurationen oder Logs.',
       accessDetailsUnavailable:

@@ -83,11 +83,11 @@ wait_for_url "provider federated catalog" "http://${provider_portal_host}/api/fe
 wait_for_url "consumer federated catalog" "http://${consumer_portal_host}/api/federated-catalog/v1/participants"
 
 curl_ingress "http://${provider_host}/${BPN_PROVIDER}/did.json" | jq -e \
-    --arg endpoint "http://${provider_host}/api/credentials/v1/participants/${BPN_PROVIDER_BASE64}" \
+    --arg endpoint "http://${provider_host}/api/credentials/v1/participants/${BPN_PROVIDER}" \
     '(.verificationMethod | length > 0) and any(.service[]; .type == "CredentialService" and .serviceEndpoint == $endpoint)' \
     >/dev/null
 curl_ingress "http://${consumer_host}/${BPN_CONSUMER}/did.json" | jq -e \
-    --arg endpoint "http://${consumer_host}/api/credentials/v1/participants/${BPN_CONSUMER_BASE64}" \
+    --arg endpoint "http://${consumer_host}/api/credentials/v1/participants/${BPN_CONSUMER}" \
     '(.verificationMethod | length > 0) and any(.service[]; .type == "CredentialService" and .serviceEndpoint == $endpoint)' \
     >/dev/null
 echo

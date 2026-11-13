@@ -100,8 +100,6 @@ spec:
               {{- include "tx-bootstrap-operator.secretValue" (dict "root" . "key" "issuerClaimsDatabaseUrl") | nindent 14 }}
             - name: ISSUER_CONTEXT
               value: {{ .Values.identity.issuerBpn | quote }}
-            - name: ISSUER_CONTEXT_PATH_ID
-              value: {{ .Values.identity.issuerBpnBase64 | quote }}
             - name: ISSUER_API_KEY
               {{- if .Values.existingSecret.keys.issuerApiKey }}
               {{- include "tx-bootstrap-operator.secretValue" (dict "root" . "key" "issuerApiKey") | nindent 14 }}

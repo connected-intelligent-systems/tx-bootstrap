@@ -60,7 +60,6 @@ export const config = {
       process.env.IDENTITYHUB_IDENTITY_API_URL ?? 'http://identityhub:8082/api/identity',
     ),
     participantContextId: process.env.IDENTITYHUB_PARTICIPANT_CONTEXT_ID ?? process.env.PARTICIPANT_BPN ?? '',
-    participantContextPathId: process.env.IDENTITYHUB_PARTICIPANT_CONTEXT_PATH_ID ?? '',
     apiKey: process.env.IDENTITYHUB_API_KEY ?? '',
     vaultUrl: trimTrailingSlash(process.env.IDENTITYHUB_VAULT_URL ?? ''),
     vaultToken: process.env.IDENTITYHUB_VAULT_TOKEN ?? '',

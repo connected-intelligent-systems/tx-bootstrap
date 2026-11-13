@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   DataTable,
@@ -8,17 +8,19 @@ import {
   Pagination,
   SelectInput,
   useRecordContext,
-  useRefresh,
   useListContext,
   useTranslate,
 } from 'react-admin'
 import { Box, Button, Typography } from '@mui/material'
 import PlayArrowIcon from '@mui/icons-material/PlayArrow'
+import KeyIcon from '@mui/icons-material/Key'
 import type { DataAccessLifecycleRecord } from '../../types/dataAccess'
 import { EmptyState, FriendlyStatusChip, PageHeader } from '../../components/portal/PortalPage'
-import TransferProcessDialog from '../../components/transferprocesses/TransferProcessDialog'
+import { dataAccessDetailPath, lifecycleStatusTone } from '../../services/dataAccessRoutes'
+import { edcErrorReason } from '../../services/dataProductViewModels'
+import { dataAccessState } from '../../services/dataAccessTransfer'
 
-const validStatuses = new Set(['pending', 'active', 'issues'])
+const validStatuses = new Set(['pending', 'active', 'expired', 'issues'])
 
 const ProductCell = () => {
   const record = useRecordContext<DataAccessLifecycleRecord>()
@@ -34,7 +36,7 @@ const ProductCell = () => {
       </Typography>
       {record.errorDetail && (
         <Typography variant="caption" color="error" sx={{ display: 'block', mt: 0.5 }}>
-          {record.errorDetail}
+          {edcErrorReason(record.errorDetail)}
         </Typography>
       )}
     </Box>
@@ -45,7 +47,7 @@ const StatusCell = () => {
   const record = useRecordContext<DataAccessLifecycleRecord>()
   const translate = useTranslate()
   if (!record) return null
-  const tone = record.status === 'active' ? 'granted' : record.status === 'issues' ? 'failed' : 'in-progress'
+  const tone = lifecycleStatusTone(record.status)
   return <FriendlyStatusChip status={tone} label={translate(`portalUx.myData.${record.status}`)} />
 }
 
@@ -53,17 +55,18 @@ const UseDataAction = ({ onUse }: { onUse: (record: DataAccessLifecycleRecord) =
   const record = useRecordContext<DataAccessLifecycleRecord>()
   const translate = useTranslate()
   if (!record?.canUseData) return null
+  const ready = dataAccessState(record.accessTransfer) === 'ready'
   return (
     <Button
       size="small"
-      variant="contained"
-      startIcon={<PlayArrowIcon />}
+      variant={ready ? 'outlined' : 'contained'}
+      startIcon={ready ? <KeyIcon /> : <PlayArrowIcon />}
       onClick={(event) => {
         event.stopPropagation()
         onUse(record)
       }}
     >
-      {translate('portalUx.myData.useData')}
+      {translate(ready ? 'portalUx.myData.openAccess' : 'portalUx.myData.getAccess')}
     </Button>
   )
 }
@@ -115,11 +118,10 @@ const StatusUrlSync = ({
 
 export const DataAccessPage = () => {
   const translate = useTranslate()
-  const refresh = useRefresh()
+  const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const requestedStatus = searchParams.get('status')
   const filterDefaultValues = validStatuses.has(requestedStatus || '') ? { status: requestedStatus } : undefined
-  const [transferDefaults, setTransferDefaults] = useState<Record<string, unknown>>()
   const filters = useMemo(
     () => [
       <SelectInput
@@ -129,6 +131,7 @@ export const DataAccessPage = () => {
         choices={[
           { id: 'pending', name: translate('portalUx.myData.pending') },
           { id: 'active', name: translate('portalUx.myData.active') },
+          { id: 'expired', name: translate('portalUx.myData.expired') },
           { id: 'issues', name: translate('portalUx.myData.issues') },
         ]}
         alwaysOn
@@ -139,13 +142,12 @@ export const DataAccessPage = () => {
     [translate],
   )
 
-  const useData = (record: DataAccessLifecycleRecord) => {
-    setTransferDefaults({
-      counterPartyAddress: record.counterPartyAddress,
-      contractId: record.agreementId,
-      assetId: record.assetId,
-    })
-  }
+  // Access is started and shown on the detail page's Access tab.
+  const useData = (record: DataAccessLifecycleRecord) =>
+    navigate(
+      { pathname: dataAccessDetailPath(record.providerId, record.assetId), search: '?tab=access' },
+      { state: { startAccess: dataAccessState(record.accessTransfer) !== 'ready' } },
+    )
 
   return (
     <Box>
@@ -216,14 +218,6 @@ export const DataAccessPage = () => {
           </DataTable>
         </>
       </List>
-      {transferDefaults && (
-        <TransferProcessDialog
-          open
-          defaultValues={transferDefaults}
-          onClose={() => setTransferDefaults(undefined)}
-          onSuccess={refresh}
-        />
-      )}
     </Box>
   )
 }

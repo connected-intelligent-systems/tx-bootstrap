@@ -43,6 +43,30 @@ describe('EDR service', () => {
     expect(fetchMock.mock.calls[0][1]).toMatchObject({ method: 'POST' })
   })
 
+  it('repeats a failed refresh once', async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(new Response('provider unreachable', { status: 502 }))
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ endpoint: 'https://provider.example/data', authorization: 'Bearer fresh' })),
+      )
+
+    const resolved = await resolveHttpEndpointDataReference('transfer-1', {
+      forceRefresh: true,
+      requireAuthorization: true,
+    })
+
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(resolved.authorization).toBe('Bearer fresh')
+  })
+
+  it('does not repeat a plain EDR lookup', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('unavailable', { status: 503 }))
+
+    await expect(resolveHttpEndpointDataReference('transfer-1')).rejects.toMatchObject({ status: 502 })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
   it('rejects missing credentials and unsafe endpoint schemes', async () => {
     vi.spyOn(globalThis, 'fetch')
       .mockResolvedValueOnce(new Response(JSON.stringify({ endpoint: 'https://provider.example/data' })))

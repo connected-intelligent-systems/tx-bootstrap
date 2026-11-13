@@ -2,7 +2,7 @@
 
 This optional image allows S3 sources to use authenticated HTTP-pull with the
 existing transfer authorization and token refresh. It rebuilds the pinned
-Tractus-X `0.12.2` runtime with the extension and dependency fixes.
+Tractus-X `0.13.0` runtime with the extension and dependency fixes.
 
 Build from the repository root:
 
