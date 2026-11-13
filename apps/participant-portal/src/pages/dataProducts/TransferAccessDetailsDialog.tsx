@@ -108,10 +108,10 @@ export type TransferAccessTab = 'proxy' | 'preview' | 'openapi' | 'direct'
 
 export const transferAccessTabs = (transfer: TransferProcess, dataset?: Dataset): TransferAccessTab[] => {
   if (!supportsHttpProxy(transfer)) return ['direct']
-  return ['proxy', 'preview', ...(dataset?.apiDescription ? (['openapi'] as const) : []), 'direct']
+  return ['preview', 'proxy', ...(dataset?.apiDescription ? (['openapi'] as const) : []), 'direct']
 }
 
-// Proxy, preview and direct access for one pull transfer.
+// Preview, proxy and direct access for one pull transfer.
 export const TransferAccessPanel = ({ transfer, dataset }: { transfer: TransferProcess; dataset?: Dataset }) => {
   const translate = useTranslate()
   const httpProxySupported = supportsHttpProxy(transfer)
@@ -154,6 +154,98 @@ export const TransferAccessPanel = ({ transfer, dataset }: { transfer: TransferP
       setPreviewing(false)
     }
   }
+
+  const directAccess = (
+    <>
+      {httpProxySupported && (
+        <Alert severity="warning" sx={{ mb: 2 }}>
+          {translate('portalUx.myData.directEdrWarning')}
+        </Alert>
+      )}
+      {isPending && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
+          <CircularProgress />
+        </Box>
+      )}
+      {error && (
+        <Alert
+          severity="warning"
+          action={
+            <Button color="inherit" size="small" onClick={() => void refetch()}>
+              {translate('portalUx.common.retry')}
+            </Button>
+          }
+        >
+          {translate('portalUx.myData.accessDetailsUnavailable')}
+        </Alert>
+      )}
+      {data && (
+        <Box sx={{ display: 'grid', gap: 2 }}>
+          <TextField
+            label={translate('portalUx.myData.endpoint')}
+            value={data.endpoint || ''}
+            placeholder="-"
+            fullWidth
+            slotProps={{
+              input: {
+                readOnly: true,
+                endAdornment: <CopyButton value={data.endpoint} label={translate('portalUx.myData.endpoint')} />,
+              },
+            }}
+          />
+          {data.endpoint && (
+            <TextField
+              label={translate('portalUx.myData.curlCommand')}
+              value={curlCommand}
+              fullWidth
+              multiline
+              minRows={2}
+              slotProps={{
+                input: {
+                  readOnly: true,
+                  endAdornment: <CopyButton value={curlCommand} label={translate('portalUx.myData.curlCommand')} />,
+                },
+              }}
+            />
+          )}
+          <TextField
+            label={translate('portalUx.myData.authenticationType')}
+            value={data.authType || '-'}
+            fullWidth
+            slotProps={{ input: { readOnly: true } }}
+          />
+          <TextField
+            label={translate('portalUx.myData.authorizationToken')}
+            value={data.authorization || ''}
+            placeholder="-"
+            type={showToken ? 'text' : 'password'}
+            fullWidth
+            slotProps={{
+              input: {
+                readOnly: true,
+                endAdornment: (
+                  <InputAdornment position="end">
+                    {data.authorization && (
+                      <Tooltip title={translate(showToken ? 'portalUx.myData.hideToken' : 'portalUx.myData.showToken')}>
+                        <IconButton
+                          aria-label={translate(showToken ? 'portalUx.myData.hideToken' : 'portalUx.myData.showToken')}
+                          onClick={() => setShowToken((value) => !value)}
+                          edge="end"
+                        >
+                          {showToken ? <VisibilityOffIcon /> : <VisibilityIcon />}
+                        </IconButton>
+                      </Tooltip>
+                    )}
+                    <CopyButton value={data.authorization} label={translate('portalUx.myData.authorizationToken')} />
+                  </InputAdornment>
+                ),
+              },
+            }}
+          />
+        </Box>
+      )}
+    </>
+  )
 
   return (
     <Box>
@@ -231,7 +323,7 @@ export const TransferAccessPanel = ({ transfer, dataset }: { transfer: TransferP
         )}
         {tab === 'preview' && (
           <Box sx={{ display: 'grid', gap: 2 }}>
-            <Alert severity="info">{translate('portalUx.myData.previewProxyDescription')}</Alert>
+            <Typography color="text.secondary">{translate('portalUx.myData.previewProxyDescription')}</Typography>
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
               <Button
                 variant="contained"
@@ -262,114 +354,16 @@ export const TransferAccessPanel = ({ transfer, dataset }: { transfer: TransferP
                   value={preview.body}
                   fullWidth
                   multiline
-                  minRows={6}
-                  maxRows={18}
+                  minRows={12}
+                  maxRows={32}
+                  sx={{ '& textarea': { fontFamily: 'monospace', fontSize: 13, lineHeight: 1.5 } }}
                   slotProps={{ input: { readOnly: true } }}
                 />
               </Box>
             )}
           </Box>
         )}
-        {tab === 'direct' && (
-          <>
-            {httpProxySupported && (
-              <Alert severity="warning" sx={{ mb: 2 }}>
-                {translate('portalUx.myData.directEdrWarning')}
-              </Alert>
-            )}
-            {isPending && (
-              <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
-                <CircularProgress />
-              </Box>
-            )}
-            {error && (
-              <Alert
-                severity="warning"
-                action={
-                  <Button color="inherit" size="small" onClick={() => void refetch()}>
-                    {translate('portalUx.common.retry')}
-                  </Button>
-                }
-              >
-                {translate('portalUx.myData.accessDetailsUnavailable')}
-              </Alert>
-            )}
-            {data && (
-              <Box sx={{ display: 'grid', gap: 2 }}>
-                <TextField
-                  label={translate('portalUx.myData.endpoint')}
-                  value={data.endpoint || ''}
-                  placeholder="-"
-                  fullWidth
-                  slotProps={{
-                    input: {
-                      readOnly: true,
-                      endAdornment: <CopyButton value={data.endpoint} label={translate('portalUx.myData.endpoint')} />,
-                    },
-                  }}
-                />
-                {data.endpoint && (
-                  <TextField
-                    label={translate('portalUx.myData.curlCommand')}
-                    value={curlCommand}
-                    fullWidth
-                    multiline
-                    minRows={2}
-                    slotProps={{
-                      input: {
-                        readOnly: true,
-                        endAdornment: (
-                          <CopyButton value={curlCommand} label={translate('portalUx.myData.curlCommand')} />
-                        ),
-                      },
-                    }}
-                  />
-                )}
-                <TextField
-                  label={translate('portalUx.myData.authenticationType')}
-                  value={data.authType || '-'}
-                  fullWidth
-                  slotProps={{ input: { readOnly: true } }}
-                />
-                <TextField
-                  label={translate('portalUx.myData.authorizationToken')}
-                  value={data.authorization || ''}
-                  placeholder="-"
-                  type={showToken ? 'text' : 'password'}
-                  fullWidth
-                  slotProps={{
-                    input: {
-                      readOnly: true,
-                      endAdornment: (
-                        <InputAdornment position="end">
-                          {data.authorization && (
-                            <Tooltip
-                              title={translate(showToken ? 'portalUx.myData.hideToken' : 'portalUx.myData.showToken')}
-                            >
-                              <IconButton
-                                aria-label={translate(
-                                  showToken ? 'portalUx.myData.hideToken' : 'portalUx.myData.showToken',
-                                )}
-                                onClick={() => setShowToken((value) => !value)}
-                                edge="end"
-                              >
-                                {showToken ? <VisibilityOffIcon /> : <VisibilityIcon />}
-                              </IconButton>
-                            </Tooltip>
-                          )}
-                          <CopyButton
-                            value={data.authorization}
-                            label={translate('portalUx.myData.authorizationToken')}
-                          />
-                        </InputAdornment>
-                      ),
-                    },
-                  }}
-                />
-              </Box>
-            )}
-          </>
-        )}
+        {tab === 'direct' && directAccess}
         {tab === 'openapi' && dataset && (
           <RecordContextProvider value={dataset}>
             <Suspense

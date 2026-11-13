@@ -52,12 +52,12 @@ describe('HTTP pull transfer access details', () => {
     expect(buildParticipantProxyCurlCommand('transfer/one')).toContain('${PARTICIPANT_API_TOKEN}')
   })
 
-  it('uses proxy, preview, OpenAPI, and advanced EDR tabs for HTTP pulls', () => {
+  it('uses preview, proxy, OpenAPI, and direct EDR tabs for HTTP pulls', () => {
     const apiDataset = { id: 'asset-1', apiDescription: { openapi: '3.1.0', info: { title: 'API', version: '1' } } }
 
     expect(supportsHttpProxy(transfer({}))).toBe(true)
-    expect(transferAccessTabs(transfer({}), apiDataset)).toEqual(['proxy', 'preview', 'openapi', 'direct'])
-    expect(transferAccessTabs(transfer({}), { id: 'asset-1' })).toEqual(['proxy', 'preview', 'direct'])
+    expect(transferAccessTabs(transfer({}), apiDataset)).toEqual(['preview', 'proxy', 'openapi', 'direct'])
+    expect(transferAccessTabs(transfer({}), { id: 'asset-1' })).toEqual(['preview', 'proxy', 'direct'])
     expect(transferAccessTabs(transfer({ transferType: 'AmazonS3-PULL' }), apiDataset)).toEqual(['direct'])
   })
 

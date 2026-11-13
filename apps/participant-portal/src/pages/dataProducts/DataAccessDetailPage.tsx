@@ -102,7 +102,7 @@ export const DataAccessDetailPage = () => {
     }
   }, [dataProvider, lifecycleForDataset, notify, refetchLifecycle])
 
-  // "Use data" on the data access list opens this page and starts access here.
+  // "Get access" on the data access list opens this page and starts access here.
   const startRequested = Boolean((location.state as { startAccess?: boolean } | null)?.startAccess)
   useEffect(() => {
     if (!startRequested || !lifecycleForDataset || autoStartHandled.current) return
@@ -137,9 +137,11 @@ export const DataAccessDetailPage = () => {
     [datasetSections, showAccess],
   )
 
+  // A record with running access opens on it.
+  const defaultTab: DetailTab = accessState === 'ready' ? 'access' : 'overview'
   useEffect(() => {
-    setTab(requestedTab && availableTabs.includes(requestedTab) ? requestedTab : 'overview')
-  }, [availableTabs, id, requestedTab])
+    setTab(requestedTab && availableTabs.includes(requestedTab) ? requestedTab : defaultTab)
+  }, [availableTabs, defaultTab, id, requestedTab])
 
   useEffect(() => {
     if (!id || (lifecycleStatus !== 'pending' && accessState !== 'preparing')) return undefined
@@ -164,7 +166,7 @@ export const DataAccessDetailPage = () => {
   const selectTab = (nextTab: DetailTab) => {
     setTab(nextTab)
     const next = new URLSearchParams(searchParams)
-    if (nextTab === 'overview') next.delete('tab')
+    if (nextTab === defaultTab) next.delete('tab')
     else next.set('tab', nextTab)
     setSearchParams(next, { replace: true })
   }
@@ -177,41 +179,7 @@ export const DataAccessDetailPage = () => {
             product: lifecycle.title || dataset?.title || dataset?.name || lifecycle.assetId,
           })}
           subtitle={translate('portalUx.myData.detailSubtitle')}
-          actions={
-            <>
-              <LifecycleStatus />
-              {lifecycle.canUseData && accessState !== 'ready' && (
-                <Button
-                  variant="contained"
-                  startIcon={preparingAccess ? <CircularProgress size={18} color="inherit" /> : <PlayArrowIcon />}
-                  disabled={preparingAccess}
-                  onClick={() => {
-                    selectTab('access')
-                    void startAccess()
-                  }}
-                >
-                  {translate('portalUx.myData.useData')}
-                </Button>
-              )}
-              {lifecycle.canUseData && (
-                <Button
-                  variant="outlined"
-                  startIcon={<SendIcon />}
-                  onClick={() =>
-                    setTransferDefaults({
-                      counterPartyAddress: lifecycle.counterPartyAddress,
-                      counterPartyId: lifecycle.providerId,
-                      protocol: lifecycle.protocol,
-                      contractId: lifecycle.agreementId,
-                      assetId: lifecycle.assetId,
-                    })
-                  }
-                >
-                  {translate('portalUx.myData.transferTo')}
-                </Button>
-              )}
-            </>
-          }
+          actions={<LifecycleStatus />}
         />
         {lifecycle.usageEndsAt && (
           <Alert severity={lifecycle.status === 'expired' ? 'warning' : 'info'} sx={{ mb: 2 }}>
@@ -312,40 +280,77 @@ export const DataAccessDetailPage = () => {
           )}
         </TabPanel>
         <TabPanel active={tab === 'access'}>
-          <Card variant="outlined">
-            <CardContent>
-              {preparingAccess && (
-                <Box>
-                  <LinearProgress aria-label={translate('portalUx.myData.accessPreparing')} />
-                  <Typography color="text.secondary" sx={{ mt: 1 }}>
-                    {translate('portalUx.myData.accessPreparing')}
+          <Box sx={{ display: 'grid', gap: 2 }}>
+            <Card variant="outlined">
+              <CardContent>
+                <Typography variant="h6" sx={{ mb: 2 }}>
+                  {translate('portalUx.myData.readViaApi')}
+                </Typography>
+                {preparingAccess && (
+                  <Box>
+                    <LinearProgress aria-label={translate('portalUx.myData.accessPreparing')} />
+                    <Typography color="text.secondary" sx={{ mt: 1 }}>
+                      {translate('portalUx.myData.accessPreparing')}
+                    </Typography>
+                  </Box>
+                )}
+                {!preparingAccess && accessState === 'ready' && lifecycle.accessTransfer && (
+                  <TransferAccessPanel transfer={lifecycle.accessTransfer} dataset={dataset} />
+                )}
+                {!preparingAccess && accessState === 'failed' && (
+                  <Alert
+                    severity="error"
+                    action={
+                      lifecycle.canUseData ? (
+                        <Button color="inherit" size="small" onClick={() => void startAccess()}>
+                          {translate('portalUx.myData.retryAccess')}
+                        </Button>
+                      ) : undefined
+                    }
+                  >
+                    {translate('portalUx.myData.accessFailed', {
+                      reason: edcErrorReason(lifecycle.accessTransfer?.errorDetail || ''),
+                    })}
+                  </Alert>
+                )}
+                {!preparingAccess && accessState === 'none' && (
+                  <Box>
+                    <Typography color="text.secondary" sx={{ mb: 2 }}>
+                      {translate('portalUx.myData.accessNone')}
+                    </Typography>
+                    <Button variant="contained" startIcon={<PlayArrowIcon />} onClick={() => void startAccess()}>
+                      {translate('portalUx.myData.getAccess')}
+                    </Button>
+                  </Box>
+                )}
+              </CardContent>
+            </Card>
+            {lifecycle.canUseData && (
+              <Card variant="outlined">
+                <CardContent>
+                  <Typography variant="h6">{translate('portalUx.myData.sendCopyTitle')}</Typography>
+                  <Typography color="text.secondary" sx={{ mt: 0.5, mb: 2 }}>
+                    {translate('portalUx.myData.sendCopyHelp')}
                   </Typography>
-                </Box>
-              )}
-              {!preparingAccess && accessState === 'ready' && lifecycle.accessTransfer && (
-                <TransferAccessPanel transfer={lifecycle.accessTransfer} dataset={dataset} />
-              )}
-              {!preparingAccess && accessState === 'failed' && (
-                <Alert
-                  severity="error"
-                  action={
-                    lifecycle.canUseData ? (
-                      <Button color="inherit" size="small" onClick={() => void startAccess()}>
-                        {translate('portalUx.myData.retryAccess')}
-                      </Button>
-                    ) : undefined
-                  }
-                >
-                  {translate('portalUx.myData.accessFailed', {
-                    reason: edcErrorReason(lifecycle.accessTransfer?.errorDetail || ''),
-                  })}
-                </Alert>
-              )}
-              {!preparingAccess && accessState === 'none' && (
-                <Typography color="text.secondary">{translate('portalUx.myData.accessNone')}</Typography>
-              )}
-            </CardContent>
-          </Card>
+                  <Button
+                    variant="outlined"
+                    startIcon={<SendIcon />}
+                    onClick={() =>
+                      setTransferDefaults({
+                        counterPartyAddress: lifecycle.counterPartyAddress,
+                        counterPartyId: lifecycle.providerId,
+                        protocol: lifecycle.protocol,
+                        contractId: lifecycle.agreementId,
+                        assetId: lifecycle.assetId,
+                      })
+                    }
+                  >
+                    {translate('portalUx.myData.sendCopy')}
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+          </Box>
         </TabPanel>
         {dataset &&
           datasetSections.map((section) => (
@@ -366,7 +371,7 @@ export const DataAccessDetailPage = () => {
       {transferDefaults && (
         <TransferProcessDialog
           open
-          title={translate('portalUx.myData.transferToTitle')}
+          title={translate('portalUx.myData.sendCopyTitle')}
           transferTypes={PUSH_TRANSFER_TYPES}
           defaultValues={transferDefaults}
           onClose={() => setTransferDefaults(undefined)}

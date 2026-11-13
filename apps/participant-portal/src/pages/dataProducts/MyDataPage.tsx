@@ -13,10 +13,12 @@ import {
 } from 'react-admin'
 import { Box, Button, Typography } from '@mui/material'
 import PlayArrowIcon from '@mui/icons-material/PlayArrow'
+import KeyIcon from '@mui/icons-material/Key'
 import type { DataAccessLifecycleRecord } from '../../types/dataAccess'
 import { EmptyState, FriendlyStatusChip, PageHeader } from '../../components/portal/PortalPage'
 import { dataAccessDetailPath, lifecycleStatusTone } from '../../services/dataAccessRoutes'
 import { edcErrorReason } from '../../services/dataProductViewModels'
+import { dataAccessState } from '../../services/dataAccessTransfer'
 
 const validStatuses = new Set(['pending', 'active', 'expired', 'issues'])
 
@@ -53,17 +55,18 @@ const UseDataAction = ({ onUse }: { onUse: (record: DataAccessLifecycleRecord) =
   const record = useRecordContext<DataAccessLifecycleRecord>()
   const translate = useTranslate()
   if (!record?.canUseData) return null
+  const ready = dataAccessState(record.accessTransfer) === 'ready'
   return (
     <Button
       size="small"
-      variant="contained"
-      startIcon={<PlayArrowIcon />}
+      variant={ready ? 'outlined' : 'contained'}
+      startIcon={ready ? <KeyIcon /> : <PlayArrowIcon />}
       onClick={(event) => {
         event.stopPropagation()
         onUse(record)
       }}
     >
-      {translate('portalUx.myData.useData')}
+      {translate(ready ? 'portalUx.myData.openAccess' : 'portalUx.myData.getAccess')}
     </Button>
   )
 }
@@ -139,11 +142,11 @@ export const DataAccessPage = () => {
     [translate],
   )
 
-  // Access is started and shown on the detail page.
+  // Access is started and shown on the detail page's Access tab.
   const useData = (record: DataAccessLifecycleRecord) =>
     navigate(
       { pathname: dataAccessDetailPath(record.providerId, record.assetId), search: '?tab=access' },
-      { state: { startAccess: true } },
+      { state: { startAccess: dataAccessState(record.accessTransfer) !== 'ready' } },
     )
 
   return (
