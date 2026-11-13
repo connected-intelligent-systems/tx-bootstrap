@@ -7,7 +7,7 @@ export const httpClient = (url: string, options: fetchUtils.Options = {}) => {
   const response = fetchUtils.fetchJson(url, options).catch((error) => {
     if (error instanceof HttpError) {
       const message = error.body[0]?.message || error.message || 'Unknown error'
-      return Promise.reject(new HttpError(message, error.status))
+      return Promise.reject(new HttpError(message, error.status, error.body))
     }
     return Promise.reject(error)
   })

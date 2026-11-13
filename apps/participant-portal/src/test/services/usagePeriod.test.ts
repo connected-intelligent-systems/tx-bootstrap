@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { edcErrorReason, passedUsageEndDate } from '../../services/dataProductViewModels'
+import { connectorErrorReasons, edcErrorReason, passedUsageEndDate } from '../../services/dataProductViewModels'
 import { lifecycleStatusTone } from '../../services/dataAccessRoutes'
 import { supportsPullAccess } from '../../pages/dataProducts/TransferAccessDetailsDialog'
 
@@ -54,5 +54,16 @@ describe('usage period', () => {
     }
     expect(supportsPullAccess(transfer as never)).toBe(false)
     expect(supportsPullAccess({ ...transfer, state: 'STARTED' } as never)).toBe(true)
+  })
+
+  it('reads the reasons a connector gave for rejecting a request', () => {
+    const pattern = "Invalid right-operand: right operand must match pattern '^(\\d{4}-\\d{2}-\\d{2}T')"
+    expect(
+      connectorErrorReasons({ status: 400, body: [{ message: pattern }, { message: pattern }, { message: 'Other' }] }),
+    ).toEqual(['i18n:portalUx.connectorErrors.dateFormat', 'Other'])
+    expect(connectorErrorReasons({ status: 500, message: 'Internal Server Error' })).toEqual([
+      'i18n:portalUx.connectorErrors.internal',
+    ])
+    expect(connectorErrorReasons({ cause: { status: 409, body: [], message: 'Conflict' } })).toEqual(['Conflict'])
   })
 })

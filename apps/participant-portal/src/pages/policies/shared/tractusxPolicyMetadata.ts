@@ -34,6 +34,44 @@ const constraint = (
   ...options,
 })
 
+// Usage purposes accepted by the Tractus-X EDC 0.13.0 policy schema
+// (jsonschema/cx-policy/usage-purpose-constraint-schema.json).
+export const USAGE_PURPOSES = [
+  'cx.bpdm.gate.download:1',
+  'cx.bpdm.gate.upload:1',
+  'cx.bpdm.pool:1',
+  'cx.bpdm.poolAll:1',
+  'cx.bpdm.vas.bdv.download:1',
+  'cx.bpdm.vas.bdv.upload:1',
+  'cx.bpdm.vas.countryrisk:1',
+  'cx.bpdm.vas.dataquality.download:1',
+  'cx.bpdm.vas.dataquality.upload:1',
+  'cx.bpdm.vas.fpd.download:1',
+  'cx.bpdm.vas.fpd.upload:1',
+  'cx.bpdm.vas.nps.download:1',
+  'cx.bpdm.vas.nps.upload:1',
+  'cx.bpdm.vas.swd.download:1',
+  'cx.bpdm.vas.swd.upload:1',
+  'cx.ccm.base:1',
+  'cx.circular.dpp:1',
+  'cx.circular.marketplace:1',
+  'cx.circular.materialaccounting:1',
+  'cx.circular.smc:1',
+  'cx.core.digitalTwinRegistry:1',
+  'cx.core.industrycore:1',
+  'cx.core.legalRequirementForThirdparty:1',
+  'cx.core.qualityNotifications:1',
+  'cx.dcm.base:1',
+  'cx.ecu.base:1',
+  'cx.engineering.base:1',
+  'cx.esdscom.base:1',
+  'cx.logistics.base:1',
+  'cx.materialaccounting.base:1',
+  'cx.pcf.base:1',
+  'cx.puris.base:1',
+  'cx.quality.base:1',
+]
+
 export const TRACTUSX_CONSTRAINTS: TractusXConstraintDefinition[] = [
   constraint('AffiliatesBpnl', 'Affiliates BPNL', ['isAnyOf'], 'text-list', {
     ruleTypes: ['permission', 'prohibition'],
@@ -107,7 +145,7 @@ export const TRACTUSX_CONSTRAINTS: TractusXConstraintDefinition[] = [
   constraint('Precedence', 'Precedence', ['eq'], 'choice', {
     values: ['cx.precedence.contractReference:1', 'cx.precedence.rcAgreement:1'],
   }),
-  constraint('UsagePurpose', 'Usage Purpose', ['isAnyOf'], 'text-list'),
+  constraint('UsagePurpose', 'Usage Purpose', ['isAnyOf'], 'choice-list', { values: USAGE_PURPOSES }),
   constraint('UsageRestriction', 'Usage Restriction', ['isAllOf'], 'choice-list', {
     ruleTypes: ['prohibition'],
     values: [

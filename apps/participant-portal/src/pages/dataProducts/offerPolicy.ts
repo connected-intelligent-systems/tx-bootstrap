@@ -1,16 +1,25 @@
 import type { PolicyConstraint } from '../../types/policy'
 import { parseBpns } from '../../utils/bpn'
+import { USAGE_PURPOSES } from '../policies/shared/tractusxPolicyMetadata'
 
 export { invalidBpns, parseBpns } from '../../utils/bpn'
 
 export type OfferAudience = 'members' | 'partners' | 'group'
+export type UsageEnd = 'none' | 'date' | 'duration'
 
 export const FRAMEWORK_AGREEMENT = 'DataExchangeGovernance:1.0'
 export const DEFAULT_USAGE_PURPOSE = 'cx.core.industrycore:1'
 
-const USAGE_PURPOSE_PATTERN = /^cx\.[A-Za-z0-9][A-Za-z0-9._-]*:[1-9]\d*$/
+export { USAGE_PURPOSES }
 
-export const isValidUsagePurpose = (value: string): boolean => USAGE_PURPOSE_PATTERN.test(value.trim())
+export const isValidUsagePurpose = (value: string): boolean => USAGE_PURPOSES.includes(value.trim())
+
+// A whole number of days, at least one.
+export const isValidDurationDays = (value: string): boolean => /^[1-9]\d*$/.test(value.trim())
+
+// The last day of usage must not have passed: the provider would refuse every transfer.
+export const isFutureEndDate = (date: string, now = new Date()): boolean =>
+  /^\d{4}-\d{2}-\d{2}$/.test(date) && Date.parse(toPolicyEndDate(date)) > now.getTime()
 
 export const toDateInputValue = (value: unknown): string => {
   const match = String(value || '').match(/^(\d{4}-\d{2}-\d{2})/)
@@ -62,9 +71,13 @@ export const buildAccessConstraints = ({
 export const buildUsageConstraints = ({
   purpose,
   endDate,
+  usageEnd = endDate ? 'date' : 'none',
+  durationDays = '',
 }: {
   purpose: string
   endDate: string
+  usageEnd?: UsageEnd
+  durationDays?: string
 }): PolicyConstraint[] => [
   {
     leftOperand: 'FrameworkAgreement',
@@ -76,12 +89,22 @@ export const buildUsageConstraints = ({
     operator: 'isAnyOf',
     rightOperand: [purpose.trim()],
   },
-  ...(endDate
+  ...(usageEnd === 'date' && endDate
     ? [
         {
           leftOperand: 'DataUsageEndDate',
           operator: 'eq',
           rightOperand: toPolicyEndDate(endDate),
+        },
+      ]
+    : []),
+  // Tractus-X EDC 0.13.0 fails with HTTP 500 on numeric right operands.
+  ...(usageEnd === 'duration' && durationDays
+    ? [
+        {
+          leftOperand: 'DataUsageEndDurationDays',
+          operator: 'eq',
+          rightOperand: String(Number(durationDays.trim())),
         },
       ]
     : []),

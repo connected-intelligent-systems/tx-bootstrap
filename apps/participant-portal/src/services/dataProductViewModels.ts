@@ -224,6 +224,27 @@ export const edcErrorReason = (detail: string) => {
   }
 }
 
+// The reasons a connector gave for rejecting a management API request:
+// EDC answers validation failures with a list of messages. Known messages
+// are returned as i18n keys (prefixed with "i18n:").
+const KNOWN_CONNECTOR_ERRORS: Array<[RegExp, string]> = [
+  [/right operand must match pattern '\^\(\\d\{4\}/, 'i18n:portalUx.connectorErrors.dateFormat'],
+  [/already exists/i, 'i18n:portalUx.connectorErrors.exists'],
+]
+
+export const connectorErrorReasons = (error: unknown): string[] => {
+  const source = (error as { cause?: unknown })?.cause ?? error
+  const { status, body, message } = (source || {}) as { status?: number; body?: unknown; message?: string }
+  if (typeof status === 'number' && status >= 500) return ['i18n:portalUx.connectorErrors.internal']
+  const messages = Array.isArray(body)
+    ? body.map((item) => (item && typeof item === 'object' ? (item as { message?: unknown }).message : undefined))
+    : []
+  const texts = messages.filter((item): item is string => typeof item === 'string' && item.length > 0)
+  if (!texts.length && message) texts.push(message)
+  const reasons = texts.map((text) => KNOWN_CONNECTOR_ERRORS.find(([pattern]) => pattern.test(text))?.[1] ?? text)
+  return [...new Set(reasons)]
+}
+
 // A DataUsageEndDate that has passed: the provider concludes the contract but
 // refuses every transfer under it.
 export const passedUsageEndDate = (policy?: DatasetPolicy, now = Date.now()) => {
