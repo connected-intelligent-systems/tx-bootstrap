@@ -99,12 +99,17 @@ configs:
         capabilities = ["create", "read", "update", "patch", "delete", "list", "sudo"]
       }
       EOPOLICY
-      vault token revoke "$$VAULT_APP_TOKEN" >/dev/null 2>&1 || true
-      vault token create \
-          -id="$$VAULT_APP_TOKEN" \
-          -policy=local-dev-full-access \
-          -orphan \
-          >/dev/null
+      # Keep a valid app token. Revoking it and creating it again under the
+      # same ID races with Vault's lease revocation, which can then revoke
+      # the new token. Periodic, so it does not expire while services renew it.
+      if ! vault token lookup "$$VAULT_APP_TOKEN" >/dev/null 2>&1; then
+          vault token create \
+              -id="$$VAULT_APP_TOKEN" \
+              -policy=local-dev-full-access \
+              -orphan \
+              -period=768h \
+              >/dev/null
+      fi
 
       export VAULT_TOKEN="$$VAULT_APP_TOKEN"
       vault kv put secret/password content="$${VAULT_PASSWORD_VALUE:-password}" >/dev/null
