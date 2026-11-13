@@ -97,13 +97,15 @@ for entry in \
     "consumer:$CONSUMER_VAULT_TOKEN"; do
     policy="${entry%%:*}"
     token="${entry#*:}"
-    vault_root token revoke "$token" >/dev/null 2>&1 || true
+    # Revoking and recreating a token under the same ID races with Vault's
+    # lease revocation; keep a valid one instead.
+    vault_root token lookup "$token" >/dev/null 2>&1 && continue
     vault_root token create \
         -id="$token" \
         -policy="$policy" \
         -no-default-policy \
         -orphan \
-        -ttl=720h >/dev/null
+        -period=720h >/dev/null
 done
 
 seed_value() {

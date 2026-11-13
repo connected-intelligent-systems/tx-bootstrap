@@ -23,7 +23,7 @@ services:
   # participant's public host name must resolve to the operator's ingress
   # there, as on the internet: tailnet-tls connects to it to detect that the
   # ingress routes the host, and would otherwise reach this gateway and wait
-  # forever. The private participant network keeps the public host aliases.
+  # forever.
   public-gateway:
     networks:
       public: !override

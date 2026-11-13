@@ -440,11 +440,9 @@ services:
       internal:
         aliases:
           - ${PARTICIPANT_ROLE:?PARTICIPANT_ROLE must be set}-public-gateway
-          # The data plane resolves its own did:web issuer while refreshing
-          # persisted EDR tokens. Keep the canonical public/DID hostnames
-          # available on the private participant network as well.
-          - ${PARTICIPANT_PUBLIC_HOST:?PARTICIPANT_PUBLIC_HOST must be set}
-          - ${PARTICIPANT_DID_HOST:?PARTICIPANT_DID_HOST must be set}
+          # Not the public and DID host names: the connectors resolve their
+          # own did:web (EDR refresh) over HTTPS, which this gateway does not
+          # serve. They reach those names like any other participant does.
           - ${PARTICIPANT_ROLE:?PARTICIPANT_ROLE must be set}-did
           - ${PARTICIPANT_ROLE:?PARTICIPANT_ROLE must be set}-public
       public:
