@@ -2,6 +2,7 @@ import { GetManyReferenceParams } from 'react-admin'
 import { parseCatalogFromJsonLd, parseDatasetFromJsonLd } from '../catalog/transformer'
 import { CatalogConnectionService } from '../../../services/catalogConnectionService'
 import { buildQuerySpec, compactJsonLd } from '../../shared/helpers'
+import { resolveDspParams } from '../../../services/dspProtocolService'
 
 const frame = {
   '@context': {
@@ -16,7 +17,8 @@ const frame = {
     dpv: 'https://w3id.org/dpv#',
     schema: 'http://schema.org/',
     owl: 'http://www.w3.org/2002/07/owl#',
-    dspace: 'https://w3id.org/dspace/v0.8/',
+    dspace: 'https://w3id.org/dspace/2025/1/',
+    dspace08: 'https://w3id.org/dspace/v0.8/',
     aas: 'https://admin-shell.io/aas/3/0/',
   },
 }
@@ -56,6 +58,7 @@ export async function getManyReference(params: GetManyReferenceParams) {
     const catalogUrl = params.id
     const catalog = await CatalogConnectionService.getCatalogByUrl(catalogUrl as string)
     const { page = 1, perPage = 10 } = params.pagination || {}
+    const dsp = await resolveDspParams(catalogUrl as string, catalog?.counterPartyId)
     const response = await fetch(`/api/management/v3/catalog/request`, {
       headers: {
         'Content-Type': 'application/json',
@@ -65,9 +68,8 @@ export async function getManyReference(params: GetManyReferenceParams) {
         '@context': {
           '@vocab': 'https://w3id.org/edc/v0.0.1/ns/',
         },
-        counterPartyAddress: catalogUrl,
+        ...dsp,
         ...(catalog?.counterPartyId ? { counterPartyId: catalog.counterPartyId } : {}),
-        protocol: 'dataspace-protocol-http',
         querySpec: buildQuerySpec(params, filterMapping),
       }),
     })
@@ -121,6 +123,7 @@ export async function getOne(params: any) {
     const catalogUrl = atob(catalogId)
     const catalog = params.meta?.counterPartyId ? null : await CatalogConnectionService.getCatalogByUrl(catalogUrl)
     const counterPartyId = params.meta?.counterPartyId || catalog?.counterPartyId
+    const dsp = await resolveDspParams(catalogUrl, counterPartyId)
 
     const response = await fetch(`/api/management/v3/catalog/dataset/request`, {
       headers: {
@@ -133,9 +136,8 @@ export async function getOne(params: any) {
         },
         '@type': 'DatasetRequest',
         '@id': datasetId,
-        counterPartyAddress: catalogUrl,
+        ...dsp,
         ...(counterPartyId ? { counterPartyId } : {}),
-        protocol: 'dataspace-protocol-http',
       }),
     })
 
@@ -179,6 +181,7 @@ export async function getMany(params: any) {
 
         const catalogUrl = atob(catalogId)
         const catalog = await CatalogConnectionService.getCatalogByUrl(catalogUrl)
+        const dsp = await resolveDspParams(catalogUrl, catalog?.counterPartyId)
 
         const response = await fetch(`/api/management/v3/catalog/dataset/request`, {
           headers: {
@@ -191,9 +194,8 @@ export async function getMany(params: any) {
             },
             '@type': 'DatasetRequest',
             '@id': datasetId,
-            counterPartyAddress: catalogUrl,
+            ...dsp,
             ...(catalog?.counterPartyId ? { counterPartyId: catalog.counterPartyId } : {}),
-            protocol: 'dataspace-protocol-http',
           }),
         })
 

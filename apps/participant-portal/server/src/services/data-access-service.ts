@@ -196,6 +196,7 @@ function buildLifecycles({ negotiations, agreements, transfers, retiredIds }: Li
       negotiationState,
       latestTransferState,
       counterPartyAddress: readString(latestRequest, 'counterPartyAddress'),
+      protocol: readString(latestRequest, 'protocol'),
       agreementId,
       negotiationIds: sortedRequests.map((item) => readString(item, '@id')).filter((value): value is string => !!value),
       agreementCount: relatedAgreements.length,

@@ -1,9 +1,13 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { getManyReference } from '../../dataProvider/resources/dataset/resource'
 import { CatalogConnectionService } from '../../services/catalogConnectionService'
+import { clearDspParamsCache } from '../../services/dspProtocolService'
 
 describe('network catalog connections', () => {
-  afterEach(() => vi.unstubAllGlobals())
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    clearDspParamsCache()
+  })
 
   it('uses the directory DSP endpoint and DID for catalog requests', async () => {
     const fetchMock = vi
@@ -23,6 +27,8 @@ describe('network catalog connections', () => {
           { status: 200 },
         ),
       )
+      // Connector discovery fails: DSP 0.8 at the published address.
+      .mockResolvedValueOnce(new Response('unreachable', { status: 502 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ message: 'catalog unavailable' }), { status: 502 }))
     vi.stubGlobal('fetch', fetchMock)
     CatalogConnectionService.invalidate()
@@ -37,10 +43,11 @@ describe('network catalog connections', () => {
       } as never),
     ).rejects.toThrow('catalog unavailable')
 
-    const request = fetchMock.mock.calls[1][1] as { body?: unknown }
+    const request = fetchMock.mock.calls[2][1] as { body?: unknown }
     expect(JSON.parse(String(request.body))).toMatchObject({
       counterPartyAddress: 'https://provider.test/dsp',
       counterPartyId: 'did:web:provider',
+      protocol: 'dataspace-protocol-http',
     })
   })
 })

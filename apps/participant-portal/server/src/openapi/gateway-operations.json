@@ -1,6 +1,7 @@
 {
   "operations": [
     { "method": "POST", "path": "/api/management/v3/catalog/request", "scope": "catalog:read" },
+    { "method": "POST", "path": "/api/management/v3/connectordiscovery/dspversionparams", "scope": "catalog:read" },
     { "method": "POST", "path": "/api/management/v3/catalog/dataset/request", "scope": "catalog:read" },
     { "method": "POST", "path": "/api/management/v3/assets/request", "scope": "assets:read" },
     { "method": "GET", "path": "/api/management/v3/assets/{id}", "scope": "assets:read" },

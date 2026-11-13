@@ -458,4 +458,46 @@ describe('Policy Transformers', () => {
     const obligationIds = getTractusXConstraintChoices('obligation', 'use').map((choice) => choice.id)
     expect(obligationIds).toEqual(['DataProvisioningEndDurationDays', 'DataProvisioningEndDate'])
   })
+
+  it('should only offer the operators and values Tractus-X EDC 0.13 accepts', () => {
+    for (const id of ['DataUsageEndDate', 'DataUsageEndDurationDays', 'DataProvisioningEndDate']) {
+      expect(getTractusXConstraint(id)?.operators).toEqual(['eq'])
+    }
+    expect(getTractusXConstraint('DataFrequency')?.values).toEqual([
+      'cx.dataFrequency.once:1',
+      'cx.dataFrequency.unlimited:1',
+    ])
+    expect(getTractusXConstraint('ExclusiveUsage')?.values).toEqual(['cx.exclusiveUsage.dataConsumer:1'])
+  })
+
+  it('should serialize end dates as timestamps and numbers as strings', async () => {
+    const result = await serializePolicyToJsonLd({
+      name: 'Usage period',
+      rules: {
+        permissions: [
+          {
+            action: 'use',
+            constraints: [
+              { leftOperand: 'DataUsageEndDate', operator: 'eq', rightOperand: '2030-01-31' },
+              { leftOperand: 'DataUsageEndDurationDays', operator: 'eq', rightOperand: 30 },
+            ],
+          },
+        ],
+        obligations: [
+          {
+            action: 'use',
+            constraints: [
+              { leftOperand: 'DataProvisioningEndDate', operator: 'eq', rightOperand: '2030-01-31T12:00:00Z' },
+            ],
+          },
+        ],
+      },
+    } as never)
+
+    expect(result.policy.permission[0].constraint.and).toEqual([
+      { leftOperand: 'DataUsageEndDate', operator: 'eq', rightOperand: '2030-01-31T23:59:59Z' },
+      { leftOperand: 'DataUsageEndDurationDays', operator: 'eq', rightOperand: '30' },
+    ])
+    expect(result.policy.obligation[0].constraint.rightOperand).toBe('2030-01-31T12:00:00Z')
+  })
 })

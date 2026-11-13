@@ -1,0 +1,112 @@
+{
+  "@id": "dfdd6701-2572-4b76-bd2f-c166b79341dd",
+  "@type": "Catalog",
+  "dataset": [
+    {
+      "@id": "test-asset-1",
+      "@type": "Dataset",
+      "hasPolicy": [
+        {
+          "@id": "dGVzdC1jb250cmFjdC1kZWYtMQ==:dGVzdC1hc3NldC0x:MjhlYjE2ZGQtNGI5Ni00Yzg4LWI0MGYtZWU0ZDJhMzNlNWFh",
+          "@type": "Offer",
+          "permission": [
+            {
+              "action": "use",
+              "constraint": [
+                {
+                  "and": [
+                    {
+                      "leftOperand": "Membership",
+                      "operator": "eq",
+                      "rightOperand": "active"
+                    },
+                    {
+                      "leftOperand": "FrameworkAgreement",
+                      "operator": "eq",
+                      "rightOperand": "DataExchangeGovernance:1.0"
+                    },
+                    {
+                      "leftOperand": "UsagePurpose",
+                      "operator": "isAnyOf",
+                      "rightOperand": "cx.core.industrycore:1"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "distribution": [
+        {
+          "@type": "Distribution",
+          "format": "AzureStorage-PUSH",
+          "accessService": {
+            "@id": "73f16c2d-fbc4-436d-a42b-8007b10e9d31",
+            "@type": "DataService",
+            "endpointDescription": "dspace:connector",
+            "endpointURL": "http://provider-did/api/v1/dsp/2025-1"
+          }
+        },
+        {
+          "@type": "Distribution",
+          "format": "HttpData-PULL",
+          "accessService": {
+            "@id": "791026ac-fcfc-4975-a7d5-e7eea2552384",
+            "@type": "DataService",
+            "endpointDescription": "dspace:connector",
+            "endpointURL": "http://provider-did/api/v1/dsp/2025-1"
+          }
+        },
+        {
+          "@type": "Distribution",
+          "format": "HttpData-PUSH",
+          "accessService": {
+            "@id": "1feb11f5-e81a-45f2-99fe-39a53de86f60",
+            "@type": "DataService",
+            "endpointDescription": "dspace:connector",
+            "endpointURL": "http://provider-did/api/v1/dsp/2025-1"
+          }
+        },
+        {
+          "@type": "Distribution",
+          "format": "AmazonS3-PUSH",
+          "accessService": {
+            "@id": "1d73aaa1-40ce-4ef3-9a26-d7a88c97bac3",
+            "@type": "DataService",
+            "endpointDescription": "dspace:connector",
+            "endpointURL": "http://provider-did/api/v1/dsp/2025-1"
+          }
+        },
+        {
+          "@type": "Distribution",
+          "format": "ProxyHttpData-PULL",
+          "accessService": {
+            "@id": "e2369389-1e9a-4bdc-ad1c-289601962a49",
+            "@type": "DataService",
+            "endpointDescription": "dspace:connector",
+            "endpointURL": "http://provider-did/api/v1/dsp/2025-1"
+          }
+        }
+      ],
+      "edc:name": "Test Asset",
+      "description": "Infrastructure-only E2E test dataset",
+      "id": "test-asset-1"
+    }
+  ],
+  "service": [
+    {
+      "@id": "315cdfc7-d147-4084-9a4f-d3ecd42760c4",
+      "@type": "DataService",
+      "endpointDescription": "dspace:connector",
+      "endpointURL": "http://provider-did/api/v1/dsp/2025-1"
+    }
+  ],
+  "participantId": "did:web:provider-did:BPNL00000003AYRE",
+  "@context": [
+    "https://w3id.org/tractusx/auth/v1.0.0",
+    "https://w3id.org/catenax/2025/9/policy/context.jsonld",
+    "https://w3id.org/dspace/2025/1/context.jsonld",
+    "https://w3id.org/edc/dspace/v0.0.1"
+  ]
+}

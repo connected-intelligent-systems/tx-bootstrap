@@ -8,6 +8,7 @@ import VerifiedUserIcon from '@mui/icons-material/VerifiedUser'
 import GroupsIcon from '@mui/icons-material/Groups'
 import HandshakeIcon from '@mui/icons-material/Handshake'
 import RuleIcon from '@mui/icons-material/Rule'
+import EventBusyIcon from '@mui/icons-material/EventBusy'
 
 const presetRules: Record<string, any> = {
   membership: {
@@ -46,6 +47,26 @@ const presetRules: Record<string, any> = {
         leftOperand: 'UsagePurpose',
         operator: 'isAnyOf',
         rightOperand: ['cx.core.industrycore:1'],
+      },
+    ],
+  },
+  usagePeriod: {
+    action: 'use',
+    constraints: [
+      {
+        leftOperand: 'FrameworkAgreement',
+        operator: 'eq',
+        rightOperand: 'DataExchangeGovernance:1.0',
+      },
+      {
+        leftOperand: 'UsagePurpose',
+        operator: 'isAnyOf',
+        rightOperand: ['cx.core.industrycore:1'],
+      },
+      {
+        leftOperand: 'DataUsageEndDurationDays',
+        operator: 'eq',
+        rightOperand: 30,
       },
     ],
   },
@@ -110,6 +131,12 @@ export const CustomAddButton = () => {
             <HandshakeIcon />
           </ListItemIcon>
           {translate('resources.policies.create.permissions.dataExchange')}
+        </MenuItem>
+        <MenuItem value="usagePeriod" onClick={handleAddTractusX} disableRipple>
+          <ListItemIcon>
+            <EventBusyIcon />
+          </ListItemIcon>
+          {translate('resources.policies.create.permissions.usagePeriod')}
         </MenuItem>
         <MenuItem value="tractusxAdvanced" onClick={handleAddTractusX} disableRipple>
           <ListItemIcon>

@@ -5,6 +5,7 @@ import json
 import socket
 import threading
 from collections.abc import Callable
+from importlib import resources
 from typing import Any
 from urllib.parse import urljoin, urlparse
 
@@ -17,7 +18,8 @@ OUTPUT_CONTEXT: dict[str, Any] = {
     "dct": "http://purl.org/dc/terms/",
     "dcat": "http://www.w3.org/ns/dcat#",
     "odrl": "http://www.w3.org/ns/odrl/2/",
-    "dspace": "https://w3id.org/dspace/v0.8/",
+    "dspace": "https://w3id.org/dspace/2025/1/",
+    "dspace08": "https://w3id.org/dspace/v0.8/",
     "prov": "http://www.w3.org/ns/prov#",
     "schema": "http://schema.org/",
     "aas": "https://admin-shell.io/aas/3/0/",
@@ -38,9 +40,22 @@ ODRL_CONTEXT: dict[str, Any] = {
     }
 }
 
+
+def _bundled(name: str) -> dict[str, Any]:
+    document: dict[str, Any] = json.loads(resources.files(__package__).joinpath("contexts", name).read_text())
+    return document
+
+
+# Contexts of DSP 2025-1 catalog responses (copies from Tractus-X EDC 0.13), so
+# crawling does not depend on w3id.org being reachable.
 BUNDLED_CONTEXTS: dict[str, dict[str, Any]] = {
     "http://www.w3.org/ns/odrl.jsonld": ODRL_CONTEXT,
     "https://www.w3.org/ns/odrl.jsonld": ODRL_CONTEXT,
+    "https://w3id.org/dspace/2025/1/context.jsonld": _bundled("dspace-2025-1.jsonld"),
+    "https://w3id.org/dspace/2025/1/odrl-profile.jsonld": _bundled("dspace-2025-1-odrl-profile.jsonld"),
+    "https://w3id.org/edc/dspace/v0.0.1": _bundled("edc-dspace.jsonld"),
+    "https://w3id.org/tractusx/auth/v1.0.0": _bundled("tractusx-auth.jsonld"),
+    "https://w3id.org/catenax/2025/9/policy/context.jsonld": _bundled("catenax-policy-2025-09.jsonld"),
 }
 
 DCAT_DATASET = "http://www.w3.org/ns/dcat#dataset"

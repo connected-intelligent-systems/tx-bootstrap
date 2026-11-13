@@ -13,6 +13,7 @@ export interface DataAccessLifecycleRecord {
   negotiationState?: string
   latestTransferState?: string
   counterPartyAddress?: string
+  protocol?: string
   agreementId?: string
   negotiationIds: string[]
   agreementCount: number

@@ -227,7 +227,9 @@ export const DatasetSchema = z
 export const CatalogSchema = z.object({
   'dct:title': z.string().optional(),
   'dct:description': z.string().optional(),
-  'dspace:participantId': z.string().optional(),
+  // DSP 2025-1 types the participant ID as an IRI: { '@id': 'did:web:...' }.
+  'dspace:participantId': z.union([z.string(), z.object({ '@id': z.string() })]).optional(),
+  'dspace08:participantId': z.string().optional(),
   'dcat:dataset': z
     .union([DatasetSchema, z.array(DatasetSchema)])
     .optional()

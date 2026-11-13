@@ -79,6 +79,93 @@
         "x-required-scope": "catalog:read"
       }
     },
+    "/api/management/v3/connectordiscovery/dspversionparams": {
+      "post": {
+        "tags": ["Connector Discovery"],
+        "description": "Discover supported connector parameters for a given connector endpoint.",
+        "operationId": "discoverDspVersionParamsV3",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConnectorParamsDiscoveryRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "A list of connector parameters for the DSP version to use with the given connector.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConnectorParamsDiscoveryResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request body was malformed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/ApiErrorDetail_1" }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A valid API-client token is required.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "403": {
+            "description": "The API client does not have the required scope.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "404": {
+            "description": "The operation or resource is not exposed by this participant.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "500": {
+            "description": "Discovery failed due to an internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/ApiErrorDetail_1" }
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Discovery failed due to connection issues to counter party",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/ApiErrorDetail_1" }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "apiClientToken": [] }],
+        "x-required-scope": "catalog:read"
+      }
+    },
     "/api/management/v3/catalog/dataset/request": {
       "post": {
         "tags": ["Catalog V3"],
@@ -4058,6 +4145,59 @@
           }
         }
       },
+      "ConnectorParamsDiscoveryRequest": {
+        "required": ["@context", "counterPartyAddress", "counterPartyId"],
+        "type": "object",
+        "properties": {
+          "@context": { "type": "object" },
+          "@type": {
+            "type": "string",
+            "example": "https://w3id.org/tractusx/v0.0.1/ns/ConnectorParamsDiscoveryRequest"
+          },
+          "counterPartyAddress": { "type": "string" },
+          "counterPartyId": { "type": "string" }
+        },
+        "description": "Note: In former versions, the property 'counterPartyId' was named 'bpnl', for convenience this value is still allowed",
+        "example": {
+          "@context": {
+            "edc": "https://w3id.org/edc/v0.0.1/ns/",
+            "tx": "https://w3id.org/tractusx/v0.0.1/ns/"
+          },
+          "@type": "tx:ConnectorParamsDiscoveryRequest",
+          "edc:counterPartyId": "BPNL1234567890",
+          "edc:counterPartyAddress": "https://provider.domain.com/api/dsp"
+        }
+      },
+      "ConnectorParamsDiscoveryResponse": {
+        "type": "object",
+        "properties": {
+          "context": { "type": "object" },
+          "counterPartyAddress": { "type": "string" },
+          "counterPartyId": { "type": "string" },
+          "protocol": { "type": "string" }
+        },
+        "example": {
+          "@context": { "edc": "https://w3id.org/edc/v0.0.1/ns/" },
+          "edc:counterPartyId": "did:web:one-example.com",
+          "edc:counterPartyAddress": "https://provider.domain.com/api/dsp/2025-1",
+          "edc:protocol": "dataspace-protocol-http:2025-1"
+        }
+      },
+      "ApiErrorDetail_1": {
+        "type": "object",
+        "properties": {
+          "invalidValue": { "type": "object" },
+          "message": { "type": "string" },
+          "path": { "type": "string" },
+          "type": { "type": "string" }
+        },
+        "example": {
+          "path": "path",
+          "message": "message",
+          "type": "type",
+          "invalidValue": "{}"
+        }
+      },
       "DatasetRequestV3": {
         "type": "object",
         "properties": {
@@ -4354,21 +4494,6 @@
               }
             ]
           }
-        }
-      },
-      "ApiErrorDetail_1": {
-        "type": "object",
-        "properties": {
-          "invalidValue": { "type": "object" },
-          "message": { "type": "string" },
-          "path": { "type": "string" },
-          "type": { "type": "string" }
-        },
-        "example": {
-          "path": "path",
-          "message": "message",
-          "type": "type",
-          "invalidValue": "{}"
         }
       },
       "List": {

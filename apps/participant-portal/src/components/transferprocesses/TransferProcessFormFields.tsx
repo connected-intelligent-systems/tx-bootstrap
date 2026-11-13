@@ -205,7 +205,6 @@ export const TransferProcessFormFields = ({
       <TextInput
         label={translate('resources.transferprocesses.fields.protocol')}
         source="protocol"
-        defaultValue="dataspace-protocol-http"
         helperText={translate('resources.transferprocesses.create.fields.protocolHelper')}
         fullWidth
         readOnly={lockCoreFields}

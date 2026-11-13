@@ -133,6 +133,8 @@ export const DataAccessDetailPage = () => {
                   onClick={() =>
                     setTransferDefaults({
                       counterPartyAddress: lifecycle.counterPartyAddress,
+                      counterPartyId: lifecycle.providerId,
+                      protocol: lifecycle.protocol,
                       contractId: lifecycle.agreementId,
                       assetId: lifecycle.assetId,
                     })

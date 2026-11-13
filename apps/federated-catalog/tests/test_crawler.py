@@ -1,3 +1,4 @@
+import json
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -78,7 +79,39 @@ async def test_directory_self_exclusion_and_multi_page_crawl(tmp_path) -> None:
         )["total"]
         == 3
     )
-    assert len([call for call in calls if call.method == "POST"]) == 2
+    assert len([call for call in calls if call.url.path.endswith("/catalog/request")]) == 2
+    await client.aclose()
+
+
+@pytest.mark.asyncio
+async def test_catalog_requests_use_the_discovered_dsp_version(tmp_path) -> None:
+    configured = settings(tmp_path)
+    store = CatalogStore(configured.store_path, 1800)
+    provider = Participant("Provider", "BPNL-PROVIDER", "did:web:provider", "https://provider.example/dsp")
+    catalog_requests: list[dict[str, object]] = []
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        body = json.loads(request.content)
+        if request.url.path.endswith("/connectordiscovery/dspversionparams"):
+            assert body["counterPartyAddress"] == "https://provider.example/dsp"
+            assert body["counterPartyId"] == "did:web:provider"
+            return httpx.Response(
+                200,
+                json={
+                    "counterPartyAddress": "https://provider.example/dsp/2025-1",
+                    "protocol": "dataspace-protocol-http:2025-1",
+                },
+            )
+        catalog_requests.append(body)
+        return httpx.Response(200, json={"@context": context(), "dcat:dataset": [dataset("one")]})
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    await CatalogCrawler(configured, store, client).crawl_participant(provider)
+
+    assert catalog_requests[0]["counterPartyAddress"] == "https://provider.example/dsp/2025-1"
+    assert catalog_requests[0]["protocol"] == "dataspace-protocol-http:2025-1"
+    status = store.get_status(provider.bpn)
+    assert status is not None and status.state == "fresh"
     await client.aclose()
 
 

@@ -321,6 +321,59 @@ http_code="$(curl -s -o /dev/null -w "%{http_code}" \
     -d "$contract_definition" 2>/dev/null || true)"
 case "$http_code" in 200|204|409) ok "contract definition ready" ;; *) fail "contract definition failed with HTTP ${http_code}" ;; esac
 
+# An offer whose data usage period has ended: e2e checks that the connector
+# concludes the contract but refuses transfers under it.
+post_provider() {
+    curl -s -o /dev/null -w "%{http_code}" -X POST "${PROVIDER_MGMT_URL}/management/v3/$1" \
+        -H "Content-Type: application/json" \
+        -H "X-Api-Key: ${EDC_API_KEY}" \
+        -d "$2" 2>/dev/null || true
+}
+expired_asset="$(jq -n --arg url "$PROVIDER_DEMO_ASSET_URL" '{
+    "@context": {"@vocab": "https://w3id.org/edc/v0.0.1/ns/"},
+    "@id": "test-asset-expired",
+    properties: {name: "Expired Test Asset", description: "E2E dataset whose usage period has ended"},
+    dataAddress: {type: "HttpData", baseUrl: $url}
+}')"
+expired_policy='{
+  "@context": [
+    "https://w3id.org/dspace/2025/1/odrl-profile.jsonld",
+    "https://w3id.org/catenax/2025/9/policy/context.jsonld",
+    {"@vocab": "https://w3id.org/edc/v0.0.1/ns/"}
+  ],
+  "@type": "PolicyDefinition",
+  "@id": "expired-usage-policy",
+  "policy": {
+    "@type": "Set",
+    "permission": [{
+      "action": "use",
+      "constraint": {
+        "and": [
+          {"leftOperand": "FrameworkAgreement", "operator": "eq", "rightOperand": "DataExchangeGovernance:1.0"},
+          {"leftOperand": "UsagePurpose", "operator": "isAnyOf", "rightOperand": "cx.core.industrycore:1"},
+          {"leftOperand": "DataUsageEndDate", "operator": "eq", "rightOperand": "2020-01-01T00:00:00Z"}
+        ]
+      }
+    }]
+  }
+}'
+expired_definition='{
+  "@context": {"@vocab": "https://w3id.org/edc/v0.0.1/ns/"},
+  "@id": "test-contract-def-expired",
+  "accessPolicyId": "membership-policy",
+  "contractPolicyId": "expired-usage-policy",
+  "assetsSelector": [{
+    "operandLeft": "https://w3id.org/edc/v0.0.1/ns/id",
+    "operator": "=",
+    "operandRight": "test-asset-expired"
+  }]
+}'
+for item in "assets|$expired_asset" "policydefinitions|$expired_policy" "contractdefinitions|$expired_definition"; do
+    http_code="$(post_provider "${item%%|*}" "${item#*|}")"
+    case "$http_code" in 200|204|409) ;; *) fail "expired offer ${item%%|*} failed with HTTP ${http_code}" ;; esac
+done
+ok "expired usage offer ready"
+
 step "Verifying DID documents"
 did_entries=("${PROVIDER_DID_HOST}|${BPN_PROVIDER}")
 # A tunnelled consumer is only reachable after its enrollment during onboarding.

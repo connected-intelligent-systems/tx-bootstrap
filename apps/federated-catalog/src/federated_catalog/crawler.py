@@ -20,6 +20,7 @@ from .models import CrawlStatus, DatasetRecord, Participant, iso, parse_time, ut
 from .store import CatalogStore, is_valid_endpoint, stable_entry_id
 
 LOGGER = logging.getLogger(__name__)
+DSP_0_8 = "dataspace-protocol-http"
 
 
 class CatalogCrawler:
@@ -129,6 +130,7 @@ class CatalogCrawler:
         rdf_documents: list[str] = []
         degraded = False
         try:
+            dsp_address, protocol = await self._dsp_params(participant)
             offset = 0
             while True:
                 response = await self.client.post(
@@ -136,9 +138,9 @@ class CatalogCrawler:
                     headers={"X-Api-Key": self.settings.edc_api_key, "Content-Type": "application/json"},
                     json={
                         "@context": {"@vocab": "https://w3id.org/edc/v0.0.1/ns/"},
-                        "counterPartyAddress": participant.dsp_endpoint,
+                        "counterPartyAddress": dsp_address,
                         "counterPartyId": participant.did,
-                        "protocol": "dataspace-protocol-http",
+                        "protocol": protocol,
                         "querySpec": {"offset": offset, "limit": self.settings.page_size},
                     },
                 )
@@ -184,6 +186,29 @@ class CatalogCrawler:
             self.failures[participant.bpn] = failures
             delay = min(self.settings.crawl_interval_seconds * (2 ** (failures - 1)), 3600)
             self.next_crawl[participant.bpn] = asyncio.get_running_loop().time() + delay
+
+    async def _dsp_params(self, participant: Participant) -> tuple[str, str]:
+        """Newest DSP version both connectors support, from the EDC's connector
+        discovery; DSP 0.8 at the published address when discovery fails."""
+        try:
+            response = await self.client.post(
+                f"{self.settings.edc_management_url}/v3/connectordiscovery/dspversionparams",
+                headers={"X-Api-Key": self.settings.edc_api_key, "Content-Type": "application/json"},
+                json={
+                    "@context": {"@vocab": "https://w3id.org/edc/v0.0.1/ns/"},
+                    "counterPartyAddress": participant.dsp_endpoint,
+                    "counterPartyId": participant.did,
+                },
+            )
+            if response.status_code == 200:
+                body = response.json()
+                address = body.get("counterPartyAddress") if isinstance(body, dict) else None
+                protocol = body.get("protocol") if isinstance(body, dict) else None
+                if isinstance(address, str) and address and isinstance(protocol, str) and protocol:
+                    return address, protocol
+        except (httpx.HTTPError, ValueError):
+            pass
+        return participant.dsp_endpoint, DSP_0_8
 
     @staticmethod
     def _error_message(error: Exception) -> str:

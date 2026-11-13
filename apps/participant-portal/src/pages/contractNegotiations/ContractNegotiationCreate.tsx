@@ -39,12 +39,7 @@ export const ContractNegotiationCreate = () => {
           fullWidth
         />
         <ContractNegotiationPolicyInput />
-        <TextInput
-          source="protocol"
-          label={translate('resources.contractnegotiations.fields.protocol')}
-          defaultValue={'dataspace-protocol-http'}
-          fullWidth
-        />
+        <TextInput source="protocol" label={translate('resources.contractnegotiations.fields.protocol')} fullWidth />
       </SimpleForm>
     </Create>
   )

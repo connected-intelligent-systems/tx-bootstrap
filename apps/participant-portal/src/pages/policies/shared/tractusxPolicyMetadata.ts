@@ -1,4 +1,4 @@
-export type TractusXValueType = 'text' | 'text-list' | 'date' | 'number' | 'boolean'
+export type TractusXValueType = 'text' | 'text-list' | 'choice' | 'choice-list' | 'date' | 'number'
 
 export type TractusXAction = 'access' | 'use'
 export type TractusXRuleType = 'permission' | 'prohibition' | 'obligation'
@@ -11,285 +11,123 @@ export interface TractusXConstraintDefinition {
   ruleTypes: TractusXRuleType[]
   operators: string[]
   valueType: TractusXValueType
-  defaultValue: string | string[] | number | boolean
+  /** The only right operands Tractus-X EDC accepts (choice and choice-list). */
+  values?: string[]
 }
 
-const equalityOperators = ['eq', 'neq']
-const listOperators = ['isAnyOf', 'isAllOf', 'isNoneOf', 'isPartOf']
-const equalityAndListOperators = [...equalityOperators, ...listOperators]
-const comparableOperators = ['eq', 'neq', 'gt', 'gteq', 'lt', 'lteq']
+// Mirrors the constraint functions of Tractus-X EDC 0.13 (cx-policy, Catena-X
+// policy context 2025-09): the connector rejects other operators and values.
+const constraint = (
+  id: string,
+  label: string,
+  operators: string[],
+  valueType: TractusXValueType,
+  options: Partial<TractusXConstraintDefinition> = {},
+): TractusXConstraintDefinition => ({
+  id,
+  label,
+  actions: ['use'],
+  defaultAction: 'use',
+  ruleTypes: ['permission'],
+  operators,
+  valueType,
+  ...options,
+})
 
 export const TRACTUSX_CONSTRAINTS: TractusXConstraintDefinition[] = [
-  {
-    id: 'AffiliatesBpnl',
-    label: 'Affiliates BPNL',
-    actions: ['use'],
-    defaultAction: 'use',
+  constraint('AffiliatesBpnl', 'Affiliates BPNL', ['isAnyOf'], 'text-list', {
     ruleTypes: ['permission', 'prohibition'],
-    operators: listOperators,
-    valueType: 'text-list',
-    defaultValue: ['BPNL000000000000'],
-  },
-  {
-    id: 'AffiliatesRegion',
-    label: 'Affiliates Region',
-    actions: ['use'],
-    defaultAction: 'use',
+  }),
+  constraint('AffiliatesRegion', 'Affiliates Region', ['isAnyOf'], 'choice-list', {
     ruleTypes: ['permission', 'prohibition'],
-    operators: listOperators,
-    valueType: 'text-list',
-    defaultValue: ['EU'],
-  },
-  {
-    id: 'BusinessPartnerGroup',
-    label: 'Business Partner Group',
+    values: [
+      'cx.region.all:1',
+      'cx.region.europe:1',
+      'cx.region.northAmerica:1',
+      'cx.region.southAmerica:1',
+      'cx.region.africa:1',
+      'cx.region.asia:1',
+      'cx.region.oceania:1',
+      'cx.region.antarctica:1',
+    ],
+  }),
+  constraint('BusinessPartnerGroup', 'Business Partner Group', ['isAnyOf', 'isNoneOf'], 'text-list', {
     actions: ['access'],
     defaultAction: 'access',
-    ruleTypes: ['permission'],
-    operators: equalityAndListOperators,
-    valueType: 'text-list',
-    defaultValue: ['gold-partners'],
-  },
-  {
-    id: 'BusinessPartnerNumber',
-    label: 'Business Partner Number',
+  }),
+  constraint('BusinessPartnerNumber', 'Business Partner Number', ['isAnyOf', 'isNoneOf'], 'text-list', {
     actions: ['access'],
     defaultAction: 'access',
-    ruleTypes: ['permission'],
-    operators: listOperators,
-    valueType: 'text-list',
-    defaultValue: ['BPNL000000000000'],
-  },
-  {
-    id: 'ConfidentialInformationMeasures',
-    label: 'Confidential Information Measures',
-    actions: ['use'],
-    defaultAction: 'use',
-    ruleTypes: ['permission'],
-    operators: listOperators,
-    valueType: 'text-list',
-    defaultValue: ['technical-and-organizational-measures'],
-  },
-  {
-    id: 'ConfidentialInformationSharing',
-    label: 'Confidential Information Sharing',
-    actions: ['use'],
-    defaultAction: 'use',
-    ruleTypes: ['permission'],
-    operators: equalityOperators,
-    valueType: 'text',
-    defaultValue: 'allowed',
-  },
-  {
-    id: 'ContractReference',
-    label: 'Contract Reference',
-    actions: ['use'],
-    defaultAction: 'use',
-    ruleTypes: ['permission'],
-    operators: equalityOperators,
-    valueType: 'text',
-    defaultValue: 'contract-reference',
-  },
-  {
-    id: 'ContractTermination',
-    label: 'Contract Termination',
-    actions: ['use'],
-    defaultAction: 'use',
-    ruleTypes: ['permission'],
-    operators: equalityOperators,
-    valueType: 'text',
-    defaultValue: 'allowed',
-  },
-  {
-    id: 'DataFrequency',
-    label: 'Data Frequency',
-    actions: ['use'],
-    defaultAction: 'use',
-    ruleTypes: ['permission'],
-    operators: comparableOperators,
-    valueType: 'number',
-    defaultValue: 1,
-  },
-  {
-    id: 'DataUsageEndDate',
-    label: 'Data Usage End Date',
-    actions: ['use'],
-    defaultAction: 'use',
-    ruleTypes: ['permission'],
-    operators: comparableOperators,
-    valueType: 'date',
-    defaultValue: '',
-  },
-  {
-    id: 'DataUsageEndDefinition',
-    label: 'Data Usage End Definition',
-    actions: ['use'],
-    defaultAction: 'use',
-    ruleTypes: ['permission'],
-    operators: equalityOperators,
-    valueType: 'text',
-    defaultValue: 'definition',
-  },
-  {
-    id: 'DataUsageEndDurationDays',
-    label: 'Data Usage End Duration Days',
-    actions: ['use'],
-    defaultAction: 'use',
-    ruleTypes: ['permission'],
-    operators: comparableOperators,
-    valueType: 'number',
-    defaultValue: 30,
-  },
-  {
-    id: 'DataProvisioningEndDurationDays',
-    label: 'Data Provisioning End Duration Days',
-    actions: ['use'],
-    defaultAction: 'use',
+  }),
+  constraint('ConfidentialInformationMeasures', 'Confidential Information Measures', ['eq'], 'choice', {
+    values: ['cx.confidentiality.measures:1'],
+  }),
+  constraint('ConfidentialInformationSharing', 'Confidential Information Sharing', ['isAnyOf'], 'choice-list', {
+    values: ['cx.sharing.affiliates:1', 'cx.sharing.managedLegalEntity:1'],
+  }),
+  constraint('ContractReference', 'Contract Reference', ['isAllOf'], 'text-list'),
+  constraint('ContractTermination', 'Contract Termination', ['eq'], 'choice', {
+    values: ['cx.data.deletion:1', 'cx.data.keeping:1'],
+  }),
+  constraint('DataFrequency', 'Data Frequency', ['eq'], 'choice', {
+    values: ['cx.dataFrequency.once:1', 'cx.dataFrequency.unlimited:1'],
+  }),
+  // Enforced since 0.13: transfers start only before the end, and the policy
+  // monitor ends running transfers when it passes.
+  constraint('DataUsageEndDate', 'Data Usage End Date', ['eq'], 'date'),
+  constraint('DataUsageEndDefinition', 'Data Usage End Definition', ['eq'], 'choice', {
+    values: ['cx.dataUsageEnd.unlimited:1'],
+  }),
+  constraint('DataUsageEndDurationDays', 'Data Usage End Duration Days', ['eq'], 'number'),
+  constraint('DataProvisioningEndDurationDays', 'Data Provisioning End Duration Days', ['eq'], 'number', {
     ruleTypes: ['obligation'],
-    operators: comparableOperators,
-    valueType: 'number',
-    defaultValue: 30,
-  },
-  {
-    id: 'DataProvisioningEndDate',
-    label: 'Data Provisioning End Date',
-    actions: ['use'],
-    defaultAction: 'use',
+  }),
+  constraint('DataProvisioningEndDate', 'Data Provisioning End Date', ['eq'], 'date', {
     ruleTypes: ['obligation'],
-    operators: comparableOperators,
-    valueType: 'date',
-    defaultValue: '',
-  },
-  {
-    id: 'ExclusiveUsage',
-    label: 'Exclusive Usage',
-    actions: ['use'],
-    defaultAction: 'use',
-    ruleTypes: ['permission'],
-    operators: equalityOperators,
-    valueType: 'boolean',
-    defaultValue: true,
-  },
-  {
-    id: 'FrameworkAgreement',
-    label: 'Framework Agreement',
+  }),
+  constraint('ExclusiveUsage', 'Exclusive Usage', ['eq'], 'choice', {
+    values: ['cx.exclusiveUsage.dataConsumer:1'],
+  }),
+  constraint('FrameworkAgreement', 'Framework Agreement', ['eq'], 'choice', {
     actions: ['access', 'use'],
-    defaultAction: 'use',
-    ruleTypes: ['permission'],
-    operators: equalityOperators,
-    valueType: 'text',
-    defaultValue: 'DataExchangeGovernance:1.0',
-  },
-  {
-    id: 'JurisdictionLocation',
-    label: 'Jurisdiction Location',
-    actions: ['use'],
-    defaultAction: 'use',
-    ruleTypes: ['permission'],
-    operators: listOperators,
-    valueType: 'text-list',
-    defaultValue: ['DE'],
-  },
-  {
-    id: 'JurisdictionLocationReference',
-    label: 'Jurisdiction Location Reference',
-    actions: ['use'],
-    defaultAction: 'use',
-    ruleTypes: ['permission'],
-    operators: equalityOperators,
-    valueType: 'text',
-    defaultValue: 'jurisdiction-reference',
-  },
-  {
-    id: 'Liability',
-    label: 'Liability',
-    actions: ['use'],
-    defaultAction: 'use',
-    ruleTypes: ['permission'],
-    operators: equalityOperators,
-    valueType: 'text',
-    defaultValue: 'liable',
-  },
-  {
-    id: 'Membership',
-    label: 'Membership',
+    values: ['DataExchangeGovernance:1.0'],
+  }),
+  constraint('JurisdictionLocation', 'Jurisdiction Location', ['eq'], 'text'),
+  constraint('JurisdictionLocationReference', 'Jurisdiction Location Reference', ['eq'], 'choice', {
+    values: ['cx.location.dataConsumer:1', 'cx.location.contractReference:1'],
+  }),
+  constraint('Liability', 'Liability', ['eq'], 'choice', {
+    values: ['cx.grossNegligence:1', 'cx.slightNegligence:1'],
+  }),
+  constraint('Membership', 'Membership', ['eq'], 'choice', {
     actions: ['access', 'use'],
     defaultAction: 'access',
-    ruleTypes: ['permission'],
-    operators: equalityOperators,
-    valueType: 'text',
-    defaultValue: 'active',
-  },
-  {
-    id: 'Precedence',
-    label: 'Precedence',
-    actions: ['use'],
-    defaultAction: 'use',
-    ruleTypes: ['permission'],
-    operators: comparableOperators,
-    valueType: 'number',
-    defaultValue: 1,
-  },
-  {
-    id: 'UsagePurpose',
-    label: 'Usage Purpose',
-    actions: ['use'],
-    defaultAction: 'use',
-    ruleTypes: ['permission'],
-    operators: listOperators,
-    valueType: 'text-list',
-    defaultValue: ['cx.core.industrycore:1'],
-  },
-  {
-    id: 'UsageRestriction',
-    label: 'Usage Restriction',
-    actions: ['use'],
-    defaultAction: 'use',
+    values: ['active'],
+  }),
+  constraint('Precedence', 'Precedence', ['eq'], 'choice', {
+    values: ['cx.precedence.contractReference:1', 'cx.precedence.rcAgreement:1'],
+  }),
+  constraint('UsagePurpose', 'Usage Purpose', ['isAnyOf'], 'text-list'),
+  constraint('UsageRestriction', 'Usage Restriction', ['isAllOf'], 'choice-list', {
     ruleTypes: ['prohibition'],
-    operators: equalityOperators,
-    valueType: 'text',
-    defaultValue: 'restricted',
-  },
-  {
-    id: 'VersionChanges',
-    label: 'Version Changes',
-    actions: ['use'],
-    defaultAction: 'use',
-    ruleTypes: ['permission'],
-    operators: equalityOperators,
-    valueType: 'text',
-    defaultValue: 'allowed',
-  },
-  {
-    id: 'Warranty',
-    label: 'Warranty',
-    actions: ['use'],
-    defaultAction: 'use',
-    ruleTypes: ['permission'],
-    operators: equalityOperators,
-    valueType: 'text',
-    defaultValue: 'provided',
-  },
-  {
-    id: 'WarrantyDefinition',
-    label: 'Warranty Definition',
-    actions: ['use'],
-    defaultAction: 'use',
-    ruleTypes: ['permission'],
-    operators: equalityOperators,
-    valueType: 'text',
-    defaultValue: 'warranty-definition',
-  },
-  {
-    id: 'WarrantyDurationMonths',
-    label: 'Warranty Duration Months',
-    actions: ['use'],
-    defaultAction: 'use',
-    ruleTypes: ['permission'],
-    operators: comparableOperators,
-    valueType: 'number',
-    defaultValue: 12,
-  },
+    values: [
+      'cx.thirdParty.forbidden:1',
+      'cx.manipulation.forbidden:1',
+      'cx.derivations.forbidden:1',
+      'cx.extraordinaryAnalytics.forbidden:1',
+      'cx.dataProviderRemoval.forbidden:1',
+    ],
+  }),
+  constraint('VersionChanges', 'Version Changes', ['eq'], 'choice', {
+    values: ['cx.versionChanges.minor:1', 'cx.versionChanges.major:1'],
+  }),
+  constraint('Warranty', 'Warranty', ['eq'], 'choice', {
+    values: ['cx.warranty.none:1', 'cx.warranty.contractReference:1', 'cx.warranty.dataQualityIssues:1'],
+  }),
+  constraint('WarrantyDefinition', 'Warranty Definition', ['eq'], 'choice', {
+    values: ['cx.warranty.contractEndDate:1'],
+  }),
+  constraint('WarrantyDurationMonths', 'Warranty Duration Months', ['eq'], 'number'),
 ]
 
 export const TRACTUSX_CONSTRAINT_IDS = new Set(TRACTUSX_CONSTRAINTS.map((constraint) => constraint.id))
