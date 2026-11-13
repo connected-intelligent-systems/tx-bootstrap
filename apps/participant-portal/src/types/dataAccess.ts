@@ -7,8 +7,9 @@ export interface DataAccessLifecycleRecord {
   dataset?: Dataset
   catalogUrl?: string
   providerId: string
-  status: 'pending' | 'active' | 'issues'
+  status: 'pending' | 'active' | 'expired' | 'issues'
   updatedAt?: string
+  usageEndsAt?: string
   errorDetail?: string
   negotiationState?: string
   latestTransferState?: string

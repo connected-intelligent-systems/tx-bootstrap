@@ -213,6 +213,28 @@ export const buildDashboardSummary = (
   }
 }
 
+// EDC stores a counterparty's DSP error as JSON; show its reason.
+export const edcErrorReason = (detail: string) => {
+  try {
+    const parsed = JSON.parse(detail)
+    const reason = Array.isArray(parsed?.reason) ? parsed.reason.join(' ') : parsed?.reason
+    return typeof reason === 'string' && reason ? reason : detail
+  } catch {
+    return detail
+  }
+}
+
+// A DataUsageEndDate that has passed: the provider concludes the contract but
+// refuses every transfer under it.
+export const passedUsageEndDate = (policy?: DatasetPolicy, now = Date.now()) => {
+  const ends = (policy?.permissions || [])
+    .flatMap((rule: any) => rule.constraints || [])
+    .filter((constraint: any) => String(constraint.leftOperand).split(/[:/#]/).at(-1) === 'DataUsageEndDate')
+    .map((constraint: any) => Date.parse(String(constraint.rightOperand)))
+    .filter((end: number) => !Number.isNaN(end) && end <= now)
+  return ends.length ? new Date(Math.min(...ends)).toISOString() : undefined
+}
+
 export const policySummary = (policy?: Policy | DatasetPolicy) => {
   if (!policy) return 'policy.none'
   const rules = 'rules' in policy ? policy.rules?.permissions || [] : policy.permissions || []

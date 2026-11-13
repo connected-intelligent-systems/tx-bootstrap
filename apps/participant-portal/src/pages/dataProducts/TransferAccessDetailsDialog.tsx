@@ -87,8 +87,14 @@ const CopyButton = ({ value, label }: { value?: string; label: string }) => {
   )
 }
 
+const FAILED_TRANSFER_STATES = new Set(['TERMINATING', 'TERMINATED', 'FAILED'])
+
+export const transferFailed = (transfer: TransferProcess) => FAILED_TRANSFER_STATES.has(transfer.state?.toUpperCase())
+
 export const supportsPullAccess = (transfer: TransferProcess) =>
-  transfer.transferDirection.toUpperCase() === 'CONSUMER' && /-pull$/i.test(transfer.transferType || '')
+  transfer.transferDirection.toUpperCase() === 'CONSUMER' &&
+  /-pull$/i.test(transfer.transferType || '') &&
+  !transferFailed(transfer)
 
 export const supportsHttpProxy = (transfer: TransferProcess) =>
   /httpdata.*-pull$/i.test(transfer.transferType || '') && transfer.transferDirection.toUpperCase() === 'CONSUMER'

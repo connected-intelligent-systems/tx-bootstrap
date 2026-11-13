@@ -299,7 +299,11 @@ export const portalUxEnglish = {
       all: 'All',
       pending: 'Pending',
       active: 'Active',
+      expired: 'Expired',
       issues: 'Issues',
+      usageEnds: 'Usage is permitted until %{date}.',
+      usageEnded:
+        'The usage period ended on %{date}. The provider refuses new transfers under this agreement; request access again to use the data.',
       emptyTitle: 'No matching data access',
       emptyText: 'Request access to a discovered data product to see it here.',
       requests: 'Request history',
@@ -336,6 +340,8 @@ export const portalUxEnglish = {
       chooseHelp: 'Select an offer and review its terms before requesting access.',
       availableOffer: 'Available offer',
       terms: 'Offer terms',
+      usageEnded:
+        'The usage period of this offer ended on %{date}. An agreement can still be concluded, but the provider refuses every transfer.',
     },
   },
 }
@@ -642,7 +648,11 @@ export const portalUxGerman = {
       all: 'Alle',
       pending: 'Offen',
       active: 'Aktiv',
+      expired: 'Abgelaufen',
       issues: 'Probleme',
+      usageEnds: 'Die Nutzung ist bis %{date} erlaubt.',
+      usageEnded:
+        'Der Nutzungszeitraum endete am %{date}. Der Anbieter lehnt neue Transfers unter dieser Vereinbarung ab; fordern Sie erneut Zugriff an, um die Daten zu nutzen.',
       emptyTitle: 'Keine passenden Datenzugriffe',
       emptyText: 'Fordern Sie Zugriff auf ein Datenprodukt an.',
       requests: 'Anfrageverlauf',
@@ -679,6 +689,8 @@ export const portalUxGerman = {
       chooseHelp: 'Prüfen Sie die Bedingungen, bevor Sie Zugriff anfordern.',
       availableOffer: 'Verfügbares Angebot',
       terms: 'Angebotsbedingungen',
+      usageEnded:
+        'Der Nutzungszeitraum dieses Angebots endete am %{date}. Eine Vereinbarung ist möglich, aber der Anbieter lehnt jeden Transfer ab.',
     },
   },
 }

@@ -17,8 +17,10 @@ import PlayArrowIcon from '@mui/icons-material/PlayArrow'
 import type { DataAccessLifecycleRecord } from '../../types/dataAccess'
 import { EmptyState, FriendlyStatusChip, PageHeader } from '../../components/portal/PortalPage'
 import TransferProcessDialog from '../../components/transferprocesses/TransferProcessDialog'
+import { lifecycleStatusTone } from '../../services/dataAccessRoutes'
+import { edcErrorReason } from '../../services/dataProductViewModels'
 
-const validStatuses = new Set(['pending', 'active', 'issues'])
+const validStatuses = new Set(['pending', 'active', 'expired', 'issues'])
 
 const ProductCell = () => {
   const record = useRecordContext<DataAccessLifecycleRecord>()
@@ -34,7 +36,7 @@ const ProductCell = () => {
       </Typography>
       {record.errorDetail && (
         <Typography variant="caption" color="error" sx={{ display: 'block', mt: 0.5 }}>
-          {record.errorDetail}
+          {edcErrorReason(record.errorDetail)}
         </Typography>
       )}
     </Box>
@@ -45,7 +47,7 @@ const StatusCell = () => {
   const record = useRecordContext<DataAccessLifecycleRecord>()
   const translate = useTranslate()
   if (!record) return null
-  const tone = record.status === 'active' ? 'granted' : record.status === 'issues' ? 'failed' : 'in-progress'
+  const tone = lifecycleStatusTone(record.status)
   return <FriendlyStatusChip status={tone} label={translate(`portalUx.myData.${record.status}`)} />
 }
 
@@ -129,6 +131,7 @@ export const DataAccessPage = () => {
         choices={[
           { id: 'pending', name: translate('portalUx.myData.pending') },
           { id: 'active', name: translate('portalUx.myData.active') },
+          { id: 'expired', name: translate('portalUx.myData.expired') },
           { id: 'issues', name: translate('portalUx.myData.issues') },
         ]}
         alwaysOn

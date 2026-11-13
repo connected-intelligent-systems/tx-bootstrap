@@ -21,6 +21,8 @@ const NEGOTIATION_PENDING_STATES = new Set([
 const NEGOTIATION_ISSUE_STATES = new Set(['DECLINING', 'DECLINED', 'TERMINATING', 'TERMINATED'])
 const TRANSFER_ISSUE_STATES = new Set(['FAILED', 'ERROR', 'TERMINATED'])
 const RELATED_RECORD_TYPES = new Set(['negotiations', 'agreements', 'transfers'])
+const LIFECYCLE_STATUSES = ['pending', 'active', 'expired', 'issues']
+const DAY_MS = 24 * 60 * 60 * 1000
 
 type DataAccessQuery = { offset?: string; limit?: string; status?: string }
 type DataAccessParams = { lifecycleId: string }
@@ -40,8 +42,9 @@ interface LifecycleRecord {
   id: string
   assetId: string
   providerId: string
-  status: 'pending' | 'active' | 'issues'
+  status: 'pending' | 'active' | 'expired' | 'issues'
   updatedAt?: string
+  usageEndsAt?: string
   errorDetail?: string
   negotiationState?: string
   latestTransferState?: string
@@ -59,7 +62,7 @@ export async function getDataAccessLifecycles(
   reply: FastifyReply,
 ) {
   const { offset, limit } = pagination(request.query)
-  const status = ['pending', 'active', 'issues'].includes(request.query.status || '') ? request.query.status : undefined
+  const status = LIFECYCLE_STATUSES.includes(request.query.status || '') ? request.query.status : undefined
   const data = await loadLifecycleData()
   const lifecycles = buildLifecycles(data)
     .filter((item) => !status || item.status === status)
@@ -173,8 +176,12 @@ function buildLifecycles({ negotiations, agreements, transfers, retiredIds }: Li
       allAgreementsRetired ||
       NEGOTIATION_ISSUE_STATES.has(negotiationState || '') ||
       TRANSFER_ISSUE_STATES.has(latestTransferState || '')
+    const usageEndsAt = usageEnd(latestAgreement)
+    const expired = Boolean(usageEndsAt && Date.parse(usageEndsAt) <= Date.now())
     const status: LifecycleRecord['status'] = agreementId
-      ? 'active'
+      ? expired
+        ? 'expired'
+        : 'active'
       : hasIssue
         ? 'issues'
         : NEGOTIATION_PENDING_STATES.has(negotiationState || '')
@@ -192,6 +199,7 @@ function buildLifecycles({ negotiations, agreements, transfers, retiredIds }: Li
       providerId,
       status,
       updatedAt,
+      usageEndsAt,
       errorDetail,
       negotiationState,
       latestTransferState,
@@ -202,9 +210,56 @@ function buildLifecycles({ negotiations, agreements, transfers, retiredIds }: Li
       agreementCount: relatedAgreements.length,
       requestCount: sortedRequests.length,
       transferCount: relatedTransfers.length,
-      canUseData: Boolean(agreementId && readString(latestRequest, 'counterPartyAddress')),
+      canUseData: Boolean(agreementId && !expired && readString(latestRequest, 'counterPartyAddress')),
     }
   })
+}
+
+// The end of the usage period that the provider enforces for transfers:
+// DataUsageEndDate, or DataUsageEndDurationDays counted from the signing date.
+// Constraints combined with "or" do not end the period on their own.
+function usageEnd(agreement?: JsonRecord): string | undefined {
+  const policy = agreement?.policy
+  if (!isRecord(policy)) return undefined
+  const signedAt = Date.parse(normalizeDate(agreement?.contractSigningDate) || '')
+  const ends: number[] = []
+  for (const permission of odrlList(policy, 'permission')) {
+    for (const constraint of requiredConstraints(odrlList(permission, 'constraint'))) {
+      const operand = odrlId(odrlValue(constraint, 'leftOperand'))
+      const value = odrlValue(constraint, 'rightOperand')
+      const name = operand?.split(/[:/#]/).at(-1)
+      if (name === 'DataUsageEndDate') {
+        const end = Date.parse(String(value))
+        if (!Number.isNaN(end)) ends.push(end)
+      } else if (name === 'DataUsageEndDurationDays' && !Number.isNaN(signedAt)) {
+        const days = Number(value)
+        if (Number.isFinite(days)) ends.push(signedAt + days * DAY_MS)
+      }
+    }
+  }
+  return ends.length ? new Date(Math.min(...ends)).toISOString() : undefined
+}
+
+function requiredConstraints(constraints: JsonRecord[]): JsonRecord[] {
+  return constraints.flatMap((constraint) => {
+    const and = odrlList(constraint, 'and')
+    if (and.length) return requiredConstraints(and)
+    return odrlValue(constraint, 'leftOperand') ? [constraint] : []
+  })
+}
+
+function odrlValue(record: JsonRecord, term: string): unknown {
+  return record[`odrl:${term}`] ?? record[term] ?? record[`http://www.w3.org/ns/odrl/2/${term}`]
+}
+
+function odrlList(record: JsonRecord, term: string): JsonRecord[] {
+  const value = odrlValue(record, term)
+  return (Array.isArray(value) ? value : [value]).filter(isRecord)
+}
+
+function odrlId(value: unknown): string | undefined {
+  if (typeof value === 'string') return value
+  return isRecord(value) && typeof value['@id'] === 'string' ? value['@id'] : undefined
 }
 
 function relationRecords(data: LifecycleData, relation: string): JsonRecord[] {

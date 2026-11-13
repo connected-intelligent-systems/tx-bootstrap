@@ -1,8 +1,8 @@
 import React, { useMemo } from 'react'
-import { Box, Card, CardContent, Chip, InputLabel, MenuItem, Select, Typography } from '@mui/material'
+import { Alert, Box, Card, CardContent, Chip, InputLabel, MenuItem, Select, Typography } from '@mui/material'
 import type { SelectChangeEvent } from '@mui/material/Select'
 import { useTranslate } from 'react-admin'
-import { policySummary } from '../../../services/dataProductViewModels'
+import { passedUsageEndDate, policySummary } from '../../../services/dataProductViewModels'
 
 interface PolicySelectionViewProps {
   policies: any[]
@@ -30,6 +30,7 @@ export const PolicySelectionView: React.FC<PolicySelectionViewProps> = ({
       </Box>
     )
   const selected = policies[selectedPolicy]
+  const usageEnded = passedUsageEndDate(selected)
   const handleChange = (event: SelectChangeEvent<string>) => onSelectPolicy(Number(event.target.value))
   return (
     <Box sx={{ width: '100%', minWidth: 0 }}>
@@ -58,6 +59,11 @@ export const PolicySelectionView: React.FC<PolicySelectionViewProps> = ({
           </Typography>
         </CardContent>
       </Card>
+      {usageEnded && (
+        <Alert severity="warning" sx={{ mt: 2 }}>
+          {translate('portalUx.policy.usageEnded', { date: new Date(usageEnded).toLocaleString() })}
+        </Alert>
+      )}
     </Box>
   )
 }

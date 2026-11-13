@@ -25,6 +25,8 @@ import {
   buildDatasetAccessSections,
   DatasetAccessOverviewContent,
 } from '../../components/datasets/DatasetAccessOverview'
+import { lifecycleStatusTone } from '../../services/dataAccessRoutes'
+import { edcErrorReason } from '../../services/dataProductViewModels'
 import { DataAccessAgreementsList, DataAccessNegotiationsList, DataAccessTransfersList } from './DataAccessRelatedLists'
 
 type LifecycleTab = 'negotiations' | 'agreements' | 'transfers'
@@ -38,7 +40,7 @@ const LifecycleStatus = () => {
   const record = useRecordContext<DataAccessLifecycleRecord>()
   const translate = useTranslate()
   if (!record) return null
-  const tone = record.status === 'active' ? 'granted' : record.status === 'issues' ? 'failed' : 'in-progress'
+  const tone = lifecycleStatusTone(record.status)
   return <FriendlyStatusChip status={tone} label={translate(`portalUx.myData.${record.status}`)} />
 }
 
@@ -146,6 +148,13 @@ export const DataAccessDetailPage = () => {
             </>
           }
         />
+        {lifecycle.usageEndsAt && (
+          <Alert severity={lifecycle.status === 'expired' ? 'warning' : 'info'} sx={{ mb: 2 }}>
+            {translate(lifecycle.status === 'expired' ? 'portalUx.myData.usageEnded' : 'portalUx.myData.usageEnds', {
+              date: new Date(lifecycle.usageEndsAt).toLocaleString(),
+            })}
+          </Alert>
+        )}
         {lifecycle.status === 'pending' && (
           <Box sx={{ mb: 2 }}>
             <LinearProgress aria-label={translate('portalUx.myData.waitingForAgreement')} />
@@ -226,7 +235,7 @@ export const DataAccessDetailPage = () => {
           </Card>
           {lifecycle.errorDetail && (
             <Alert severity="error" sx={{ mt: 2 }}>
-              {lifecycle.errorDetail}
+              {edcErrorReason(lifecycle.errorDetail)}
             </Alert>
           )}
         </TabPanel>
