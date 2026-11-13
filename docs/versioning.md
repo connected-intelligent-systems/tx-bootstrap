@@ -8,8 +8,8 @@ components keep their upstream versions.
 
 | Build       | Version format           | Use                              |
 | ----------- | ------------------------ | -------------------------------- |
-| Release     | `0.4.1`                  | A published, fixed stack version |
-| Development | `0.4.1-dev.sha.<commit>` | A specific build from `main`     |
+| Release     | `0.5.0`                  | A published, fixed stack version |
+| Development | `0.5.0-dev.sha.<commit>` | A specific build from `main`     |
 | Local       | `local`                  | Images built from your checkout  |
 
 Prefer an explicit release, development version, or digest for repeatable
@@ -18,10 +18,10 @@ deployments. Floating aliases such as `latest` can change.
 ## Prepare a release
 
 From the repository root, set the next version and validate it. For example,
-to prepare a patch after `0.4.1`:
+to prepare a patch after `0.5.0`:
 
 ```sh
-npm run version:set -- 0.4.2
+npm run version:set -- 0.5.1
 npm run version:check
 ```
 
@@ -46,6 +46,7 @@ also publish immutable development builds. See the
 
 ## Release notes
 
+- [0.5.0](releases/0.5.0.md) — Tractus-X EDC 0.13.0, DSP 2025-1 and the portal's Access tab
 - [0.4.1](releases/0.4.1.md) — Tunnel route polling and participant certificate fixes
 - [0.4.0](releases/0.4.0.md) — Catalog and portal security fixes, verified tunnel routing
 - [0.3.1](releases/0.3.1.md) — Operator deployment fixes and console API key prompt
