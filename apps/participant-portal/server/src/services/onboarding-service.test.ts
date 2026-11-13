@@ -31,7 +31,7 @@ vi.mock('../clients/dataspace-admin-client.js', () => ({
 
 vi.mock('../clients/identityhub-client.js', () => ({
   assertIdentityHubConfigured: vi.fn(async () => undefined),
-  getIdentityHubParticipantContextPathId: () => 'QlBOTDAwMDAwMDAwMDAwMg==',
+  getIdentityHubParticipantContextId: () => 'BPNL000000000002',
   identityHubFetch: mocks.identityHubFetch,
 }))
 

@@ -6,7 +6,6 @@ import {
   parseJsonEnv,
   parseLogLevelEnv,
 } from "@tx-bootstrap/core/server/config/env.js";
-import { base64 } from "@tx-bootstrap/core/server/utils/crypto.js";
 import {
   credentialDefinitions,
   holderAttestationId,
@@ -29,8 +28,6 @@ const consoleRuntimeConfig = parseJsonEnv<ConsoleRuntimeConfig>(
 );
 const issuerContext =
   process.env.ISSUER_CONTEXT ?? process.env.BPN_ISSUER ?? "BPNL00000003CRHK";
-const issuerContextPathId =
-  process.env.ISSUER_CONTEXT_PATH_ID ?? base64(issuerContext);
 const issuerApiKeyAlias =
   process.env.ISSUER_API_KEY_ALIAS ?? `${issuerContext}-apikey`;
 
@@ -107,7 +104,6 @@ export const config = {
         process.env.BPN_ISSUER ?? "BPNL00000003CRHK"
       }`,
     context: issuerContext,
-    contextPathId: issuerContextPathId,
     apiKey: process.env.ISSUER_API_KEY ?? "",
     apiKeyAlias: issuerApiKeyAlias,
     apiKeyVaultUrl: process.env.ISSUER_API_KEY_VAULT_URL ?? "",

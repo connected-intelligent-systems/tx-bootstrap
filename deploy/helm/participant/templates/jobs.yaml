@@ -76,8 +76,6 @@ spec:
               value: {{ .Values.identity.participantRole | quote }}
             - name: PARTICIPANT_BPN
               value: {{ .Values.identity.participantBpn | quote }}
-            - name: PARTICIPANT_BPN_BASE64
-              value: {{ .Values.identity.participantBpnBase64 | quote }}
             - name: IDENTITYHUB_PARTICIPANT_CONTEXT_ID
               value: {{ .Values.identity.identityHubParticipantContextId | quote }}
             - name: PARTICIPANT_DID_HOST

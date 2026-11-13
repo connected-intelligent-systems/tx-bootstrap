@@ -40,7 +40,7 @@ x-gateway-runtime: &gateway-runtime
 services:
   issuer-identityhub:
     <<: *java-runtime
-    image: tractusx/identityhub:${IDENTITYHUB_TAG:-0.3.2}
+    image: tractusx/identityhub:${IDENTITYHUB_TAG:-0.4.1}
     configs:
       - source: ih-logging
         target: /app/logging.properties
@@ -147,7 +147,7 @@ services:
 
   bdrs-server:
     <<: *java-runtime
-    image: tractusx/bdrs-server:${BDRS_TAG:-0.5.7}
+    image: tractusx/bdrs-server:${BDRS_TAG:-0.6.0}
     environment:
       <<: *java-env
       WEB_HTTP_PORT: "8080"
@@ -186,7 +186,7 @@ services:
 
   issuerservice:
     <<: *java-runtime
-    image: tractusx/issuerservice:${ISSUERSERVICE_TAG:-0.3.2}
+    image: tractusx/issuerservice:${ISSUERSERVICE_TAG:-0.4.1}
     environment:
       <<: *java-env
       WEB_HTTP_PORT: "8081"
@@ -362,7 +362,6 @@ services:
       ISSUER_ISSUANCE_URL: "${ISSUER_ISSUANCE_URL:-https://${ISSUER_DID_HOST:?ISSUER_DID_HOST must be set}/api/issuance}"
       ISSUER_CLAIMS_DATABASE_URL: "${ISSUER_CLAIMS_DATABASE_URL:?ISSUER_CLAIMS_DATABASE_URL must be set}"
       ISSUER_CONTEXT: "${BPN_ISSUER:?BPN_ISSUER must be set}"
-      ISSUER_CONTEXT_PATH_ID: "${BPN_ISSUER_BASE64:?BPN_ISSUER_BASE64 must be set}"
       ISSUER_API_KEY: "${ISSUER_API_KEY:-}"
       ISSUER_API_KEY_ALIAS: "${BPN_ISSUER:?BPN_ISSUER must be set}-apikey"
       ISSUER_API_KEY_VAULT_URL: "${VAULT_URL:?VAULT_URL must be set}"

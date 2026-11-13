@@ -9,7 +9,7 @@ must be provisioned separately. See the
 
 Use [values.yaml](values.yaml) as the full settings reference. Set at least:
 
-- participant BPN, base64 encoding, stable context ID, and public hostnames
+- participant BPN, stable context ID, and public hostnames
 - operator issuer, directory, and onboarding endpoints
 - Vault URL, an isolated KV mount, and an AES key under
   `identityHub.encryptionKeyAlias`

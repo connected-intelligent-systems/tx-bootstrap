@@ -9,7 +9,7 @@ See the [shared Helm prerequisites](../README.md#before-installation).
 Use [values.yaml](values.yaml) as the settings reference. Prepare your own
 values file with:
 
-- issuer BPN, its base64 encoding, and public DID hostname
+- issuer BPN and public DID hostname
 - Vault URL and pre-provisioned AES keys matching
   `issuerIdentityHub.encryptionKeyAlias` and `issuerService.encryptionKeyAlias`
 - the existing Secret name and key mappings

@@ -34,7 +34,6 @@ javaRuntime:
 identity:
   participantRole: participant
   participantBpn: BPNL000000000002
-  participantBpnBase64: "QlBOTDAwMDAwMDAwMDAwMg=="
   participantContextId: 00000000-0000-0000-0000-000000000002
   identityHubParticipantContextId: BPNL000000000002
   participantDidHost: participant.example.invalid
@@ -106,7 +105,7 @@ identityHub:
     runAsGroup: 101
   image:
     repository: tractusx/identityhub
-    tag: 0.3.2
+    tag: 0.4.1
     digest: ""
     pullPolicy: IfNotPresent
   jtiValidation: true
@@ -140,7 +139,7 @@ controlPlane:
     runAsGroup: 101
   image:
     repository: tractusx/edc-controlplane-postgresql-hashicorp-vault
-    tag: 0.12.1
+    tag: 0.13.0
     digest: ""
     pullPolicy: IfNotPresent
   bdrsCacheValiditySeconds: 600
@@ -167,7 +166,7 @@ dataPlane:
     runAsGroup: 101
   image:
     repository: tractusx/edc-dataplane-hashicorp-vault
-    tag: 0.12.1
+    tag: 0.13.0
     digest: ""
     pullPolicy: IfNotPresent
   service:

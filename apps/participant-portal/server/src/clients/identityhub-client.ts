@@ -32,11 +32,8 @@ export async function assertIdentityHubConfigured(): Promise<void> {
   }
 }
 
-export function getIdentityHubParticipantContextPathId(): string {
-  return (
-    config.identityHub.participantContextPathId ||
-    Buffer.from(config.identityHub.participantContextId).toString('base64')
-  )
+export function getIdentityHubParticipantContextId(): string {
+  return config.identityHub.participantContextId
 }
 
 async function identityHubHeaders(): Promise<Record<string, string>> {

@@ -1,12 +1,12 @@
 # syntax=docker/dockerfile:1.7
-FROM tractusx/edc-dataplane-hashicorp-vault:0.12.2@sha256:2bde43fcdfdd57383807c0366523e748388cccadb63ce6709deaa7cf5f6118cc AS upstream
+FROM tractusx/edc-dataplane-hashicorp-vault:0.13.0@sha256:de22ff97df715244de7c04784ee3fe6f08d369064186da675dcaffda63b5062c AS upstream
 FROM eclipse-temurin:17-jdk AS java-toolchain
 
 # Rebuild the pinned source with patched serializer dependencies.
 FROM eclipse-temurin:25-jdk AS compiler
 COPY --from=java-toolchain /opt/java/openjdk /opt/java/jdk17
 WORKDIR /runtime
-ADD --checksum=sha256:0a2750178198455acaf9a229188ea92ebba1a8ee428179003124207b67edfc7d https://codeload.github.com/eclipse-tractusx/tractusx-edc/tar.gz/2ab522b5b74e53aa558f44f74d13fa9eff395a73 /tmp/runtime-source.tar.gz
+ADD --checksum=sha256:ad17463b033702360556d931380520626c27a99231bbebeffe62cb0e874f14d3 https://codeload.github.com/eclipse-tractusx/tractusx-edc/tar.gz/964d33d7ed942369f624aacbc45037a1f79fc7be /tmp/runtime-source.tar.gz
 RUN tar -xzf /tmp/runtime-source.tar.gz --strip-components=1 -C /runtime \
     && rm /tmp/runtime-source.tar.gz \
     && printf '\norg.gradle.java.installations.paths=/opt/java/jdk17\n' >> gradle.properties

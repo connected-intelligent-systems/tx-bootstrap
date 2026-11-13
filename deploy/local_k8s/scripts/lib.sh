@@ -55,11 +55,8 @@ render_values() {
     sed \
         -e "s/__INGRESS_IP__/${LOCAL_K8S_INGRESS_IP}/g" \
         -e "s/__BPN_ISSUER__/${BPN_ISSUER}/g" \
-        -e "s#__BPN_ISSUER_BASE64__#${BPN_ISSUER_BASE64}#g" \
         -e "s/__BPN_PROVIDER__/${BPN_PROVIDER}/g" \
-        -e "s#__BPN_PROVIDER_BASE64__#${BPN_PROVIDER_BASE64}#g" \
         -e "s/__BPN_CONSUMER__/${BPN_CONSUMER}/g" \
-        -e "s#__BPN_CONSUMER_BASE64__#${BPN_CONSUMER_BASE64}#g" \
         -e "s/__PROVIDER_CONTEXT_ID__/${PROVIDER_PARTICIPANT_CONTEXT_ID}/g" \
         -e "s/__CONSUMER_CONTEXT_ID__/${CONSUMER_PARTICIPANT_CONTEXT_ID}/g" \
         "$source_file" >"$target_file"

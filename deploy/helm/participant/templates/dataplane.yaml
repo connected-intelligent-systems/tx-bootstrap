@@ -59,7 +59,7 @@ spec:
             - name: EDC_HOSTNAME
               value: {{ include "tx-bootstrap-participant.componentName" (dict "root" . "component" "dataplane") | quote }}
             - name: EDC_PARTICIPANT_ID
-              value: {{ .Values.identity.participantBpn | quote }}
+              value: {{ include "tx-bootstrap-participant.participantDid" . | quote }}
             - name: EDC_PARTICIPANT_CONTEXT_ID
               value: {{ .Values.identity.participantContextId | quote }}
             - name: EDC_IAM_ISSUER_ID

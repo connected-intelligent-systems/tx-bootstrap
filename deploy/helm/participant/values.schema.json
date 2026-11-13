@@ -66,7 +66,6 @@
       "required": [
         "participantRole",
         "participantBpn",
-        "participantBpnBase64",
         "participantContextId",
         "identityHubParticipantContextId",
         "participantDidHost",
@@ -81,7 +80,6 @@
           "pattern": "^[a-z0-9](?:[-a-z0-9]*[a-z0-9])?$"
         },
         "participantBpn": { "$ref": "#/definitions/bpn" },
-        "participantBpnBase64": { "$ref": "#/definitions/base64" },
         "participantContextId": { "type": "string", "format": "uuid" },
         "identityHubParticipantContextId": { "type": "string", "minLength": 1 },
         "participantDidHost": { "$ref": "#/definitions/hostname" },
@@ -525,7 +523,6 @@
   ],
   "definitions": {
     "bpn": { "type": "string", "pattern": "^BPN[LSA][A-Z0-9]{12}$" },
-    "base64": { "type": "string", "pattern": "^[A-Za-z0-9_-]+={0,2}$" },
     "hostname": {
       "type": "string",
       "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?$"

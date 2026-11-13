@@ -37,7 +37,7 @@ previous token valid if the replacement email cannot be sent.
 
 | Setting                                            | Purpose                                               |
 | -------------------------------------------------- | ----------------------------------------------------- |
-| `PARTICIPANT_BPN`, `PARTICIPANT_BPN_BASE64`        | Assigned BPN and its base64 encoding                  |
+| `PARTICIPANT_BPN`                                  | Assigned BPN                                          |
 | `PARTICIPANT_CONTEXT_ID`                           | Stable, unique connector context ID                   |
 | `PARTICIPANT_PUBLIC_HOST`, `PARTICIPANT_DID_HOST`  | Public connector and DID hostnames; usually identical |
 | `BPN_ISSUER`, `ISSUER_DID_HOST`, `BDRS_SERVER_URL` | Operator identity and directory endpoint              |

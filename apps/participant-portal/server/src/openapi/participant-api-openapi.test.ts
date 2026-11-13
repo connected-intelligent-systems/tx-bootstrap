@@ -34,8 +34,8 @@ describe('participant API OpenAPI', () => {
   it('records the pinned native EDC schema source', () => {
     expect(participantApiOpenApi['x-upstream']).toMatchObject({
       distribution: 'Tractus-X EDC',
-      distributionVersion: '0.12.1',
-      eclipseEdcManagementApiVersion: '3.1.4',
+      distributionVersion: '0.13.0',
+      eclipseEdcManagementApiVersion: '3.1.6',
     })
   })
 })

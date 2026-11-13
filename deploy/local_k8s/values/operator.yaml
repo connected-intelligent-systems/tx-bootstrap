@@ -1,6 +1,5 @@
 identity:
   issuerBpn: __BPN_ISSUER__
-  issuerBpnBase64: __BPN_ISSUER_BASE64__
   issuerDidHost: issuer.__INGRESS_IP__.nip.io
   useHttpsDidWeb: false
 

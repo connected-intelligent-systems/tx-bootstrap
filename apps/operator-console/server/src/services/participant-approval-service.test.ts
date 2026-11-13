@@ -72,7 +72,8 @@ describe("participant approval service automatic checks", () => {
 
 describe("participant revocation", () => {
   const did = "did:web:participant.example:BPNL000000000001";
-  const base = "https://issuer.example/api/admin/v1alpha/participants/context";
+  const base =
+    "https://issuer.example/api/admin/v1alpha/participants/BPNL000000000099";
 
   function issuerMock({
     holderDid = did,
@@ -273,7 +274,8 @@ describe("participant revocation", () => {
 
 describe("participant readmission", () => {
   const did = "did:web:participant.example:BPNL000000000001";
-  const base = "https://issuer.example/api/admin/v1alpha/participants/context";
+  const base =
+    "https://issuer.example/api/admin/v1alpha/participants/BPNL000000000099";
 
   function mock(
     holder: Record<string, unknown> | null,
@@ -428,7 +430,6 @@ function createService() {
         issuanceUrl: "https://issuer.example/api/issuance",
         did: "did:web:issuer.example",
         context: "BPNL000000000099",
-        contextPathId: "context",
         apiKey: "",
         apiKeyAlias: "issuer-key",
         apiKeyVaultUrl: "",
