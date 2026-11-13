@@ -45,6 +45,7 @@ interface LifecycleRecord {
   status: 'pending' | 'active' | 'expired' | 'issues'
   updatedAt?: string
   usageEndsAt?: string
+  accessTransfer?: JsonRecord
   errorDetail?: string
   negotiationState?: string
   latestTransferState?: string
@@ -169,6 +170,15 @@ function buildLifecycles({ negotiations, agreements, transfers, retiredIds }: Li
     const negotiationState = readString(latestRequest, 'state')
     const latestTransferState = readString(latestTransfer, 'state')
     const agreementId = readString(latestAgreement, '@id')
+    // The HTTP-pull transfer of the current agreement serves proxy access.
+    const accessTransfer = latest(
+      relatedTransfers.filter(
+        (item) =>
+          readString(item, 'contractId') === agreementId &&
+          /^httpdata.*-pull$/i.test(readString(item, 'transferType') || '') &&
+          (readString(item, 'type') || 'CONSUMER') === 'CONSUMER',
+      ),
+    )
     const allAgreementsRetired = relatedAgreements.length > 0 && usableAgreements.length === 0
     const errorDetail = readString(latestRequest, 'errorDetail') || readString(latestTransfer, 'errorDetail')
     const hasIssue =
@@ -200,6 +210,7 @@ function buildLifecycles({ negotiations, agreements, transfers, retiredIds }: Li
       status,
       updatedAt,
       usageEndsAt,
+      accessTransfer: accessTransfer && normalizeTransfer(accessTransfer),
       errorDetail,
       negotiationState,
       latestTransferState,

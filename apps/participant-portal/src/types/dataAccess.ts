@@ -1,4 +1,5 @@
 import type { Dataset } from './catalog'
+import type { TransferProcess } from './transferProcess'
 
 export interface DataAccessLifecycleRecord {
   id: string
@@ -10,6 +11,7 @@ export interface DataAccessLifecycleRecord {
   status: 'pending' | 'active' | 'expired' | 'issues'
   updatedAt?: string
   usageEndsAt?: string
+  accessTransfer?: TransferProcess
   errorDetail?: string
   negotiationState?: string
   latestTransferState?: string

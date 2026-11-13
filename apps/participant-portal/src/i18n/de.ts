@@ -770,6 +770,9 @@ const germanMessages: Partial<TranslationMessages> = {
       },
       actions: {
         terminate: 'Beenden',
+        startTransfer: 'Transfer starten',
+        showCoreFields: 'Transferdetails anzeigen',
+        hideCoreFields: 'Transferdetails ausblenden',
         download: 'Daten herunterladen',
         downloading: 'Lädt herunter...',
       },

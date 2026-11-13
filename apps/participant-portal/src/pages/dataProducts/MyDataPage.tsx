@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   DataTable,
@@ -8,7 +8,6 @@ import {
   Pagination,
   SelectInput,
   useRecordContext,
-  useRefresh,
   useListContext,
   useTranslate,
 } from 'react-admin'
@@ -16,8 +15,7 @@ import { Box, Button, Typography } from '@mui/material'
 import PlayArrowIcon from '@mui/icons-material/PlayArrow'
 import type { DataAccessLifecycleRecord } from '../../types/dataAccess'
 import { EmptyState, FriendlyStatusChip, PageHeader } from '../../components/portal/PortalPage'
-import TransferProcessDialog from '../../components/transferprocesses/TransferProcessDialog'
-import { lifecycleStatusTone } from '../../services/dataAccessRoutes'
+import { dataAccessDetailPath, lifecycleStatusTone } from '../../services/dataAccessRoutes'
 import { edcErrorReason } from '../../services/dataProductViewModels'
 
 const validStatuses = new Set(['pending', 'active', 'expired', 'issues'])
@@ -117,11 +115,10 @@ const StatusUrlSync = ({
 
 export const DataAccessPage = () => {
   const translate = useTranslate()
-  const refresh = useRefresh()
+  const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const requestedStatus = searchParams.get('status')
   const filterDefaultValues = validStatuses.has(requestedStatus || '') ? { status: requestedStatus } : undefined
-  const [transferDefaults, setTransferDefaults] = useState<Record<string, unknown>>()
   const filters = useMemo(
     () => [
       <SelectInput
@@ -142,13 +139,12 @@ export const DataAccessPage = () => {
     [translate],
   )
 
-  const useData = (record: DataAccessLifecycleRecord) => {
-    setTransferDefaults({
-      counterPartyAddress: record.counterPartyAddress,
-      contractId: record.agreementId,
-      assetId: record.assetId,
-    })
-  }
+  // Access is started and shown on the detail page.
+  const useData = (record: DataAccessLifecycleRecord) =>
+    navigate(
+      { pathname: dataAccessDetailPath(record.providerId, record.assetId), search: '?tab=access' },
+      { state: { startAccess: true } },
+    )
 
   return (
     <Box>
@@ -219,14 +215,6 @@ export const DataAccessPage = () => {
           </DataTable>
         </>
       </List>
-      {transferDefaults && (
-        <TransferProcessDialog
-          open
-          defaultValues={transferDefaults}
-          onClose={() => setTransferDefaults(undefined)}
-          onSuccess={refresh}
-        />
-      )}
     </Box>
   )
 }

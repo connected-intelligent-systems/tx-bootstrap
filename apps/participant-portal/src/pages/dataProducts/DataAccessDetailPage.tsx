@@ -1,17 +1,31 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import { useParams, useSearchParams } from 'react-router-dom'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
   DateField,
   Labeled,
   NumberField,
   RecordContextProvider,
   TextField,
+  useDataProvider,
   useGetOne,
+  useNotify,
   useRecordContext,
-  useRefresh,
   useTranslate,
 } from 'react-admin'
-import { Alert, Box, Button, Card, CardContent, LinearProgress, Tab, Tabs } from '@mui/material'
+import {
+  Alert,
+  Box,
+  Button,
+  Card,
+  CardContent,
+  CircularProgress,
+  LinearProgress,
+  Tab,
+  Tabs,
+  Typography,
+} from '@mui/material'
+import SendIcon from '@mui/icons-material/Send'
+import KeyIcon from '@mui/icons-material/Key'
 import InfoIcon from '@mui/icons-material/Info'
 import HandshakeIcon from '@mui/icons-material/Handshake'
 import AssignmentTurnedInIcon from '@mui/icons-material/AssignmentTurnedIn'
@@ -27,6 +41,8 @@ import {
 } from '../../components/datasets/DatasetAccessOverview'
 import { lifecycleStatusTone } from '../../services/dataAccessRoutes'
 import { edcErrorReason } from '../../services/dataProductViewModels'
+import { dataAccessState, PUSH_TRANSFER_TYPES, startDataAccess } from '../../services/dataAccessTransfer'
+import { TransferAccessPanel } from './TransferAccessDetailsDialog'
 import { DataAccessAgreementsList, DataAccessNegotiationsList, DataAccessTransfersList } from './DataAccessRelatedLists'
 
 type LifecycleTab = 'negotiations' | 'agreements' | 'transfers'
@@ -47,7 +63,12 @@ const LifecycleStatus = () => {
 export const DataAccessDetailPage = () => {
   const { id = '' } = useParams<{ id: string }>()
   const translate = useTranslate()
-  const refresh = useRefresh()
+  const dataProvider = useDataProvider()
+  const notify = useNotify()
+  const location = useLocation()
+  const navigate = useNavigate()
+  const [starting, setStarting] = useState(false)
+  const autoStartHandled = useRef(false)
   const [searchParams, setSearchParams] = useSearchParams()
   const requestedTab = searchParams.get('tab')
   const [tab, setTab] = useState<DetailTab>(requestedTab || 'overview')
@@ -65,6 +86,30 @@ export const DataAccessDetailPage = () => {
   const lifecycleForDataset = lifecycleQuery.data
   const lifecycleStatus = lifecycleQuery.data?.status
   const refetchLifecycle = lifecycleQuery.refetch
+  const accessState = dataAccessState(lifecycleForDataset?.accessTransfer)
+  const preparingAccess = starting || accessState === 'preparing'
+
+  const startAccess = useCallback(async () => {
+    if (!lifecycleForDataset) return
+    setStarting(true)
+    try {
+      await startDataAccess(dataProvider, lifecycleForDataset)
+      await refetchLifecycle()
+    } catch (error) {
+      notify(error instanceof Error ? error.message : String(error), { type: 'error' })
+    } finally {
+      setStarting(false)
+    }
+  }, [dataProvider, lifecycleForDataset, notify, refetchLifecycle])
+
+  // "Use data" on the data access list opens this page and starts access here.
+  const startRequested = Boolean((location.state as { startAccess?: boolean } | null)?.startAccess)
+  useEffect(() => {
+    if (!startRequested || !lifecycleForDataset || autoStartHandled.current) return
+    autoStartHandled.current = true
+    navigate({ pathname: location.pathname, search: location.search }, { replace: true, state: null })
+    if (lifecycleForDataset.canUseData && ['none', 'failed'].includes(accessState)) void startAccess()
+  }, [accessState, lifecycleForDataset, location.pathname, location.search, navigate, startAccess, startRequested])
   const datasetCatalogUrl = lifecycleForDataset?.catalogUrl || lifecycleForDataset?.counterPartyAddress
   const datasetResourceId =
     datasetCatalogUrl && lifecycleForDataset?.assetId
@@ -80,9 +125,16 @@ export const DataAccessDetailPage = () => {
     () => (dataset ? buildDatasetAccessSections(dataset, translate) : []),
     [dataset, translate],
   )
+  // Access is a tab of its own once an agreement allows use or a transfer exists.
+  const showAccess = Boolean(lifecycleForDataset?.canUseData) || accessState === 'ready' || accessState === 'failed'
   const availableTabs = useMemo(
-    () => ['overview', ...datasetSections.map((section) => section.id), ...LIFECYCLE_TABS],
-    [datasetSections],
+    () => [
+      'overview',
+      ...(showAccess ? ['access'] : []),
+      ...datasetSections.map((section) => section.id),
+      ...LIFECYCLE_TABS,
+    ],
+    [datasetSections, showAccess],
   )
 
   useEffect(() => {
@@ -90,12 +142,12 @@ export const DataAccessDetailPage = () => {
   }, [availableTabs, id, requestedTab])
 
   useEffect(() => {
-    if (!id || lifecycleStatus !== 'pending') return undefined
+    if (!id || (lifecycleStatus !== 'pending' && accessState !== 'preparing')) return undefined
     const interval = window.setInterval(() => {
       void refetchLifecycle()
-    }, 3000)
+    }, 2000)
     return () => window.clearInterval(interval)
-  }, [id, lifecycleStatus, refetchLifecycle])
+  }, [accessState, id, lifecycleStatus, refetchLifecycle])
 
   if (lifecycleQuery.isPending && !lifecycleQuery.data) return <LoadingState />
   if (lifecycleQuery.error || !lifecycleQuery.data) {
@@ -128,10 +180,23 @@ export const DataAccessDetailPage = () => {
           actions={
             <>
               <LifecycleStatus />
-              {lifecycle.canUseData && (
+              {lifecycle.canUseData && accessState !== 'ready' && (
                 <Button
                   variant="contained"
-                  startIcon={<PlayArrowIcon />}
+                  startIcon={preparingAccess ? <CircularProgress size={18} color="inherit" /> : <PlayArrowIcon />}
+                  disabled={preparingAccess}
+                  onClick={() => {
+                    selectTab('access')
+                    void startAccess()
+                  }}
+                >
+                  {translate('portalUx.myData.useData')}
+                </Button>
+              )}
+              {lifecycle.canUseData && (
+                <Button
+                  variant="outlined"
+                  startIcon={<SendIcon />}
                   onClick={() =>
                     setTransferDefaults({
                       counterPartyAddress: lifecycle.counterPartyAddress,
@@ -142,7 +207,7 @@ export const DataAccessDetailPage = () => {
                     })
                   }
                 >
-                  {translate('portalUx.myData.useData')}
+                  {translate('portalUx.myData.transferTo')}
                 </Button>
               )}
             </>
@@ -173,6 +238,13 @@ export const DataAccessDetailPage = () => {
           sx={{ borderBottom: 1, borderColor: 'divider' }}
         >
           <Tab value="overview" icon={<InfoIcon />} label={translate('portalUx.product.overview')} />
+          {showAccess && (
+            <Tab
+              value="access"
+              icon={preparingAccess ? <CircularProgress size={20} /> : <KeyIcon />}
+              label={translate('portalUx.myData.accessTitle')}
+            />
+          )}
           {datasetSections.map((section) => (
             <Tab key={section.id} value={section.id} icon={section.icon} label={section.label} />
           ))}
@@ -233,11 +305,47 @@ export const DataAccessDetailPage = () => {
               )}
             </CardContent>
           </Card>
-          {lifecycle.errorDetail && (
+          {lifecycle.errorDetail && lifecycle.errorDetail !== lifecycle.accessTransfer?.errorDetail && (
             <Alert severity="error" sx={{ mt: 2 }}>
               {edcErrorReason(lifecycle.errorDetail)}
             </Alert>
           )}
+        </TabPanel>
+        <TabPanel active={tab === 'access'}>
+          <Card variant="outlined">
+            <CardContent>
+              {preparingAccess && (
+                <Box>
+                  <LinearProgress aria-label={translate('portalUx.myData.accessPreparing')} />
+                  <Typography color="text.secondary" sx={{ mt: 1 }}>
+                    {translate('portalUx.myData.accessPreparing')}
+                  </Typography>
+                </Box>
+              )}
+              {!preparingAccess && accessState === 'ready' && lifecycle.accessTransfer && (
+                <TransferAccessPanel transfer={lifecycle.accessTransfer} dataset={dataset} />
+              )}
+              {!preparingAccess && accessState === 'failed' && (
+                <Alert
+                  severity="error"
+                  action={
+                    lifecycle.canUseData ? (
+                      <Button color="inherit" size="small" onClick={() => void startAccess()}>
+                        {translate('portalUx.myData.retryAccess')}
+                      </Button>
+                    ) : undefined
+                  }
+                >
+                  {translate('portalUx.myData.accessFailed', {
+                    reason: edcErrorReason(lifecycle.accessTransfer?.errorDetail || ''),
+                  })}
+                </Alert>
+              )}
+              {!preparingAccess && accessState === 'none' && (
+                <Typography color="text.secondary">{translate('portalUx.myData.accessNone')}</Typography>
+              )}
+            </CardContent>
+          </Card>
         </TabPanel>
         {dataset &&
           datasetSections.map((section) => (
@@ -258,9 +366,14 @@ export const DataAccessDetailPage = () => {
       {transferDefaults && (
         <TransferProcessDialog
           open
+          title={translate('portalUx.myData.transferToTitle')}
+          transferTypes={PUSH_TRANSFER_TYPES}
           defaultValues={transferDefaults}
           onClose={() => setTransferDefaults(undefined)}
-          onSuccess={refresh}
+          onSuccess={() => {
+            void refetchLifecycle()
+            selectTab('transfers')
+          }}
         />
       )}
     </RecordContextProvider>

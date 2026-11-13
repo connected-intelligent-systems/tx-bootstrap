@@ -797,6 +797,9 @@ const englishMessages: Partial<TranslationMessages> = {
     },
     actions: {
       terminate: 'Terminate',
+      startTransfer: 'Start transfer',
+      showCoreFields: 'Show transfer details',
+      hideCoreFields: 'Hide transfer details',
       download: 'Download Data',
       downloading: 'Downloading...',
     },
