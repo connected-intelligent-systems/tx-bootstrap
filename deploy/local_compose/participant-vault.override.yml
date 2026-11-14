@@ -1,7 +1,7 @@
 # Local-only embedded Vault shared by provider and consumer deployments.
 services:
   vault:
-    image: hashicorp/vault:1.15
+    image: hashicorp/vault:2.0.2
     environment:
       VAULT_ADDR: "http://127.0.0.1:8200"
       VAULT_TOKEN: ${VAULT_TOKEN:?VAULT_TOKEN must be set}
@@ -28,7 +28,7 @@ services:
           - ${PARTICIPANT_ROLE:-participant}-vault
 
   vault-init:
-    image: hashicorp/vault:1.15
+    image: hashicorp/vault:2.0.2
     user: "0:0"
     entrypoint: ["/bin/sh", "/usr/local/bin/local-vault-bootstrap"]
     environment:
