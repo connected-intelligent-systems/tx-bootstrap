@@ -251,6 +251,22 @@ if [ "$http_code" = "409" ]; then
 fi
 case "$http_code" in 200|204) ok "provider asset ready" ;; *) fail "asset creation or update failed with HTTP ${http_code}" ;; esac
 
+# Creates a provider management object unless it exists. On a rerun EDC answers
+# 409, or 400 for a policy definition that a contract definition references
+# (Tractus-X EDC 0.13); the object counts as ready when it can be read back.
+ensure_provider() {
+    local resource="$1" id="$2" body="$3"
+    http_code="$(curl -s -o /dev/null -w "%{http_code}" \
+        -X POST "${PROVIDER_MGMT_URL}/management/v3/${resource}" \
+        -H "Content-Type: application/json" \
+        -H "X-Api-Key: ${EDC_API_KEY}" \
+        -d "$body" 2>/dev/null || true)"
+    case "$http_code" in 200|204|409) return 0 ;; esac
+    [ "$(curl -s -o /dev/null -w "%{http_code}" \
+        "${PROVIDER_MGMT_URL}/management/v3/${resource}/${id}" \
+        -H "X-Api-Key: ${EDC_API_KEY}" 2>/dev/null || true)" = "200" ]
+}
+
 membership_policy='{
   "@context": [
     "https://w3id.org/dspace/2025/1/odrl-profile.jsonld",
@@ -267,12 +283,11 @@ membership_policy='{
     }]
   }
 }'
-http_code="$(curl -s -o /dev/null -w "%{http_code}" \
-    -X POST "${PROVIDER_MGMT_URL}/management/v3/policydefinitions" \
-    -H "Content-Type: application/json" \
-    -H "X-Api-Key: ${EDC_API_KEY}" \
-    -d "$membership_policy" 2>/dev/null || true)"
-case "$http_code" in 200|204|409) ok "membership policy ready" ;; *) fail "membership policy failed with HTTP ${http_code}" ;; esac
+if ensure_provider policydefinitions membership-policy "$membership_policy"; then
+    ok "membership policy ready"
+else
+    fail "membership policy failed with HTTP ${http_code}"
+fi
 
 contract_policy='{
   "@context": [
@@ -296,12 +311,11 @@ contract_policy='{
     }]
   }
 }'
-http_code="$(curl -s -o /dev/null -w "%{http_code}" \
-    -X POST "${PROVIDER_MGMT_URL}/management/v3/policydefinitions" \
-    -H "Content-Type: application/json" \
-    -H "X-Api-Key: ${EDC_API_KEY}" \
-    -d "$contract_policy" 2>/dev/null || true)"
-case "$http_code" in 200|204|409) ok "contract policy ready" ;; *) fail "contract policy failed with HTTP ${http_code}" ;; esac
+if ensure_provider policydefinitions dataexchange-policy "$contract_policy"; then
+    ok "contract policy ready"
+else
+    fail "contract policy failed with HTTP ${http_code}"
+fi
 
 contract_definition='{
   "@context": {"@vocab": "https://w3id.org/edc/v0.0.1/ns/"},
@@ -314,21 +328,14 @@ contract_definition='{
     "operandRight": "test-asset-1"
   }]
 }'
-http_code="$(curl -s -o /dev/null -w "%{http_code}" \
-    -X POST "${PROVIDER_MGMT_URL}/management/v3/contractdefinitions" \
-    -H "Content-Type: application/json" \
-    -H "X-Api-Key: ${EDC_API_KEY}" \
-    -d "$contract_definition" 2>/dev/null || true)"
-case "$http_code" in 200|204|409) ok "contract definition ready" ;; *) fail "contract definition failed with HTTP ${http_code}" ;; esac
+if ensure_provider contractdefinitions test-contract-def-1 "$contract_definition"; then
+    ok "contract definition ready"
+else
+    fail "contract definition failed with HTTP ${http_code}"
+fi
 
 # An offer whose data usage period has ended: e2e checks that the connector
 # concludes the contract but refuses transfers under it.
-post_provider() {
-    curl -s -o /dev/null -w "%{http_code}" -X POST "${PROVIDER_MGMT_URL}/management/v3/$1" \
-        -H "Content-Type: application/json" \
-        -H "X-Api-Key: ${EDC_API_KEY}" \
-        -d "$2" 2>/dev/null || true
-}
 expired_asset="$(jq -n --arg url "$PROVIDER_DEMO_ASSET_URL" '{
     "@context": {"@vocab": "https://w3id.org/edc/v0.0.1/ns/"},
     "@id": "test-asset-expired",
@@ -368,10 +375,12 @@ expired_definition='{
     "operandRight": "test-asset-expired"
   }]
 }'
-for item in "assets|$expired_asset" "policydefinitions|$expired_policy" "contractdefinitions|$expired_definition"; do
-    http_code="$(post_provider "${item%%|*}" "${item#*|}")"
-    case "$http_code" in 200|204|409) ;; *) fail "expired offer ${item%%|*} failed with HTTP ${http_code}" ;; esac
-done
+ensure_provider assets test-asset-expired "$expired_asset" ||
+    fail "expired offer asset failed with HTTP ${http_code}"
+ensure_provider policydefinitions expired-usage-policy "$expired_policy" ||
+    fail "expired offer policy failed with HTTP ${http_code}"
+ensure_provider contractdefinitions test-contract-def-expired "$expired_definition" ||
+    fail "expired offer contract definition failed with HTTP ${http_code}"
 ok "expired usage offer ready"
 
 step "Verifying DID documents"
