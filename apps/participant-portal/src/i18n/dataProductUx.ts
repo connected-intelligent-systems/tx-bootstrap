@@ -54,7 +54,6 @@ export const dataProductUxEnglish = {
       standardOffer: 'Standard offer',
       partialLoadError: 'Some related product information could not be loaded.',
       loadingRelated: 'Loading related product information',
-      noTechnicalDetails: 'No additional technical information is available.',
     },
   },
 }
@@ -118,7 +117,6 @@ export const dataProductUxGerman = {
       standardOffer: 'Standardangebot',
       partialLoadError: 'Einige zugehörige Produktinformationen konnten nicht geladen werden.',
       loadingRelated: 'Zugehörige Produktinformationen werden geladen',
-      noTechnicalDetails: 'Keine zusätzlichen technischen Informationen verfügbar.',
     },
   },
 }
