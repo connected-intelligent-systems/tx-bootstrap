@@ -191,8 +191,8 @@ services:
       TX_EDC_IAM_DCP_BDRS_SERVER_URL: "${BDRS_SERVER_URL:?BDRS_SERVER_URL must be set}"
       TX_EDC_IAM_DCP_BDRS_CACHE_VALIDITY: "600"
       TX_EDC_DID_SERVICE_SELF_REGISTRATION_ENABLED: "false"
-      "EDC_IAM_TRUSTED-ISSUER_0-ISSUER_ID": "did:web:${ISSUER_DID_HOST:?ISSUER_DID_HOST must be set}:${BPN_ISSUER:?BPN_ISSUER must be set}"
-      "EDC_IAM_TRUSTED-ISSUER_0-ISSUER_SUPPORTEDTYPES": '["MembershipCredential","FrameworkCredential","BpnCredential","DataExchangeGovernanceCredential","DismantlerCredential"]'
+      "EDC_IAM_TRUSTEDISSUER_0-ISSUER_ID": "did:web:${ISSUER_DID_HOST:?ISSUER_DID_HOST must be set}:${BPN_ISSUER:?BPN_ISSUER must be set}"
+      "EDC_IAM_TRUSTEDISSUER_0-ISSUER_SUPPORTEDTYPES": '["MembershipCredential","FrameworkCredential","BpnCredential","DataExchangeGovernanceCredential","DismantlerCredential"]'
       WEB_HTTP_PORT: "8080"
       WEB_HTTP_PATH: "/api"
       WEB_HTTP_MANAGEMENT_PORT: "8081"
