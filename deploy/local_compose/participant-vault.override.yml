@@ -1,8 +1,13 @@
 # Local-only embedded Vault shared by provider and consumer deployments.
 services:
   vault:
-    image: hashicorp/vault:1.15
+    image: hashicorp/vault:2.0.2
+    # Vault 2.x starts as the vault user. The unseal wrapper needs root to
+    # read the key file vault-init keeps private; the entrypoint still runs
+    # the server itself as vault. The image has no setcap, and mlock is off.
+    user: "0:0"
     environment:
+      SKIP_SETCAP: "true"
       VAULT_ADDR: "http://127.0.0.1:8200"
       VAULT_TOKEN: ${VAULT_TOKEN:?VAULT_TOKEN must be set}
       VAULT_LOCAL_CONFIG: >-
@@ -28,7 +33,7 @@ services:
           - ${PARTICIPANT_ROLE:-participant}-vault
 
   vault-init:
-    image: hashicorp/vault:1.15
+    image: hashicorp/vault:2.0.2
     user: "0:0"
     entrypoint: ["/bin/sh", "/usr/local/bin/local-vault-bootstrap"]
     environment:

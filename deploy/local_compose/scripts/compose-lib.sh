@@ -43,3 +43,28 @@ compose() {
     env ${overrides[@]+"${overrides[@]}"} \
         docker compose --env-file "$ENV_FILE" -f "$compose_file" "$@"
 }
+
+# compose_up <domain>: `up -d --remove-orphans`, restarting once each container
+# whose health check last failed with HTTP 404. EDC-based runtimes (connectors,
+# IdentityHub, BDRS) occasionally start without serving /api/check and answer
+# readiness with 404 until they are restarted.
+compose_up() {
+    local domain="$1" service container output restarted=0
+    compose "$domain" up -d --remove-orphans && return 0
+
+    while read -r service container; do
+        output="$(docker inspect --format '{{json .State.Health.Log}}' "$container" |
+            jq -r 'last.Output // ""' || true)"
+        case "$output" in
+            *"HTTP/1.1 404"*|*"404 Not Found"*)
+                echo "$service answers its readiness check with 404; restarting it once." >&2
+                docker restart "$container" >/dev/null
+                restarted=1
+                ;;
+        esac
+    done < <(compose "$domain" ps --format '{{.Service}} {{.ID}} {{.Health}}' |
+        awk '$3 == "unhealthy" { print $1, $2 }')
+
+    [ "$restarted" = 1 ] || return 1
+    compose "$domain" up -d --remove-orphans
+}

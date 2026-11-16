@@ -106,9 +106,9 @@ spec:
             - name: TX_EDC_IAM_DCP_BDRS_CACHE_VALIDITY
               value: {{ .Values.controlPlane.bdrsCacheValiditySeconds | quote }}
             - { name: TX_EDC_DID_SERVICE_SELF_REGISTRATION_ENABLED, value: "false" }
-            - name: EDC_IAM_TRUSTED-ISSUER_0-ISSUER_ID
+            - name: EDC_IAM_TRUSTEDISSUER_0-ISSUER_ID
               value: {{ include "tx-bootstrap-participant.issuerDid" . | quote }}
-            - name: EDC_IAM_TRUSTED-ISSUER_0-ISSUER_SUPPORTEDTYPES
+            - name: EDC_IAM_TRUSTEDISSUER_0-ISSUER_SUPPORTEDTYPES
               value: {{ .Values.controlPlane.trustedIssuerSupportedTypes | toJson | quote }}
             - { name: WEB_HTTP_PORT, value: "8080" }
             - { name: WEB_HTTP_PATH, value: /api }

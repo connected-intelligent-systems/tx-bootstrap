@@ -157,14 +157,14 @@ if tunnel_enabled; then
     chmod 700 "$(dirname "$TUNNEL_CONSUMER_AUTHKEY")"
     [ -e "$TUNNEL_CONSUMER_AUTHKEY" ] || install -m 600 /dev/null "$TUNNEL_CONSUMER_AUTHKEY"
 fi
-compose operator up -d --remove-orphans
+compose_up operator
 if tunnel_enabled; then
     # The console reaches Headscale and checks tunnelled endpoints publicly.
     connect_public_dns operator operator-console
 fi
-compose provider up -d --remove-orphans
+compose_up provider
 connect_public_dns provider identityhub controlplane dataplane participant-portal-backend federated-catalog
-compose consumer up -d --remove-orphans
+compose_up consumer
 connect_public_dns consumer identityhub controlplane dataplane participant-portal-backend federated-catalog
 
 echo "tx-bootstrap local stack started."
