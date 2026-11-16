@@ -46,12 +46,18 @@ configs:
 
       bootstrap_file="$${VAULT_BOOTSTRAP_FILE:-/vault/bootstrap/credentials}"
 
+      # Fail instead of hanging when Vault never comes up.
       wait_for_vault() {
+          deadline=$$(( $$(date +%s) + $${VAULT_WAIT_SECONDS:-180} ))
           while :; do
               status_json="$$(vault status -format=json 2>/dev/null || true)"
               if [ -n "$$status_json" ]; then
                   printf '%s\n' "$$status_json"
                   return 0
+              fi
+              if [ "$$(date +%s)" -ge "$$deadline" ]; then
+                  echo "Vault at $$VAULT_ADDR did not answer within $${VAULT_WAIT_SECONDS:-180}s" >&2
+                  return 1
               fi
               sleep 1
           done
