@@ -70,6 +70,106 @@ describe("participant approval service automatic checks", () => {
   });
 });
 
+describe("issuer holder registration on approval", () => {
+  const base =
+    "https://issuer.example/api/admin/v1alpha/participants/BPNL000000000099";
+  const did = "did:web:participant.example";
+
+  function mock(holder: Record<string, unknown> | null) {
+    return vi.fn(async (url: string, init?: RequestInit) => {
+      const method = init?.method ?? "GET";
+      if (url === `${base}/holders/BPNL000000000001` && method === "GET")
+        return holder
+          ? new Response(JSON.stringify(holder), { status: 200 })
+          : new Response("", { status: 404 });
+      return new Response("{}", { status: method === "POST" ? 201 : 200 });
+    });
+  }
+
+  async function registration(fetchMock: ReturnType<typeof mock>) {
+    vi.stubGlobal("fetch", fetchMock);
+    const checks = await createService({
+      issuerApiKey: "issuer-secret",
+    }).runApprovalSetup(verifiedCase());
+    const holderWrites = fetchMock.mock.calls
+      .filter(
+        ([url, init]) =>
+          url === `${base}/holders` &&
+          ["POST", "PUT"].includes(init?.method ?? ""),
+      )
+      .map(([, init]) => [init?.method, JSON.parse(String(init?.body))]);
+    return {
+      check: checks.find(
+        (check) => check.name === "issuer-holder-registration",
+      ),
+      holderWrites,
+    };
+  }
+
+  it("registers a new holder", async () => {
+    const { check, holderWrites } = await registration(mock(null));
+
+    expect(check).toMatchObject({ status: "ok" });
+    expect(holderWrites).toEqual([
+      [
+        "POST",
+        {
+          did,
+          holderId: "BPNL000000000001",
+          name: "Example GmbH",
+          properties: {},
+        },
+      ],
+    ]);
+  });
+
+  it("leaves the participant's own active holder alone", async () => {
+    const { check, holderWrites } = await registration(
+      mock({ did, holderName: "Example GmbH", properties: {} }),
+    );
+
+    expect(check).toMatchObject({ status: "ok", message: "Already exists" });
+    expect(holderWrites).toEqual([]);
+  });
+
+  it("takes over the blocked holder of a revoked participant with the same BPN", async () => {
+    const { check, holderWrites } = await registration(
+      mock({
+        did: "did:web:revoked.invalid:BPNL000000000001",
+        holderName: "Old GmbH",
+        properties: {
+          revoked: true,
+          originalDid: "did:web:old.example",
+          region: "eu",
+        },
+      }),
+    );
+
+    expect(check).toMatchObject({ status: "ok" });
+    expect(holderWrites).toEqual([
+      [
+        "PUT",
+        {
+          holderId: "BPNL000000000001",
+          did,
+          name: "Example GmbH",
+          properties: { region: "eu" },
+        },
+      ],
+    ]);
+  });
+
+  it("refuses an active holder with another DID", async () => {
+    const { check, holderWrites } = await registration(
+      mock({ did: "did:web:other.example", properties: {} }),
+    );
+
+    expect(check).toMatchObject({ status: "failed", retryable: false });
+    expect(check?.message).toContain("did:web:other.example");
+    expect(holderWrites).toEqual([]);
+  });
+});
+
 describe("participant revocation", () => {
   const did = "did:web:participant.example:BPNL000000000001";
   const base =
@@ -417,7 +517,7 @@ describe("participant readmission", () => {
   });
 });
 
-function createService() {
+function createService({ issuerApiKey = "" } = {}) {
   return createParticipantApprovalService({
     config: {
       bdrs: {
@@ -430,7 +530,7 @@ function createService() {
         issuanceUrl: "https://issuer.example/api/issuance",
         did: "did:web:issuer.example",
         context: "BPNL000000000099",
-        apiKey: "",
+        apiKey: issuerApiKey,
         apiKeyAlias: "issuer-key",
         apiKeyVaultUrl: "",
         apiKeyVaultToken: "",

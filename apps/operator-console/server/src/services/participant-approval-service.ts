@@ -604,19 +604,80 @@ export function createParticipantApprovalService({
     }
 
     checks.push(
-      await upsertIssuer(
-        "issuer-holder-registration",
-        `/v1alpha/participants/${encodedIssuerContext}/holders`,
-        {
-          did: row.did,
-          holderId: row.bpn,
-          name: row.organization_name,
-          properties: {},
-        },
-        row.bpn,
-      ),
+      await registerIssuerHolder(row.bpn, row.did, row.organization_name),
     );
     return checks;
+  }
+
+  // A BPN can come back: an external BPN is onboarded again, or a participant
+  // that was revoked is approved anew. Its holder still exists at the issuer,
+  // blocked by the revocation, so a plain create answers 409 and the new
+  // participant could never get credentials. A blocked holder is taken over;
+  // an active one with another DID belongs to someone else and stops setup.
+  async function registerIssuerHolder(
+    bpn: string,
+    did: string,
+    organizationName: string,
+  ): Promise<SetupCheck> {
+    const name = "issuer-holder-registration";
+    const path = `${issuerParticipantPath()}/holders`;
+    try {
+      const current = await issuerFetch(
+        "GET",
+        `${path}/${encodeURIComponent(bpn)}`,
+      );
+      if (current.status === 404) {
+        const created = await issuerFetch("POST", path, {
+          did,
+          holderId: bpn,
+          name: organizationName,
+          properties: {},
+        });
+        if (!created.ok && created.status !== 409)
+          return failedResponse(name, created);
+        return { name, status: "ok", message: "Ready" };
+      }
+      if (!current.ok) return failedResponse(name, current);
+      const holder = (await current.json()) as {
+        did?: string;
+        properties?: Record<string, unknown>;
+      };
+      const blocked =
+        holder.properties?.revoked === true ||
+        holder.did === `did:web:revoked.invalid:${bpn}`;
+      if (!blocked && holder.did === did)
+        return { name, status: "ok", message: "Already exists" };
+      if (!blocked)
+        return {
+          name,
+          status: "failed",
+          retryable: false,
+          message: `The issuer already has an active holder for ${bpn} with ${holder.did}. Revoke that participant first.`,
+        };
+      const properties = { ...(holder.properties ?? {}) };
+      delete properties.revoked;
+      delete properties.originalDid;
+      const update = await issuerFetch("PUT", path, {
+        holderId: bpn,
+        did,
+        name: organizationName,
+        properties,
+      });
+      if (!update.ok) return failedResponse(name, update);
+      return {
+        name,
+        status: "ok",
+        message:
+          "Took over the blocked holder of an earlier participant with this BPN; its revoked credentials stay revoked",
+      };
+    } catch (error) {
+      return {
+        name,
+        status: "failed",
+        retryable: true,
+        message: error.message,
+      };
+    }
   }
 
   async function ensureIssuerPolicyClaims(row) {
