@@ -274,8 +274,28 @@ negotiate() {
     done
 }
 
+# Tractus-X EDC stores an agreement's BPNs asynchronously after the negotiation
+# finalizes. A transfer requested before that is refused with "No BPN entry
+# found for agreement"; that refusal is retried once, any other is returned.
+TRANSFER_ATTEMPTS="${TRANSFER_ATTEMPTS:-2}"
+
 # transfer <agreement id>: sets TRANSFER_ID and STATE (STARTED, COMPLETED or TERMINATED).
 transfer() {
+    local attempt=1
+    while :; do
+        transfer_once "$1"
+        if [ "$STATE" = "TERMINATED" ] && [ "$attempt" -lt "$TRANSFER_ATTEMPTS" ] &&
+            jq -r '.errorDetail // .["edc:errorDetail"] // ""' "$TMPDIR/transfer_status.json" | grep -q "No BPN entry found for agreement"; then
+            warn "transfer ${TRANSFER_ID} was refused before the provider stored the agreement BPNs; retrying (attempt $((attempt + 1)) of ${TRANSFER_ATTEMPTS})"
+            attempt=$((attempt + 1))
+            sleep 3
+            continue
+        fi
+        return 0
+    done
+}
+
+transfer_once() {
     local elapsed=0
     jq -n --arg dsp "$PROVIDER_DSP_ADDRESS" --arg did "$PROVIDER_DID" --arg protocol "$PROTOCOL" --arg contract "$1" '{
       "@context": {"@vocab": "https://w3id.org/edc/v0.0.1/ns/"},
