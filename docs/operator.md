@@ -121,11 +121,17 @@ Expose the onboarding API and issuer gateway through HTTPS:
 | Route                                        | Purpose                |
 | -------------------------------------------- | ---------------------- |
 | `/api/onboarding-cases*`                     | Participant onboarding |
+| `/api/network/participants`                  | Participant directory  |
 | `/.well-known/did.json` and issuer DID paths | Identity resolution    |
 | `/statuslist/*`                              | Credential status      |
 | `/api/issuance/*`                            | Credential issuance    |
 | `/api/directory/*`                           | BPN-to-DID lookup      |
 | `/.well-known/api/*`                         | Service discovery      |
+
+Participant portals and federated catalogs read the directory from
+`ONBOARDING_DATASPACE_ADMIN_API_URL`, which points at this host's `/api`. A
+proxy that routes only the onboarding cases to the onboarding service leaves
+them without other participants.
 
 Keep the console, BDRS management, issuer administration, Vault, and PostgreSQL
 on administrative networks. The console supports `api-key` authentication or
