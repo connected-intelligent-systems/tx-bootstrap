@@ -78,6 +78,11 @@ services:
 configs:
   nginx-participant-local-portal:
     content: |
+      upstream internal_gateway {
+          zone internal_gateway 64k;
+          resolver 127.0.0.11 valid=5s ipv6=off;
+          server internal-gateway:80 resolve;
+      }
       server {
           listen 80;
           server_name _;
@@ -86,7 +91,7 @@ configs:
               auth_basic "Participant portal";
               auth_basic_user_file /etc/nginx/auth/users;
 
-              proxy_pass http://internal-gateway;
+              proxy_pass http://internal_gateway;
               proxy_http_version 1.1;
               proxy_set_header Host $$host;
               proxy_set_header X-Real-IP $$remote_addr;
@@ -105,12 +110,17 @@ configs:
 
   nginx-participant-local-api:
     content: |
+      upstream internal_gateway {
+          zone internal_gateway 64k;
+          resolver 127.0.0.11 valid=5s ipv6=off;
+          server internal-gateway:80 resolve;
+      }
       server {
           listen 80;
           server_name _;
 
           location = /api/openapi.json {
-              proxy_pass http://internal-gateway;
+              proxy_pass http://internal_gateway;
               proxy_http_version 1.1;
               proxy_set_header Host $$host;
               proxy_set_header X-Real-IP $$remote_addr;
@@ -126,7 +136,7 @@ configs:
 
           location ^~ /api/data/ {
               client_max_body_size ${PARTICIPANT_PORTAL_DATA_PROXY_MAX_REQUEST_BYTES:-52428800};
-              proxy_pass http://internal-gateway;
+              proxy_pass http://internal_gateway;
               proxy_http_version 1.1;
               proxy_request_buffering off;
               proxy_buffering off;
@@ -144,7 +154,7 @@ configs:
           }
 
           location = /api/management {
-              proxy_pass http://internal-gateway;
+              proxy_pass http://internal_gateway;
               proxy_http_version 1.1;
               proxy_set_header Host $$host;
               proxy_set_header X-Real-IP $$remote_addr;
@@ -158,7 +168,7 @@ configs:
           }
 
           location ^~ /api/management/ {
-              proxy_pass http://internal-gateway;
+              proxy_pass http://internal_gateway;
               proxy_http_version 1.1;
               proxy_set_header Host $$host;
               proxy_set_header X-Real-IP $$remote_addr;
@@ -172,7 +182,7 @@ configs:
           }
 
           location = /api/federated-catalog {
-              proxy_pass http://internal-gateway;
+              proxy_pass http://internal_gateway;
               proxy_http_version 1.1;
               proxy_set_header Host $$host;
               proxy_set_header X-Real-IP $$remote_addr;
@@ -186,7 +196,7 @@ configs:
           }
 
           location ^~ /api/federated-catalog/ {
-              proxy_pass http://internal-gateway;
+              proxy_pass http://internal_gateway;
               proxy_http_version 1.1;
               proxy_set_header Host $$host;
               proxy_set_header X-Real-IP $$remote_addr;

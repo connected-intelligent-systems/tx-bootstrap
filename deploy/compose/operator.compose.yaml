@@ -435,37 +435,64 @@ configs:
       org.eclipse.edc.level=INFO
   nginx-issuer-did:
     content: |
+      # Upstreams resolve at runtime, so a recreated issuerservice or BDRS is
+      # reached without restarting this proxy.
+      upstream issuer_status_list {
+          zone issuer_status_list 64k;
+          resolver 127.0.0.11 valid=5s ipv6=off;
+          server issuerservice:8088 resolve;
+      }
+      upstream issuer_issuance {
+          zone issuer_issuance 64k;
+          resolver 127.0.0.11 valid=5s ipv6=off;
+          server issuerservice:8082 resolve;
+      }
+      upstream issuer_well_known {
+          zone issuer_well_known 64k;
+          resolver 127.0.0.11 valid=5s ipv6=off;
+          server issuerservice:8084 resolve;
+      }
+      upstream bdrs_directory {
+          zone bdrs_directory 64k;
+          resolver 127.0.0.11 valid=5s ipv6=off;
+          server bdrs-server:8082 resolve;
+      }
+      upstream issuer_did {
+          zone issuer_did 64k;
+          resolver 127.0.0.11 valid=5s ipv6=off;
+          server issuerservice:8083 resolve;
+      }
       server {
           listen 80;
           server_name _;
 
           location /statuslist/ {
-              proxy_pass http://issuerservice:8088/statuslist/;
+              proxy_pass http://issuer_status_list/statuslist/;
               proxy_set_header Host $$host;
               proxy_set_header Accept application/json;
               proxy_set_header X-Real-IP $$remote_addr;
           }
 
           location /api/issuance/ {
-              proxy_pass http://issuerservice:8082/api/issuance/;
+              proxy_pass http://issuer_issuance/api/issuance/;
               proxy_set_header Host $$host;
               proxy_set_header X-Real-IP $$remote_addr;
           }
 
           location /.well-known/api/ {
-              proxy_pass http://issuerservice:8084/.well-known/api/;
+              proxy_pass http://issuer_well_known/.well-known/api/;
               proxy_set_header Host $$host;
               proxy_set_header X-Real-IP $$remote_addr;
           }
 
           location /api/directory/ {
-              proxy_pass http://bdrs-server:8082/api/directory/;
+              proxy_pass http://bdrs_directory/api/directory/;
               proxy_set_header Host $$host;
               proxy_set_header X-Real-IP $$remote_addr;
           }
 
           location / {
-              proxy_pass http://issuerservice:8083;
+              proxy_pass http://issuer_did;
               proxy_set_header Host $$host;
               proxy_set_header X-Real-IP $$remote_addr;
           }
