@@ -159,14 +159,30 @@ describe("issuer holder registration on approval", () => {
     ]);
   });
 
-  it("refuses an active holder with another DID", async () => {
+  it("moves an active holder with another DID to the new DID", async () => {
     const { check, holderWrites } = await registration(
-      mock({ did: "did:web:other.example", properties: {} }),
+      mock({
+        did: "did:web:old.example",
+        holderName: "Example GmbH",
+        properties: { region: "eu" },
+      }),
     );
 
-    expect(check).toMatchObject({ status: "failed", retryable: false });
-    expect(check?.message).toContain("did:web:other.example");
-    expect(holderWrites).toEqual([]);
+    expect(check).toMatchObject({
+      status: "ok",
+      message: `Holder moved from did:web:old.example to ${did}`,
+    });
+    expect(holderWrites).toEqual([
+      [
+        "PUT",
+        {
+          holderId: "BPNL000000000001",
+          did,
+          name: "Example GmbH",
+          properties: { region: "eu" },
+        },
+      ],
+    ]);
   });
 });
 

@@ -609,11 +609,22 @@ export function createParticipantApprovalService({
     return checks;
   }
 
-  // A BPN can come back: an external BPN is onboarded again, or a participant
-  // that was revoked is approved anew. Its holder still exists at the issuer,
-  // blocked by the revocation, so a plain create answers 409 and the new
-  // participant could never get credentials. A blocked holder is taken over;
-  // an active one with another DID belongs to someone else and stops setup.
+  function isBlockedHolder(
+    bpn: string,
+    holder: { did?: string; properties?: Record<string, unknown> },
+  ) {
+    return (
+      holder.properties?.revoked === true ||
+      holder.did === `did:web:revoked.invalid:${bpn}`
+    );
+  }
+
+  // A BPN can come back: an external BPN is onboarded again, a revoked
+  // participant is approved anew, or a participant moves to another DID. The
+  // holder still exists at the issuer, blocked by a revocation or with the old
+  // DID, so a plain create answers 409 and the participant could never get
+  // credentials. The case's business partner is verified for this BPN and BDRS
+  // already maps the BPN to the new DID, so the holder follows it.
   async function registerIssuerHolder(
     bpn: string,
     did: string,
@@ -642,18 +653,9 @@ export function createParticipantApprovalService({
         did?: string;
         properties?: Record<string, unknown>;
       };
-      const blocked =
-        holder.properties?.revoked === true ||
-        holder.did === `did:web:revoked.invalid:${bpn}`;
+      const blocked = isBlockedHolder(bpn, holder);
       if (!blocked && holder.did === did)
         return { name, status: "ok", message: "Already exists" };
-      if (!blocked)
-        return {
-          name,
-          status: "failed",
-          retryable: false,
-          message: `The issuer already has an active holder for ${bpn} with ${holder.did}. Revoke that participant first.`,
-        };
       const properties = { ...(holder.properties ?? {}) };
       delete properties.revoked;
       delete properties.originalDid;
@@ -667,8 +669,9 @@ export function createParticipantApprovalService({
       return {
         name,
         status: "ok",
-        message:
-          "Took over the blocked holder of an earlier participant with this BPN; its revoked credentials stay revoked",
+        message: blocked
+          ? "Took over the blocked holder of an earlier participant with this BPN; its revoked credentials stay revoked"
+          : `Holder moved from ${holder.did} to ${did}`,
       };
     } catch (error) {
       return {
