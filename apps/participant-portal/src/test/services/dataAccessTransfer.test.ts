@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
-import { dataAccessState, HTTP_PULL, startDataAccess } from '../../services/dataAccessTransfer'
+import {
+  dataAccessState,
+  HTTP_PULL,
+  refusedBeforeAgreementBpns,
+  startDataAccess,
+} from '../../services/dataAccessTransfer'
 import type { DataAccessLifecycleRecord } from '../../types/dataAccess'
 import type { TransferProcess } from '../../types/transferProcess'
 
@@ -22,6 +27,14 @@ describe('data access transfer', () => {
     expect(dataAccessState(transfer('TERMINATED'))).toBe('none')
     expect(dataAccessState(transfer('COMPLETED'))).toBe('none')
     expect(dataAccessState(transfer('FAILED'))).toBe('failed')
+  })
+
+  it('recognizes a transfer refused before the provider stored the agreement BPNs', () => {
+    const refused = '[{"@value":"No BPN entry found for agreement cb4157cd-6add-450f-bf4d-e15b377d55fe"}]'
+    expect(refusedBeforeAgreementBpns(transfer('TERMINATED', refused))).toBe(true)
+    expect(refusedBeforeAgreementBpns(transfer('TERMINATED', '{"reason":["refused"]}'))).toBe(false)
+    expect(refusedBeforeAgreementBpns(transfer('STARTED'))).toBe(false)
+    expect(refusedBeforeAgreementBpns(undefined)).toBe(false)
   })
 
   it('starts an HTTP-pull transfer for the agreement', async () => {
