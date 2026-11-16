@@ -340,3 +340,42 @@ async def test_manual_refresh_wakes_the_crawler_and_has_a_cooldown(tmp_path) -> 
         await crawler.close()
         await task
     await client.aclose()
+
+
+@pytest.mark.asyncio
+async def test_manual_refresh_during_a_running_crawl_is_not_lost(tmp_path) -> None:
+    configured = settings(tmp_path)
+    store = CatalogStore(configured.store_path, 1800)
+    provider = Participant("Provider", "BPNL-PROVIDER", "did:web:provider", "https://provider.example/dsp")
+    catalog_requests = 0
+    first_request_seen = asyncio.Event()
+    release_first_request = asyncio.Event()
+    second_request_seen = asyncio.Event()
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal catalog_requests
+        if request.method == "GET":
+            return directory_response(provider)
+        if request.url.path.endswith("/catalog/request"):
+            catalog_requests += 1
+            if catalog_requests == 1:
+                first_request_seen.set()
+                await release_first_request.wait()
+            else:
+                second_request_seen.set()
+            return httpx.Response(200, json={"@context": context(), "dcat:dataset": []})
+        return httpx.Response(404)
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    crawler = CatalogCrawler(configured, store, client)
+    task = asyncio.create_task(crawler.run())
+    try:
+        await asyncio.wait_for(first_request_seen.wait(), timeout=10)
+        # The refresh arrives while the first crawl is still waiting for its answer.
+        assert await crawler.request_refresh(provider.bpn) == [provider.bpn]
+        release_first_request.set()
+        await asyncio.wait_for(second_request_seen.wait(), timeout=10)
+    finally:
+        await crawler.close()
+        await task
+    await client.aclose()
