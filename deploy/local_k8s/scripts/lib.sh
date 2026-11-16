@@ -32,21 +32,24 @@ detect_ingress_ip() {
         --output 'jsonpath={.status.loadBalancer.ingress[0].ip}' 2>/dev/null || true
 }
 
-# Hostnames and DIDs contain the address, so a deployment keeps the address it
-# was installed with until down.sh --volumes removes its state.
+# Sets LOCAL_K8S_INGRESS_IP unless the environment does. Hostnames and DIDs
+# contain the address, so a deployment keeps the address it was installed with
+# until down.sh --volumes removes its state.
 INGRESS_IP_FILE="$GENERATED_DIR/ingress-ip"
-if [ -z "${LOCAL_K8S_INGRESS_IP:-}" ] && [ -s "$INGRESS_IP_FILE" ]; then
-    LOCAL_K8S_INGRESS_IP="$(cat "$INGRESS_IP_FILE")"
-fi
-if [ -z "${LOCAL_K8S_INGRESS_IP:-}" ]; then
-    LOCAL_K8S_INGRESS_IP="$(detect_ingress_ip)"
-    if [ -z "$LOCAL_K8S_INGRESS_IP" ]; then
-        echo "Cannot read the ingress address from the Traefik service in context '$KUBE_CONTEXT'." >&2
-        echo "Enable Kubernetes and Traefik in Rancher Desktop, or set LOCAL_K8S_INGRESS_IP." >&2
-        exit 1
+resolve_ingress_ip() {
+    if [ -z "${LOCAL_K8S_INGRESS_IP:-}" ] && [ -s "$INGRESS_IP_FILE" ]; then
+        LOCAL_K8S_INGRESS_IP="$(cat "$INGRESS_IP_FILE")"
     fi
-    printf "%s\n" "$LOCAL_K8S_INGRESS_IP" >"$INGRESS_IP_FILE"
-fi
+    if [ -z "${LOCAL_K8S_INGRESS_IP:-}" ]; then
+        LOCAL_K8S_INGRESS_IP="$(detect_ingress_ip)"
+        if [ -z "$LOCAL_K8S_INGRESS_IP" ]; then
+            echo "Cannot read the ingress address from the Traefik service in context '$KUBE_CONTEXT'." >&2
+            echo "Enable Kubernetes and Traefik in Rancher Desktop, or set LOCAL_K8S_INGRESS_IP." >&2
+            exit 1
+        fi
+        printf "%s\n" "$LOCAL_K8S_INGRESS_IP" >"$INGRESS_IP_FILE"
+    fi
+}
 
 require_command() {
     command -v "$1" >/dev/null 2>&1 || {
@@ -75,6 +78,7 @@ render_values() {
     local source_file="$1"
     local target_file="$2"
 
+    resolve_ingress_ip
     sed \
         -e "s/__INGRESS_IP__/${LOCAL_K8S_INGRESS_IP}/g" \
         -e "s/__BPN_ISSUER__/${BPN_ISSUER}/g" \

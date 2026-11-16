@@ -6,6 +6,7 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib.sh"
 
 require_commands curl jq kubectl
 check_context
+resolve_ingress_ip
 
 for namespace in tx-operator tx-provider tx-consumer; do
     kubectl --context "$KUBE_CONTEXT" \
