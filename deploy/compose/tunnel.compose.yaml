@@ -4,7 +4,7 @@
 #
 #   <name>.${TUNNEL_DOMAIN}:443 ──▶ traefik (TLS passthrough, routes by SNI)
 #                                ──▶ tunnel-router (nginx stream in tunnel-node)
-#                                ──▶ <name>.<MagicDNS domain>:18443 over WireGuard
+#                                ──▶ participant's tailnet address:18443 over WireGuard
 #                                ──▶ participant's own TLS endpoint
 #
 # The ingress never decrypts participant traffic and holds no certificates:
@@ -32,7 +32,10 @@ x-runtime-defaults: &runtime-defaults
 
 services:
   # The ingress's own WireGuard peer. Kernel mode so the router sharing its
-  # network namespace can reach tailnet addresses and MagicDNS (100.100.100.100).
+  # network namespace can reach tailnet addresses. MagicDNS stays off: routes
+  # carry node addresses, and Tailscale's resolver would replace Docker's
+  # (ndots:0), so the console name would first be tried with the host's search
+  # domains and route refreshes could time out.
   # The key is only used for the first start; the node identity then lives in
   # the tunnel-node-state volume.
   tunnel-node:
@@ -45,7 +48,7 @@ services:
       TS_HOSTNAME: ${TUNNEL_INGRESS_HOSTNAME:-txb-ingress}
       TS_STATE_DIR: /var/lib/tailscale
       TS_USERSPACE: "false"
-      TS_ACCEPT_DNS: "true"
+      TS_ACCEPT_DNS: "false"
       TS_EXTRA_ARGS: --login-server=${TUNNEL_HEADSCALE_URL:?TUNNEL_HEADSCALE_URL must be set} --accept-routes=false --ssh=false
       # Fixed WireGuard port, published below, so participants behind NAT
       # connect directly instead of through a DERP relay.
