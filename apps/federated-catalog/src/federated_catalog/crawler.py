@@ -35,6 +35,9 @@ class CatalogCrawler:
         self.next_crawl: dict[str, float] = {}
         self.failures: dict[str, int] = {}
         self.manual_refresh_at: dict[str, float] = {}
+        # Manual refreshes not yet served by a crawl that started after them. A
+        # crawl already running when the refresh came in does not count.
+        self.pending_refresh: set[str] = set()
         self.wake = asyncio.Event()
 
     async def close(self) -> None:
@@ -91,6 +94,7 @@ class CatalogCrawler:
             self.manual_refresh_at[candidate] = now
             self.failures[candidate] = 0
             self.next_crawl[candidate] = 0
+            self.pending_refresh.add(candidate)
             scheduled.append(candidate)
         if scheduled:
             self.wake.set()
@@ -105,6 +109,7 @@ class CatalogCrawler:
         for schedule in (self.next_crawl, self.failures, self.manual_refresh_at):
             for bpn in [bpn for bpn in schedule if bpn not in listed]:
                 del schedule[bpn]
+        self.pending_refresh &= listed
         now = asyncio.get_running_loop().time()
         due = [participant for participant in participants if now >= self.next_crawl.get(participant.bpn, 0)]
         semaphore = asyncio.Semaphore(self.settings.crawl_concurrency)
@@ -174,6 +179,7 @@ class CatalogCrawler:
         status = self.store.get_status(participant.bpn) or CrawlStatus(participant=participant)
         status.participant = participant
         status.last_attempt_at = iso(utc_now())
+        self.pending_refresh.discard(participant.bpn)
         records: list[DatasetRecord] = []
         rdf_documents: list[str] = []
         degraded = False
@@ -233,6 +239,9 @@ class CatalogCrawler:
             failures = self.failures.get(participant.bpn, 0) + 1
             self.failures[participant.bpn] = failures
             self.next_crawl[participant.bpn] = asyncio.get_running_loop().time() + self.retry_delay(failures)
+        if participant.bpn in self.pending_refresh:
+            # Refreshed while this crawl was running: crawl again right away.
+            self.next_crawl[participant.bpn] = 0
 
     def retry_delay(self, failures: int) -> float:
         """Seconds until the next attempt after consecutive failures.
