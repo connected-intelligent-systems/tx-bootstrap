@@ -606,7 +606,7 @@ wheels = [
 
 [[package]]
 name = "tx-bootstrap-federated-catalog"
-version = "0.5.2"
+version = "0.5.3"
 source = { editable = "." }
 dependencies = [
     { name = "fastapi" },
