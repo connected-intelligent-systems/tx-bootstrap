@@ -33,6 +33,15 @@ export function dataAccessState(transfer?: TransferProcess): DataAccessState {
   return 'preparing'
 }
 
+// Tractus-X EDC stores an agreement's BPNs asynchronously once the negotiation
+// finalizes. A transfer requested before that is refused with this error,
+// although a new transfer on the same agreement succeeds a moment later.
+const AGREEMENT_BPNS_PENDING = 'No BPN entry found for agreement'
+
+export function refusedBeforeAgreementBpns(transfer?: TransferProcess): boolean {
+  return dataAccessState(transfer) === 'failed' && Boolean(transfer?.errorDetail?.includes(AGREEMENT_BPNS_PENDING))
+}
+
 type TransferCreator = {
   create: (resource: string, params: { data: Record<string, unknown> }) => Promise<{ data: { id?: unknown } }>
 }

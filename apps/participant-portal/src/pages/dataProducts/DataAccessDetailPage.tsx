@@ -41,7 +41,12 @@ import {
 } from '../../components/datasets/DatasetAccessOverview'
 import { lifecycleStatusTone } from '../../services/dataAccessRoutes'
 import { edcErrorReason } from '../../services/dataProductViewModels'
-import { dataAccessState, PUSH_TRANSFER_TYPES, startDataAccess } from '../../services/dataAccessTransfer'
+import {
+  dataAccessState,
+  PUSH_TRANSFER_TYPES,
+  refusedBeforeAgreementBpns,
+  startDataAccess,
+} from '../../services/dataAccessTransfer'
 import { TransferAccessPanel } from './TransferAccessDetailsDialog'
 import { DataAccessAgreementsList, DataAccessNegotiationsList, DataAccessTransfersList } from './DataAccessRelatedLists'
 
@@ -69,6 +74,7 @@ export const DataAccessDetailPage = () => {
   const navigate = useNavigate()
   const [starting, setStarting] = useState(false)
   const autoStartHandled = useRef(false)
+  const bpnsRetried = useRef(new Set<string>())
   const [searchParams, setSearchParams] = useSearchParams()
   const requestedTab = searchParams.get('tab')
   const [tab, setTab] = useState<DetailTab>(requestedTab || 'overview')
@@ -110,6 +116,19 @@ export const DataAccessDetailPage = () => {
     navigate({ pathname: location.pathname, search: location.search }, { replace: true, state: null })
     if (lifecycleForDataset.canUseData && ['none', 'failed'].includes(accessState)) void startAccess()
   }, [accessState, lifecycleForDataset, location.pathname, location.search, navigate, startAccess, startRequested])
+
+  // A provider can refuse a transfer requested right after the agreement, before
+  // it has stored the agreement's BPNs. Start it once more for that agreement.
+  useEffect(() => {
+    const agreementId = lifecycleForDataset?.agreementId
+    if (!agreementId || bpnsRetried.current.has(agreementId)) return undefined
+    if (!refusedBeforeAgreementBpns(lifecycleForDataset.accessTransfer)) return undefined
+    const timer = window.setTimeout(() => {
+      bpnsRetried.current.add(agreementId)
+      void startAccess()
+    }, 2000)
+    return () => window.clearTimeout(timer)
+  }, [lifecycleForDataset, startAccess])
   const datasetCatalogUrl = lifecycleForDataset?.catalogUrl || lifecycleForDataset?.counterPartyAddress
   const datasetResourceId =
     datasetCatalogUrl && lifecycleForDataset?.assetId
