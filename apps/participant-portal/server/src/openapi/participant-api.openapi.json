@@ -2715,6 +2715,107 @@
         "x-required-scope": "federated-catalog:read"
       }
     },
+    "/api/federated-catalog/v1/refresh": {
+      "post": {
+        "tags": ["Federated Catalog"],
+        "summary": "Refresh all partner catalogs now",
+        "description": "Schedules an immediate crawl of all active participants instead of waiting for their next refresh. Participants refreshed within the last 30 seconds are skipped. The crawls run in the background; poll the participant crawl state for the results.",
+        "operationId": "refreshFederatedCatalog",
+        "responses": {
+          "202": {
+            "description": "Participants scheduled for a crawl.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FederatedRefreshResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A valid API-client token is required.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "403": {
+            "description": "The API client does not have the required scope.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "404": {
+            "description": "The operation or resource is not exposed by this participant.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          }
+        },
+        "security": [{ "apiClientToken": [] }],
+        "x-required-scope": "federated-catalog:read"
+      }
+    },
+    "/api/federated-catalog/v1/participants/{bpn}/refresh": {
+      "post": {
+        "tags": ["Federated Catalog"],
+        "summary": "Refresh one partner's catalog now",
+        "description": "Schedules an immediate crawl of one participant, for example to retry after an error. A participant refreshed within the last 30 seconds is not scheduled again.",
+        "operationId": "refreshFederatedCatalogParticipant",
+        "parameters": [
+          {
+            "name": "bpn",
+            "in": "path",
+            "required": true,
+            "description": "Business partner number of the participant.",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Participants scheduled for a crawl.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FederatedRefreshResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A valid API-client token is required.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "403": {
+            "description": "The API client does not have the required scope.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          },
+          "404": {
+            "description": "The operation or resource is not exposed by this participant.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GatewayError" }
+              }
+            }
+          }
+        },
+        "security": [{ "apiClientToken": [] }],
+        "x-required-scope": "federated-catalog:read"
+      }
+    },
     "/api/federated-catalog/v1/sparql": {
       "get": {
         "tags": ["Federated Catalog SPARQL"],
@@ -5051,6 +5152,17 @@
           },
           "active": { "type": "boolean" },
           "stale": { "type": "boolean" }
+        }
+      },
+      "FederatedRefreshResult": {
+        "type": "object",
+        "required": ["scheduled"],
+        "properties": {
+          "scheduled": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "BPNs of the participants scheduled for a crawl."
+          }
         }
       },
       "FederatedParticipantPage": {

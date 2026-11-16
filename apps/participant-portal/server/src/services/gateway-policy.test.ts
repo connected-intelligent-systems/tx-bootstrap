@@ -29,6 +29,10 @@ describe('participant gateway policy', () => {
   it('separates REST search from SPARQL scopes', () => {
     expect(federatedCatalogScope('GET', '/api/federated-catalog/v1/datasets?q=mobility')).toBe('federated-catalog:read')
     expect(federatedCatalogScope('POST', '/api/federated-catalog/v1/sparql')).toBe('federated-catalog:sparql')
+    expect(federatedCatalogScope('POST', '/api/federated-catalog/v1/refresh')).toBe('federated-catalog:read')
+    expect(federatedCatalogScope('POST', '/api/federated-catalog/v1/participants/BPNL1/refresh')).toBe(
+      'federated-catalog:read',
+    )
     expect(federatedCatalogScope('DELETE', '/api/federated-catalog/v1/datasets/id')).toBeNull()
   })
 })

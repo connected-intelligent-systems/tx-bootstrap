@@ -1,3 +1,4 @@
+import asyncio
 import json
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -233,4 +234,109 @@ async def test_malformed_dsp_endpoint_does_not_stop_directory_sync(tmp_path) -> 
     malformed = Participant("Bad", "BPNL-BAD", "did:web:bad", "https://bad.example/{dsp}")
     await crawler.synchronize_directory([malformed, *participants])
     assert [status.participant.bpn for status in store.statuses()] == ["BPNL-GOOD"]
+    await client.aclose()
+
+
+def directory_response(*participants: Participant) -> httpx.Response:
+    return httpx.Response(200, json={"participants": [participant.public_dict() for participant in participants]})
+
+
+@pytest.mark.asyncio
+async def test_failed_crawl_is_retried_quickly_and_then_backs_off(tmp_path) -> None:
+    configured = settings(tmp_path, retry_seconds=60, crawl_interval_seconds=900)
+    store = CatalogStore(configured.store_path, 1800)
+    provider = Participant("Provider", "BPNL-PROVIDER", "did:web:provider", "https://provider.example/dsp")
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        raise httpx.RemoteProtocolError("Server disconnected without sending a response.", request=request)
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    crawler = CatalogCrawler(configured, store, client)
+    delays = []
+    for _ in range(4):
+        before = asyncio.get_running_loop().time()
+        await crawler.crawl_participant(provider)
+        delays.append(round(crawler.next_crawl[provider.bpn] - before))
+
+    assert delays == [60, 900, 1800, 3600]
+    status = store.get_status(provider.bpn)
+    assert status is not None and status.last_error == "Upstream request failed (RemoteProtocolError)"
+    await client.aclose()
+
+
+@pytest.mark.asyncio
+async def test_run_loop_retries_a_failed_crawl_without_waiting_for_the_directory(tmp_path) -> None:
+    configured = settings(tmp_path, retry_seconds=1, directory_interval_seconds=300)
+    store = CatalogStore(configured.store_path, 1800)
+    provider = Participant("Provider", "BPNL-PROVIDER", "did:web:provider", "https://provider.example/dsp")
+    catalog_requests = 0
+    retried = asyncio.Event()
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal catalog_requests
+        if request.method == "GET":
+            return directory_response(provider)
+        if request.url.path.endswith("/catalog/request"):
+            catalog_requests += 1
+            if catalog_requests == 1:
+                raise httpx.ConnectError("Connection refused", request=request)
+            retried.set()
+            return httpx.Response(200, json={"@context": context(), "dcat:dataset": [dataset("one")]})
+        return httpx.Response(404)
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    crawler = CatalogCrawler(configured, store, client)
+    task = asyncio.create_task(crawler.run())
+    try:
+        await asyncio.wait_for(retried.wait(), timeout=10)
+    finally:
+        # The loop finishes the running crawl before it stops.
+        await crawler.close()
+        await task
+    status = store.get_status(provider.bpn)
+    assert status is not None and status.state == "fresh"
+    assert catalog_requests == 2
+    await client.aclose()
+
+
+@pytest.mark.asyncio
+async def test_manual_refresh_wakes_the_crawler_and_has_a_cooldown(tmp_path) -> None:
+    configured = settings(tmp_path, manual_refresh_cooldown_seconds=30)
+    store = CatalogStore(configured.store_path, 1800)
+    provider = Participant("Provider", "BPNL-PROVIDER", "did:web:provider", "https://provider.example/dsp")
+    consumer = Participant("Consumer", "BPNL-CONSUMER", "did:web:consumer", "https://consumer.example/dsp")
+    catalog_requests: list[str] = []
+    requested = asyncio.Event()
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        if request.method == "GET":
+            return directory_response(provider, consumer)
+        if request.url.path.endswith("/catalog/request"):
+            catalog_requests.append(json.loads(request.content)["counterPartyId"])
+            requested.set()
+            return httpx.Response(200, json={"@context": context(), "dcat:dataset": []})
+        return httpx.Response(404)
+
+    async def requests_reach(count: int) -> None:
+        while len(catalog_requests) < count:
+            requested.clear()
+            await requested.wait()
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    crawler = CatalogCrawler(configured, store, client)
+    task = asyncio.create_task(crawler.run())
+    try:
+        async with asyncio.timeout(10):
+            await requests_reach(2)
+            # Both were just crawled; the next regular crawl is 15 minutes away.
+            assert await crawler.request_refresh(provider.bpn) == [provider.bpn]
+            await requests_reach(3)
+        assert catalog_requests[2] == "did:web:provider"
+        assert await crawler.request_refresh(provider.bpn) == []
+        assert await crawler.request_refresh() == [consumer.bpn]
+        with pytest.raises(KeyError):
+            await crawler.request_refresh("BPNL-UNKNOWN")
+    finally:
+        await crawler.close()
+        await task
     await client.aclose()
