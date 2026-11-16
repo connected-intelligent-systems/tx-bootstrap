@@ -604,19 +604,83 @@ export function createParticipantApprovalService({
     }
 
     checks.push(
-      await upsertIssuer(
-        "issuer-holder-registration",
-        `/v1alpha/participants/${encodedIssuerContext}/holders`,
-        {
-          did: row.did,
-          holderId: row.bpn,
-          name: row.organization_name,
-          properties: {},
-        },
-        row.bpn,
-      ),
+      await registerIssuerHolder(row.bpn, row.did, row.organization_name),
     );
     return checks;
+  }
+
+  function isBlockedHolder(
+    bpn: string,
+    holder: { did?: string; properties?: Record<string, unknown> },
+  ) {
+    return (
+      holder.properties?.revoked === true ||
+      holder.did === `did:web:revoked.invalid:${bpn}`
+    );
+  }
+
+  // A BPN can come back: an external BPN is onboarded again, a revoked
+  // participant is approved anew, or a participant moves to another DID. The
+  // holder still exists at the issuer, blocked by a revocation or with the old
+  // DID, so a plain create answers 409 and the participant could never get
+  // credentials. The case's business partner is verified for this BPN and BDRS
+  // already maps the BPN to the new DID, so the holder follows it.
+  async function registerIssuerHolder(
+    bpn: string,
+    did: string,
+    organizationName: string,
+  ): Promise<SetupCheck> {
+    const name = "issuer-holder-registration";
+    const path = `${issuerParticipantPath()}/holders`;
+    try {
+      const current = await issuerFetch(
+        "GET",
+        `${path}/${encodeURIComponent(bpn)}`,
+      );
+      if (current.status === 404) {
+        const created = await issuerFetch("POST", path, {
+          did,
+          holderId: bpn,
+          name: organizationName,
+          properties: {},
+        });
+        if (!created.ok && created.status !== 409)
+          return failedResponse(name, created);
+        return { name, status: "ok", message: "Ready" };
+      }
+      if (!current.ok) return failedResponse(name, current);
+      const holder = (await current.json()) as {
+        did?: string;
+        properties?: Record<string, unknown>;
+      };
+      const blocked = isBlockedHolder(bpn, holder);
+      if (!blocked && holder.did === did)
+        return { name, status: "ok", message: "Already exists" };
+      const properties = { ...(holder.properties ?? {}) };
+      delete properties.revoked;
+      delete properties.originalDid;
+      const update = await issuerFetch("PUT", path, {
+        holderId: bpn,
+        did,
+        name: organizationName,
+        properties,
+      });
+      if (!update.ok) return failedResponse(name, update);
+      return {
+        name,
+        status: "ok",
+        message: blocked
+          ? "Took over the blocked holder of an earlier participant with this BPN; its revoked credentials stay revoked"
+          : `Holder moved from ${holder.did} to ${did}`,
+      };
+    } catch (error) {
+      return {
+        name,
+        status: "failed",
+        retryable: true,
+        message: error.message,
+      };
+    }
   }
 
   async function ensureIssuerPolicyClaims(row) {

@@ -1,6 +1,18 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useLocale, useTranslate } from 'react-admin'
-import { Alert, Box, Button, FormControl, InputLabel, MenuItem, Pagination, Select, TextField } from '@mui/material'
+import RefreshIcon from '@mui/icons-material/Refresh'
+import {
+  Alert,
+  Box,
+  Button,
+  CircularProgress,
+  FormControl,
+  InputLabel,
+  MenuItem,
+  Pagination,
+  Select,
+  TextField,
+} from '@mui/material'
 import { DEFAULT_CATEGORIES, DEFAULT_MEDIA_TYPES } from '../../config'
 import type { DiscoveredDataProduct } from '../../types/dataProduct'
 import { toDiscoveredDataProduct } from '../../services/dataProductViewModels'
@@ -9,12 +21,34 @@ import { ContractNegotiationDialog } from '../catalogs/ContractNegotiationDialog
 import { parseDatasetFromJsonLd } from '../../dataProvider/resources/catalog/transformer'
 import {
   getFederatedCatalogParticipants,
+  refreshFederatedCatalog,
   searchFederatedCatalog,
   type ParticipantCrawlStatus,
 } from '../../services/federatedCatalogService'
 import { DiscoverDataProductCard } from './DiscoverDataProductCard'
 
 const pageSize = 20
+const refreshPollMs = 2000
+const refreshTimeoutMs = 90_000
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+
+/** Asks the federated catalog to crawl the partners now and waits until each
+ * scheduled crawl has finished (its last attempt changed) or the timeout passed. */
+async function refreshPartnerCatalogs(): Promise<void> {
+  const before = new Map(
+    (await getFederatedCatalogParticipants()).map((item) => [item.participant.bpn, item.lastAttemptAt]),
+  )
+  const scheduled = new Set(await refreshFederatedCatalog())
+  const deadline = Date.now() + refreshTimeoutMs
+  while (scheduled.size > 0 && Date.now() < deadline) {
+    await sleep(refreshPollMs)
+    for (const item of await getFederatedCatalogParticipants()) {
+      const bpn = item.participant.bpn
+      if (item.lastAttemptAt && item.lastAttemptAt !== before.get(bpn)) scheduled.delete(bpn)
+    }
+  }
+}
 
 export const DiscoverDataPage = () => {
   const translate = useTranslate()
@@ -33,6 +67,19 @@ export const DiscoverDataPage = () => {
   const [page, setPage] = useState(1)
   const [total, setTotal] = useState(0)
   const [refresh, setRefresh] = useState(0)
+  const [refreshing, setRefreshing] = useState(false)
+
+  const refreshPartners = useCallback(async () => {
+    setRefreshing(true)
+    try {
+      await refreshPartnerCatalogs()
+    } catch (error) {
+      setCrawlWarnings([error instanceof Error ? error.message : String(error)])
+    } finally {
+      setRefreshing(false)
+      setRefresh((value) => value + 1)
+    }
+  }, [])
 
   const load = useCallback(async () => {
     void refresh
@@ -103,7 +150,21 @@ export const DiscoverDataPage = () => {
 
   return (
     <Box>
-      <PageHeader title={translate('portalUx.discover.title')} subtitle={translate('portalUx.discover.subtitle')} />
+      <PageHeader
+        title={translate('portalUx.discover.title')}
+        subtitle={translate('portalUx.discover.subtitle')}
+        actions={
+          <Button
+            variant="outlined"
+            startIcon={refreshing ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />}
+            disabled={refreshing}
+            onClick={() => void refreshPartners()}
+            sx={{ whiteSpace: 'nowrap' }}
+          >
+            {translate(refreshing ? 'portalUx.discover.refreshing' : 'portalUx.discover.refresh')}
+          </Button>
+        }
+      />
       <Box
         component="form"
         onSubmit={(event) => {
@@ -192,7 +253,12 @@ export const DiscoverDataPage = () => {
         <Alert
           severity="warning"
           action={
-            <Button color="inherit" size="small" onClick={() => setRefresh((value) => value + 1)}>
+            <Button
+              color="inherit"
+              size="small"
+              disabled={refreshing}
+              onClick={() => (loadError ? setRefresh((value) => value + 1) : void refreshPartners())}
+            >
               {translate('portalUx.common.retry')}
             </Button>
           }

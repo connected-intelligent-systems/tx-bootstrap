@@ -22,6 +22,11 @@ class StubCrawler:
     async def close(self) -> None:
         self.stop.set()
 
+    async def request_refresh(self, bpn: str | None = None) -> list[str]:
+        if bpn == "BPNL-UNKNOWN":
+            raise KeyError(bpn)
+        return [bpn] if bpn else ["BPNL1", "BPNL2"]
+
 
 def test_rest_and_sparql_api_are_key_protected_and_bounded(tmp_path) -> None:
     configured = Settings(store_path=str(tmp_path / "store"), api_key="secret")
@@ -81,3 +86,19 @@ def test_sparql_update_and_service_are_rejected(tmp_path) -> None:
     with TestClient(app) as client:
         for query, _metadata in queries:
             assert client.post("/v1/sparql", content=query, headers=headers).status_code == 400
+
+
+def test_refresh_endpoints_schedule_crawls(tmp_path) -> None:
+    configured = Settings(store_path=str(tmp_path / "store"), api_key="secret")
+    app = create_app(configured, CatalogStore(configured.store_path, 1800), StubCrawler())  # type: ignore[arg-type]
+    headers = {"X-Api-Key": "secret"}
+
+    with TestClient(app) as client:
+        assert client.post("/v1/refresh").status_code == 401
+        everyone = client.post("/v1/refresh", headers=headers)
+        assert everyone.status_code == 202
+        assert everyone.json() == {"scheduled": ["BPNL1", "BPNL2"]}
+        one = client.post("/v1/participants/BPNL1/refresh", headers=headers)
+        assert one.status_code == 202
+        assert one.json() == {"scheduled": ["BPNL1"]}
+        assert client.post("/v1/participants/BPNL-UNKNOWN/refresh", headers=headers).status_code == 404

@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { getFederatedCatalogParticipants, searchFederatedCatalog } from './federatedCatalogService'
+import {
+  getFederatedCatalogParticipants,
+  refreshFederatedCatalog,
+  searchFederatedCatalog,
+} from './federatedCatalogService'
 
 afterEach(() => vi.restoreAllMocks())
 
@@ -39,5 +43,19 @@ describe('federated catalog service', () => {
       new Response(JSON.stringify({ error: 'catalog unavailable' }), { status: 503 }),
     )
     await expect(getFederatedCatalogParticipants()).rejects.toThrow('catalog unavailable')
+  })
+
+  it('requests a refresh of all partners or of one partner', async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation(async () => new Response(JSON.stringify({ scheduled: ['BPNL1'] }), { status: 202 }))
+
+    await expect(refreshFederatedCatalog()).resolves.toEqual(['BPNL1'])
+    await expect(refreshFederatedCatalog('BPNL 1')).resolves.toEqual(['BPNL1'])
+
+    expect(fetchMock.mock.calls.map(([url, init]) => [String(url), init?.method])).toEqual([
+      ['/api/federated-catalog/v1/refresh', 'POST'],
+      ['/api/federated-catalog/v1/participants/BPNL%201/refresh', 'POST'],
+    ])
   })
 })

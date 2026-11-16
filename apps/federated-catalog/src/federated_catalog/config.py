@@ -22,6 +22,10 @@ class Settings:
     edc_api_key: str = os.getenv("EDC_API_KEY", "")
     directory_interval_seconds: int = _int("DIRECTORY_REFRESH_INTERVAL_SECONDS", 300)
     crawl_interval_seconds: int = _int("CATALOG_REFRESH_INTERVAL_SECONDS", 900)
+    # First retry after a failed crawl; later failures back off from the refresh interval.
+    retry_seconds: int = _int("CATALOG_RETRY_SECONDS", 60)
+    # Minimum time between two manual refreshes of the same participant.
+    manual_refresh_cooldown_seconds: int = _int("CATALOG_MANUAL_REFRESH_COOLDOWN_SECONDS", 30)
     crawl_concurrency: int = _int("CATALOG_CRAWL_CONCURRENCY", 4)
     page_size: int = _int("CATALOG_CRAWL_PAGE_SIZE", 100)
     request_timeout_seconds: int = _int("CATALOG_REQUEST_TIMEOUT_SECONDS", 30)

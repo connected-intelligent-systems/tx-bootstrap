@@ -201,6 +201,34 @@ function federatedCatalogPaths() {
         },
       }),
     },
+    '/api/federated-catalog/v1/refresh': {
+      post: protectedOperation('federated-catalog:read', {
+        tags: ['Federated Catalog'],
+        summary: 'Refresh all partner catalogs now',
+        description:
+          'Schedules an immediate crawl of all active participants instead of waiting for their next refresh. ' +
+          'Participants refreshed within the last 30 seconds are skipped. The crawls run in the background; ' +
+          'poll the participant crawl state for the results.',
+        operationId: 'refreshFederatedCatalog',
+        responses: {
+          202: jsonResponse('Participants scheduled for a crawl.', '#/components/schemas/FederatedRefreshResult'),
+        },
+      }),
+    },
+    '/api/federated-catalog/v1/participants/{bpn}/refresh': {
+      post: protectedOperation('federated-catalog:read', {
+        tags: ['Federated Catalog'],
+        summary: "Refresh one partner's catalog now",
+        description:
+          'Schedules an immediate crawl of one participant, for example to retry after an error. ' +
+          'A participant refreshed within the last 30 seconds is not scheduled again.',
+        operationId: 'refreshFederatedCatalogParticipant',
+        parameters: [pathParameter('bpn', 'Business partner number of the participant.')],
+        responses: {
+          202: jsonResponse('Participants scheduled for a crawl.', '#/components/schemas/FederatedRefreshResult'),
+        },
+      }),
+    },
     '/api/federated-catalog/v1/sparql': {
       get: protectedOperation('federated-catalog:sparql', {
         tags: ['Federated Catalog SPARQL'],
@@ -376,6 +404,17 @@ function federatedCatalogSchemas() {
         lastError: { type: 'string', nullable: true, description: 'Sanitized crawl error.' },
         active: { type: 'boolean' },
         stale: { type: 'boolean' },
+      },
+    },
+    FederatedRefreshResult: {
+      type: 'object',
+      required: ['scheduled'],
+      properties: {
+        scheduled: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'BPNs of the participants scheduled for a crawl.',
+        },
       },
     },
     FederatedParticipantPage: {

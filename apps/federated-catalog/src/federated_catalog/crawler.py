@@ -34,29 +34,77 @@ class CatalogCrawler:
         self.stop = asyncio.Event()
         self.next_crawl: dict[str, float] = {}
         self.failures: dict[str, int] = {}
+        self.manual_refresh_at: dict[str, float] = {}
+        self.wake = asyncio.Event()
 
     async def close(self) -> None:
         self.stop.set()
+        self.wake.set()
         if self.owns_client:
             await self.client.aclose()
 
     async def run(self) -> None:
+        loop = asyncio.get_running_loop()
+        next_directory = 0.0
         while not self.stop.is_set():
+            self.wake.clear()
+            cycle_failed = False
             try:
                 await self.run_cycle()
             except Exception as error:
                 # A directory outage must not deactivate participants or stop future refreshes.
                 LOGGER.warning("Federated catalog refresh failed: %s", self._error_message(error))
+                cycle_failed = True
             finally:
                 self.ready.set()
+            now = loop.time()
+            if cycle_failed:
+                # Without the directory nothing gets crawled; retry it, not the crawls.
+                wake_at = now + min(self.settings.retry_seconds, self.settings.directory_interval_seconds)
+            else:
+                if now >= next_directory:
+                    next_directory = now + self.settings.directory_interval_seconds
+                # Wake for the directory refresh, the next due crawl (such as a retry
+                # after a failure), a manual refresh, or shutdown, whichever comes first.
+                wake_at = min([next_directory, *self.next_crawl.values()])
             try:
-                await asyncio.wait_for(self.stop.wait(), timeout=self.settings.directory_interval_seconds)
+                await asyncio.wait_for(self.wake.wait(), timeout=max(wake_at - loop.time(), 1))
             except TimeoutError:
                 pass
+
+    async def request_refresh(self, bpn: str | None = None) -> list[str]:
+        """Schedule an immediate crawl of one participant or of all active ones.
+
+        Returns the BPNs that were scheduled; participants refreshed manually
+        within the cooldown are left out. Raises KeyError for an unknown BPN."""
+        statuses = {
+            status.participant.bpn: status for status in await asyncio.to_thread(self.store.statuses) if status.active
+        }
+        if bpn is not None and bpn not in statuses:
+            raise KeyError(bpn)
+        now = asyncio.get_running_loop().time()
+        cooldown = self.settings.manual_refresh_cooldown_seconds
+        scheduled = []
+        for candidate in [bpn] if bpn is not None else sorted(statuses):
+            if now - self.manual_refresh_at.get(candidate, float("-inf")) < cooldown:
+                continue
+            self.manual_refresh_at[candidate] = now
+            self.failures[candidate] = 0
+            self.next_crawl[candidate] = 0
+            scheduled.append(candidate)
+        if scheduled:
+            self.wake.set()
+        return scheduled
 
     async def run_cycle(self) -> None:
         participants = await self.fetch_participants()
         await self.synchronize_directory(participants)
+        # Only listed participants get crawled; forget the schedule of removed ones
+        # so their past due times do not keep waking the loop.
+        listed = {participant.bpn for participant in participants}
+        for schedule in (self.next_crawl, self.failures, self.manual_refresh_at):
+            for bpn in [bpn for bpn in schedule if bpn not in listed]:
+                del schedule[bpn]
         now = asyncio.get_running_loop().time()
         due = [participant for participant in participants if now >= self.next_crawl.get(participant.bpn, 0)]
         semaphore = asyncio.Semaphore(self.settings.crawl_concurrency)
@@ -184,8 +232,17 @@ class CatalogCrawler:
             self.store.put_status(status)
             failures = self.failures.get(participant.bpn, 0) + 1
             self.failures[participant.bpn] = failures
-            delay = min(self.settings.crawl_interval_seconds * (2 ** (failures - 1)), 3600)
-            self.next_crawl[participant.bpn] = asyncio.get_running_loop().time() + delay
+            self.next_crawl[participant.bpn] = asyncio.get_running_loop().time() + self.retry_delay(failures)
+
+    def retry_delay(self, failures: int) -> float:
+        """Seconds until the next attempt after consecutive failures.
+
+        The first retry comes quickly, since most failures are short outages
+        (a partner restarting, the own connector still starting). Later ones
+        back off from the refresh interval to at most an hour."""
+        if failures <= 1:
+            return float(min(self.settings.retry_seconds, self.settings.crawl_interval_seconds))
+        return float(min(self.settings.crawl_interval_seconds * 2 ** (failures - 2), 3600))
 
     async def _dsp_params(self, participant: Participant) -> tuple[str, str]:
         """Newest DSP version both connectors support, from the EDC's connector

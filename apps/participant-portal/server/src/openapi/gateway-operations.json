@@ -219,6 +219,16 @@
       "scope": "federated-catalog:read"
     },
     {
+      "method": "POST",
+      "path": "/api/federated-catalog/v1/participants/{bpn}/refresh",
+      "scope": "federated-catalog:read"
+    },
+    {
+      "method": "POST",
+      "path": "/api/federated-catalog/v1/refresh",
+      "scope": "federated-catalog:read"
+    },
+    {
       "method": "GET",
       "path": "/api/federated-catalog/v1/sparql",
       "scope": "federated-catalog:sparql"

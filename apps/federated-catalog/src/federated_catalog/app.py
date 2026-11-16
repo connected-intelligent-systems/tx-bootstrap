@@ -95,6 +95,19 @@ def create_app(
         statuses = await asyncio.to_thread(catalog_store.statuses)
         return {"items": [{**status.to_dict(), "stale": catalog_store.is_stale(status)} for status in statuses]}
 
+    @app.post("/v1/refresh", status_code=202, dependencies=[Depends(require_api_key)])
+    async def refresh_all() -> dict[str, Any]:
+        """Crawl all partners now instead of waiting for their next refresh."""
+        return {"scheduled": await catalog_crawler.request_refresh()}
+
+    @app.post("/v1/participants/{bpn}/refresh", status_code=202, dependencies=[Depends(require_api_key)])
+    async def refresh_participant(bpn: str) -> dict[str, Any]:
+        """Crawl one partner now, for example to retry after an error."""
+        try:
+            return {"scheduled": await catalog_crawler.request_refresh(bpn)}
+        except KeyError as error:
+            raise HTTPException(status_code=404, detail="Participant not found") from error
+
     @app.api_route("/v1/sparql", methods=["GET", "POST"], dependencies=[Depends(require_api_key)])
     async def sparql(request: Request) -> Response:
         query = request.query_params.get("query")

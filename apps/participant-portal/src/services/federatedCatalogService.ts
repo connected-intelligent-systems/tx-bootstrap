@@ -54,8 +54,18 @@ export async function getFederatedCatalogParticipants(): Promise<ParticipantCraw
   return response.items
 }
 
-async function requestJson<T>(url: string): Promise<T> {
-  const response = await fetch(url, { headers: { Accept: 'application/json' } })
+/** Asks the federated catalog to crawl all partners (or one) now. Returns the scheduled BPNs;
+ * partners refreshed within the last few seconds are left out. */
+export async function refreshFederatedCatalog(bpn?: string): Promise<string[]> {
+  const url = bpn
+    ? `/api/federated-catalog/v1/participants/${encodeURIComponent(bpn)}/refresh`
+    : '/api/federated-catalog/v1/refresh'
+  const response = await requestJson<{ scheduled: string[] }>(url, { method: 'POST' })
+  return response.scheduled
+}
+
+async function requestJson<T>(url: string, init: { method?: string } = {}): Promise<T> {
+  const response = await fetch(url, { ...init, headers: { Accept: 'application/json' } })
   const payload = (await response.json().catch(() => ({}))) as T & { error?: string; detail?: string }
   if (!response.ok) throw new Error(payload.error || payload.detail || `Request failed with HTTP ${response.status}`)
   return payload
