@@ -58,6 +58,28 @@ move_network_address \
         --filter label=com.docker.compose.service=controlplane)" \
     "${PREFIX}-provider-internal"
 
+# The gateway looks the control plane up again within a few seconds. Until then
+# it still uses the old address, which the runner attached below can be given,
+# and answers 502. Wait for the gateway to reach the control plane instead of
+# letting the runner's single catalog request race the lookup.
+printf "  waiting for the provider gateway to reach the moved control plane"
+if ! docker run --rm --network "$PUBLIC_NETWORK" "$RUNNER_IMAGE" sh -c '
+    for attempt in $(seq 1 30); do
+        status="$(wget -S -q -T 3 -O /dev/null --header "Content-Type: application/json" --post-data "{}" \
+            "http://${1}/api/v1/dsp/2025-1/catalog/request" 2>&1 |
+            sed -n "s/^ *HTTP\/[0-9.]* \([0-9]*\).*/\1/p" | tail -n 1)"
+        case "$status" in
+            "" | 502 | 503 | 504) printf "."; sleep 1 ;;
+            *) echo " OK (HTTP $status)"; exit 0 ;;
+        esac
+    done
+    exit 1
+' sh "${PROVIDER_DID_HOST:-provider-did}"; then
+    echo " TIMEOUT" >&2
+    echo "The provider gateway still cannot reach the moved control plane after 30 s." >&2
+    exit 1
+fi
+
 docker create \
     --name "$CONTAINER" \
     --network "${PREFIX}-consumer-internal" \
