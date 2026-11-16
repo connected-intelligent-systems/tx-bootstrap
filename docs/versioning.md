@@ -8,8 +8,8 @@ components keep their upstream versions.
 
 | Build       | Version format           | Use                              |
 | ----------- | ------------------------ | -------------------------------- |
-| Release     | `0.5.3`                  | A published, fixed stack version |
-| Development | `0.5.3-dev.sha.<commit>` | A specific build from `main`     |
+| Release     | `0.5.4`                  | A published, fixed stack version |
+| Development | `0.5.4-dev.sha.<commit>` | A specific build from `main`     |
 | Local       | `local`                  | Images built from your checkout  |
 
 Prefer an explicit release, development version, or digest for repeatable
@@ -18,10 +18,10 @@ deployments. Floating aliases such as `latest` can change.
 ## Prepare a release
 
 From the repository root, set the next version and validate it. For example,
-to prepare a patch after `0.5.3`:
+to prepare a patch after `0.5.4`:
 
 ```sh
-npm run version:set -- 0.5.4
+npm run version:set -- 0.5.5
 npm run version:check
 ```
 
