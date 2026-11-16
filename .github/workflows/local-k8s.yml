@@ -43,6 +43,9 @@ jobs:
 
       - name: Render environment values
         shell: bash
+        env:
+          # No cluster here to read Rancher Desktop's ingress address from.
+          LOCAL_K8S_INGRESS_IP: 192.168.64.2
         run: |
           source deploy/local_k8s/scripts/lib.sh
           render_values deploy/local_k8s/values/operator.yaml deploy/local_k8s/.generated/operator-values.yaml

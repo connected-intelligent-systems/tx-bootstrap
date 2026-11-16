@@ -35,10 +35,21 @@ deploy/local_k8s/scripts/verify.sh
 
 ## Access and configuration
 
-Default hostnames use `nip.io` with `LOCAL_K8S_INGRESS_IP`. Set that value in
-your custom environment file if the Rancher Desktop address differs.
-Host-side checks connect through `LOCAL_K8S_INGRESS_CONNECT_IP`, which defaults
-to `127.0.0.1` for Rancher Desktop's port forwarding.
+Hostnames and DIDs use `nip.io` names for `LOCAL_K8S_INGRESS_IP`. Unless your
+environment file sets it, the first installation reads the address of Rancher
+Desktop's Traefik service and keeps it in `.generated/ingress-ip` until
+`down.sh --volumes`. Host-side checks connect through
+`LOCAL_K8S_INGRESS_CONNECT_IP`, which defaults to `127.0.0.1` for Rancher
+Desktop's port forwarding.
+
+Rancher Desktop can assign its VM a new address after a restart. The
+participants then no longer reach each other, and `verify.sh` reports the old
+and new address. Reinstall with `down.sh --volumes` and `up.sh`, or add the old
+address in the VM until its next restart:
+
+```sh
+rdctl shell sudo ip addr add <old address>/32 dev vznat
+```
 
 Generated values and credentials are stored under the ignored `.generated/`
 directory. TLS is disabled locally; configure real DNS and TLS for other

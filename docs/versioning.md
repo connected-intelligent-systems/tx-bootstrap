@@ -46,6 +46,7 @@ also publish immutable development builds. See the
 
 ## Release notes
 
+- [0.5.3](releases/0.5.3.md) — Compose gateways follow recreated services, local Kubernetes ingress address
 - [0.5.2](releases/0.5.2.md) — Tunnel route refresh DNS, transfer retry after new agreements, local Vault 2.0.2
 - [0.5.1](releases/0.5.1.md) — Participant DID self-resolution over HTTPS and stable Vault tokens
 - [0.5.0](releases/0.5.0.md) — Tractus-X EDC 0.13.0, DSP 2025-1 and the portal's Access tab

@@ -51,6 +51,8 @@ if [ "$remove_volumes" = "true" ]; then
     kubectl --context "$KUBE_CONTEXT" delete namespace cnpg-system \
         --ignore-not-found \
         --wait=true
+    # The next installation reads the ingress address again.
+    rm -f -- "$INGRESS_IP_FILE"
     echo "Local Kubernetes applications, infrastructure, and volumes were removed."
 else
     echo "Local Kubernetes applications were removed; PostgreSQL and Vault data were retained."
