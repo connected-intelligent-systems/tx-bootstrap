@@ -82,6 +82,41 @@ wait_for_url "consumer participant OpenAPI" "http://${consumer_portal_host}/api/
 wait_for_url "provider federated catalog" "http://${provider_portal_host}/api/federated-catalog/v1/participants"
 wait_for_url "consumer federated catalog" "http://${consumer_portal_host}/api/federated-catalog/v1/participants"
 
+# Participants reach each other and the issuer through the nip.io names, which
+# point at LOCAL_K8S_INGRESS_IP. Host-side checks use the port forward instead,
+# so they pass even when that address is wrong.
+wait_in_cluster() {
+    local label="$1" namespace="$2" url="$3" pod attempt current_ip
+
+    printf "Waiting for %s" "$label"
+    for attempt in $(seq 1 30); do
+        pod="$(kubectl --context "$KUBE_CONTEXT" --namespace "$namespace" \
+            get pod --selector app.kubernetes.io/component=portal \
+            --field-selector status.phase=Running --output name 2>/dev/null | head -1)"
+        if [ -n "$pod" ] && kubectl --context "$KUBE_CONTEXT" --namespace "$namespace" \
+            exec "$pod" --container portal -- \
+            node -e 'fetch(process.argv[1], { signal: AbortSignal.timeout(5000) }).then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))' \
+            "$url" >/dev/null 2>&1; then
+            printf " OK\n"
+            return 0
+        fi
+        printf "."
+        sleep 2
+    done
+    printf " TIMEOUT\n" >&2
+    current_ip="$(detect_ingress_ip)"
+    if [ -n "$current_ip" ] && [ "$current_ip" != "$LOCAL_K8S_INGRESS_IP" ]; then
+        echo "The deployment uses ingress address ${LOCAL_K8S_INGRESS_IP}, but Traefik now answers on ${current_ip}." >&2
+        echo "Rancher Desktop changed its VM address. Reinstall with down.sh --volumes and up.sh, or add the old" >&2
+        echo "address in the VM: rdctl shell sudo ip addr add ${LOCAL_K8S_INGRESS_IP}/32 dev vznat" >&2
+    fi
+    return 1
+}
+
+wait_in_cluster "provider DID from the consumer" tx-consumer "http://${provider_host}/${BPN_PROVIDER}/did.json"
+wait_in_cluster "consumer DID from the provider" tx-provider "http://${consumer_host}/${BPN_CONSUMER}/did.json"
+wait_in_cluster "issuer DID from the provider" tx-provider "http://${issuer_host}/${BPN_ISSUER}/did.json"
+
 curl_ingress "http://${provider_host}/${BPN_PROVIDER}/did.json" | jq -e \
     --arg endpoint "http://${provider_host}/api/credentials/v1/participants/${BPN_PROVIDER}" \
     '(.verificationMethod | length > 0) and any(.service[]; .type == "CredentialService" and .serviceEndpoint == $endpoint)' \
